@@ -3,9 +3,9 @@ from typing import Optional, Tuple
 import torch
 from torch import nn
 
-from .nn import MLP
-from .models import NP
 from .deepset import DeepSet
+from .models import NP
+from .nn import MLP
 
 
 class CNPDecoder(nn.Module):

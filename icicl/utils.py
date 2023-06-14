@@ -1,9 +1,9 @@
 from typing import Tuple
 
-import torch
+import mlkernels
 import numpy as np
 import stheno
-import mlkernels
+import torch
 
 
 def batch(x, other_dims):
