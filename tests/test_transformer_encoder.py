@@ -3,7 +3,7 @@ import torch
 from icicl.networks.transformer import TransformerEncoder, TransformerEncoderLayer
 
 
-def test_transformer():
+def test_transformer_encoder():
     # Test parameters.
     m = 16
     n = 64
