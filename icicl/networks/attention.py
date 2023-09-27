@@ -1,4 +1,5 @@
 """https://github.com/rishikksh20/CrossViT-pytorch/blob/master/module.py"""
+from typing import Optional
 
 import einops
 import torch
@@ -27,8 +28,10 @@ class MultiHeadSelfAttention(nn.Module):
             else nn.Identity()
         )
 
-    @check_shapes("x: [m, n, d]", "return: [m, n, d]")
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    @check_shapes("x: [m, n, d]", "mask: [m, n, n]", "return: [m, n, d]")
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         qkv = self.to_qkv(x).chunk(3, dim=-1)
 
         # Each of shape (m, num_heads, n, head_dim).
@@ -37,6 +40,11 @@ class MultiHeadSelfAttention(nn.Module):
         )
 
         dots = (q @ k.transpose(-1, -2)) * self.scale
+
+        if mask is not None:
+            mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+            dots = torch.masked_fill(dots, mask, -float("Inf"))
+
         attn = dots.softmax(dim=-1)
 
         out = attn @ v
