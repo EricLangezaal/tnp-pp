@@ -1,8 +1,9 @@
 from typing import Optional, Tuple
 
+import torch
 from torch import nn
 
-from .utils import compress_batch_dimensions
+from .batch import compress_batch_dimensions
 
 
 class MLP(nn.Module):
@@ -28,8 +29,8 @@ class MLP(nn.Module):
         layers: Optional[Tuple[int, ...]] = None,
         num_layers: Optional[int] = None,
         width: Optional[int] = None,
-        nonlinearity=None,
-        dtype=None,
+        nonlinearity: Optional[nn.Module] = None,
+        dtype: Optional[torch.dtype] = None,
     ):
         super().__init__()
 
@@ -38,8 +39,9 @@ class MLP(nn.Module):
         num_layers_given = num_layers is not None and width is not None
         if not (layers_given or num_layers_given):
             raise ValueError(
-                f"Must specify either `layers` or `num_layers` and `width`."
+                "Must specify either `layers` or `num_layers` and `width`."
             )
+
         # Make sure that `layers` is a tuple of various widths.
         if not layers_given and num_layers_given:
             layers = (width,) * num_layers
@@ -60,10 +62,8 @@ class MLP(nn.Module):
             net.append(nn.Linear(layers[-1], out_dim, dtype=dtype))
             self.net = nn.Sequential(*net)
 
-    def forward(self, x):
-        # x = torch.transpose(x, -1, -2)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x, uncompress = compress_batch_dimensions(x, 2)
         x = self.net(x)
         x = uncompress(x)
-        # x = torch.transpose(x, -1, -2)
         return x
