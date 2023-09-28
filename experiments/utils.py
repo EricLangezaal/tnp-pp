@@ -1,7 +1,7 @@
 """https://github.com/cambridge-mlg/dpconvcnp/blob/main/experiments/utils.py"""
 
 import argparse
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 from check_shapes import check_shapes
@@ -11,7 +11,7 @@ from torch import nn
 from tqdm.auto import tqdm
 
 import wandb
-from icicl.data.data import DataGenerator
+from icicl.data.data import Batch, DataGenerator
 
 
 @check_shapes(
@@ -82,7 +82,7 @@ def val_epoch(
     model: nn.Module,
     generator: DataGenerator,
     epoch: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], List[Batch]]:
     result: Dict = {
         "loglik": [],
         "pred_mean": [],
@@ -91,8 +91,10 @@ def val_epoch(
         "gt_std": [],
         "gt_loglik": [],
     }
+    batches = []
 
     for batch in tqdm(generator, total=generator.num_batches, desc="Validation"):
+        batches.append(batch)
         with torch.no_grad():
             pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
 
@@ -108,7 +110,7 @@ def val_epoch(
 
         result["loglik"].append(loglik)
         result["pred_mean"].append(pred_dist.loc)
-        result["pred_std"].append(pred_dist.std)
+        result["pred_std"].append(pred_dist.scale)
         result["gt_mean"].append(gt_mean)
         result["gt_std"].append(gt_std)
         result["gt_loglik"].append(gt_loglik)
@@ -116,7 +118,7 @@ def val_epoch(
     loss = -torch.stack(result["loglik"]).mean()
     wandb.log({"val/loss": loss, "epoch": epoch})
 
-    return result
+    return result, batches
 
 
 def initialize_experiment() -> Tuple[Any, DictConfig]:
@@ -140,3 +142,12 @@ def initialize_experiment() -> Tuple[Any, DictConfig]:
     )
 
     return experiment
+
+
+def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
+    wandb.log(
+        {
+            f"{name}/loglik": result["loglik"].mean(),
+            f"{name}/gt_loglik": result["gt_loglik"].mean(),
+        }
+    )

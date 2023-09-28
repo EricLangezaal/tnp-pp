@@ -1,4 +1,11 @@
-from utils import initialize_experiment, np_loss_fn, train_epoch, val_epoch
+from plot import plot
+from utils import (
+    evaluation_summary,
+    initialize_experiment,
+    np_loss_fn,
+    train_epoch,
+    val_epoch,
+)
 
 
 def main():
@@ -20,7 +27,10 @@ def main():
             loss_fn=np_loss_fn,
         )
 
-        val_epoch(model=model, generator=gen_val, epoch=epoch)
+        val_result, batches = val_epoch(model=model, generator=gen_val, epoch=epoch)
+
+        evaluation_summary("val", val_result)
+        plot(model=model, batches=batches, epoch=epoch, num_fig=5)
 
 
 if __name__ == "__main__":

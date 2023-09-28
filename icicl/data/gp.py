@@ -47,7 +47,9 @@ class GPGenerator(SyntheticGenerator, ABC):
         gt_pred = self.set_up_ground_truth_gp(kernel=kernel)
 
         # Set up covariance at input locations
-        kxx = kernel(x.to(torch.float64)).evaluate()
+        with torch.no_grad():
+            kxx = kernel(x.to(torch.float64)).evaluate()
+
         kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std**2.0
 
         # Sample from GP with zero mean and covariance kxx.
@@ -167,7 +169,9 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         num_ctx = xc.shape[-2]
 
         x = torch.cat((xc, xt), dim=-2)
-        kxx = self.kernel(x)
+        with torch.no_grad():
+            kxx = self.kernel(x).evaluate()
+
         kxx += torch.eye(x.shape[-2], dtype=torch.float64) * self.noise_std**2.0
 
         kcc = kxx[:, :num_ctx, :num_ctx]
@@ -177,7 +181,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
 
         mean = (ktc @ torch.linalg.solve(kcc, yc))[..., 0]
         cov = ktt - ktc @ torch.linalg.solve(kcc, kct)
-        std = torch.diag(cov).sqrt()
+        std = torch.diagonal(cov, dim1=-2, dim2=-1).sqrt()
 
         if yt is not None:
             yt = yt.to(torch.float64)
@@ -186,9 +190,9 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
             gt_loglik = gt_loglik.to(dtype)
 
         else:
-            gt_log_lik = None
+            gt_loglik = None
 
         mean = mean.to(dtype)[:, :, None]
         std = std.to(dtype)[:, :, None]
 
-        return mean, std, gt_log_lik
+        return mean, std, gt_loglik

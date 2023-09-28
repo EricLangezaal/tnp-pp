@@ -185,13 +185,13 @@ class SyntheticGenerator(DataGenerator, ABC):
         xc = (
             torch.rand((self.batch_size, num_ctx, self.dim))
             * (self.context_range[:, 1] - self.context_range[:, 0])
-            - self.context_range[:, 0]
+            + self.context_range[:, 0]
         )
 
         xt = (
             torch.rand((self.batch_size, num_trg, self.dim))
             * (self.target_range[:, 1] - self.target_range[:, 0])
-            - self.target_range[:, 0]
+            + self.target_range[:, 0]
         )
 
         return torch.concat([xc, xt], axis=1)
