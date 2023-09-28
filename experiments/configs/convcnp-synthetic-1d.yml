@@ -1,0 +1,83 @@
+generators:
+  train:
+    _target_: icicl.data.gp.RandomScaleGPGenerator
+    dim: ${params.dim}
+    kernel_type: eq
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: -0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 512
+    min_num_trg: 512
+    max_num_trg: 512
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 16384
+    batch_size: 16
+  val:
+    _target_: icicl.data.gp.RandomScaleGPGenerator
+    dim: ${params.dim}
+    kernel_type: eq
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: -0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 512
+    min_num_trg: 512
+    max_num_trg: 512
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 4096
+    batch_size: 16
+
+model:
+  _target_: icicl.models.convcnp.ConvCNP
+  encoder: ${convcnp_encoder}
+  decoder: ${convcnp_decoder}
+  likelihood: ${likelihood}
+
+convcnp_encoder:
+  _target_: icicl.models.convcnp.ConvCNPEncoder
+  conv_net: ${unet}
+  setconv_encoder: ${setconv_encoder}
+
+setconv_encoder:
+  _target_: icicl.networks.setconv.SetConvEncoder
+  dim: ${params.dim}
+  points_per_unit: ${params.points_per_unit}
+  init_lengthscale: 0.1
+  margin: 0.1
+
+unet:
+  _target_: icicl.networks.conv.UNet
+  dim: ${params.dim}
+  in_channels: 2
+  first_channels: 32
+  last_channels: 2
+  kernel_size: 5
+  num_channels: [32, 32, 32]
+  strides: [2, 2, 2]
+
+convcnp_decoder:
+  _target_: icicl.networks.setconv.SetConvDecoder
+  dim: ${params.dim}
+  init_lengthscale: 0.1
+  scaling_factor: ${eval:'${params.points_per_unit} ** ${params.dim}'}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.Adam
+  _partial_: True
+  lr: 5e-4
+
+params:
+  epochs: 200
+  dim: 1
+  points_per_unit: 32
+
+
+misc:
+  project: convcnp_tests
+  name: v0
