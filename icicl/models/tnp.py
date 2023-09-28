@@ -31,10 +31,7 @@ class TNPDEncoder(nn.Module):
         z = self.xy_encoder(z)
 
         # Construct mask.
-        mask = torch.ones(x.shape[:-1] + x.shape[-2:-1]) > 0.5
-        mask[:, : xc.shape[-2], : xc.shape[-2]] = False
-        for i in range(xt.shape[-2]):
-            mask[:, xc.shape[-2] + i, : xc.shape[-2] + i] = False
+        mask = gen_tnpd_mask(xc, xt)
 
         z = self.transformer_encoder(z, mask)
         return z
@@ -63,3 +60,19 @@ class TNPD(NeuralProcess):
         likelihood: nn.Module,
     ):
         super().__init__(encoder, decoder, likelihood)
+
+
+@check_shapes("xc: [m, nc, dx]", "xt: [m, nt, dx]", "return: [m, n, n]")
+def gen_tnpd_mask(xc: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
+    m = xc.shape[0]
+    nc = xc.shape[-2]
+    nt = xt.shape[-2]
+    n = nc + nt
+
+    mask = torch.ones(m, n, n) > 0.5
+    mask[:, :nc, :nc] = False
+    for i in range(xt.shape[-2]):
+        mask[:, nc + i, :nc] = False
+        # mask[:, nc + i, nc + i] = False
+
+    return mask
