@@ -52,7 +52,7 @@ def plot(
                     xt=batches[i].xt[:1],
                     yt=batches[i].yt[:1],
                 )
-                gt_nll = -gt_loglik.mean()
+                gt_nll = -gt_loglik.mean() / batches[i].yt.shape[1]
 
             # Make figure for plotting
             fig = plt.figure(figsize=figsize)

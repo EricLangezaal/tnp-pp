@@ -147,7 +147,7 @@ def initialize_experiment() -> Tuple[Any, DictConfig]:
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
     wandb.log(
         {
-            f"{name}/loglik": result["loglik"].mean(),
-            f"{name}/gt_loglik": result["gt_loglik"].mean(),
+            f"{name}/loglik": torch.stack(result["loglik"]).mean(),
+            f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
         }
     )
