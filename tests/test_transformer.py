@@ -1,9 +1,9 @@
 import torch
 
-from icicl.networks.transformer import TransformerEncoder, TransformerEncoderLayer
+from icicl.networks.transformer import MultiHeadSelfAttentionLayer, TransformerEncoder
 
 
-def test_transformer_encoder():
+def test_transformer():
     # Test parameters.
     m = 16
     n = 64
@@ -16,7 +16,7 @@ def test_transformer_encoder():
     x = torch.randn(m, n, embed_dim)
     mask = torch.rand(m, n, n) > 0.5
 
-    layer = TransformerEncoderLayer(
+    layer = MultiHeadSelfAttentionLayer(
         embed_dim=embed_dim,
         num_heads=num_heads,
         head_dim=head_dim,

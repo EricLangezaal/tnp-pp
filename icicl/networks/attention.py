@@ -1,4 +1,5 @@
 """https://github.com/rishikksh20/CrossViT-pytorch/blob/master/module.py"""
+from abc import ABC
 from typing import Optional
 
 import einops
@@ -7,7 +8,7 @@ from check_shapes import check_shapes
 from torch import nn
 
 
-class MultiHeadAttention(nn.Module):
+class MultiHeadAttention(nn.Module, ABC):
     def __init__(
         self, embed_dim: int, num_heads: int, head_dim: int, p_dropout: float = 0.0
     ):
@@ -15,7 +16,6 @@ class MultiHeadAttention(nn.Module):
 
         self.embed_dim = embed_dim
         self.num_heads = num_heads
-        self.head_dim = head_dim
         self.scale = head_dim**-0.5
 
         inner_dim = head_dim * num_heads
@@ -37,7 +37,7 @@ class MultiHeadAttention(nn.Module):
         "mask: [m, nq, nkv]",
         "return: [m, nq, dx]",
     )
-    def forward(
+    def propagate(
         self,
         xq: torch.Tensor,
         xk: torch.Tensor,
@@ -75,7 +75,7 @@ class MultiHeadSelfAttention(MultiHeadAttention):
         x: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        return super().forward(x, x, x, mask)
+        return super().propagate(x, x, x, mask)
 
 
 class MultiHeadCrossAttention(MultiHeadAttention):
@@ -88,4 +88,4 @@ class MultiHeadCrossAttention(MultiHeadAttention):
     def forward(
         self, xq: torch.Tensor, xkv: torch.Tensor, mask: Optional[torch.Tensor] = None
     ):
-        return super().forward(xq, xkv, xkv, mask)
+        return super().propagate(xq, xkv, xkv, mask)

@@ -34,4 +34,4 @@ def test_setconv(ndim: int):
     )
 
     x_grid, z_grid = setconv_encoder(xc, yc, xt)
-    z_grid = setconv_decoder(x_grid, z_grid, xt)
+    z_grid = setconv_decoder((x_grid, z_grid), xt)

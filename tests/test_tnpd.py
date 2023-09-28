@@ -4,7 +4,7 @@ import torch
 from icicl.likelihoods.gaussian import NormalLikelihood
 from icicl.models.tnp import TNPD, TNPDDecoder, TNPDEncoder, gen_tnpd_mask
 from icicl.networks.mlp import MLP
-from icicl.networks.transformer import TransformerEncoder, TransformerEncoderLayer
+from icicl.networks.transformer import MultiHeadSelfAttentionLayer, TransformerEncoder
 
 
 @pytest.mark.parametrize("ndim", [1, 2])
@@ -26,7 +26,7 @@ def test_transformer_encoder(ndim: int):
     yc = torch.randn(m, nc, 1)
     xt = torch.randn(m, nt, ndim)
 
-    transformer_encoder_layer = TransformerEncoderLayer(
+    transformer_encoder_layer = MultiHeadSelfAttentionLayer(
         embed_dim=embed_dim,
         num_heads=num_heads,
         head_dim=head_dim,
