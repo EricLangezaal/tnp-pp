@@ -62,14 +62,14 @@ def test_gen_tnpd_mask():
     for mask_ in mask:
         for i in range(nc):
             for j in range(nc):
-                assert mask_[i, j] is False
+                assert mask_[i, j] == False
 
             for j in range(nt):
-                assert mask_[i, nc + j]
+                assert mask_[i, nc + j] == True
 
         for i in range(nt):
             for j in range(nc):
-                assert mask_[nc + i, j] is False
+                assert mask_[nc + i, j] == False
 
             for j in range(nt):
-                assert mask_[nc + i, nc + j]
+                assert mask_[nc + i, nc + j] == True
