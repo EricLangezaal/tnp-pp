@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import torch
 from torch import nn
 
-from .batch import compress_batch_dimensions
+from ..utils.batch import compress_batch_dimensions
 
 
 class MLP(nn.Module):
