@@ -31,23 +31,32 @@ generators:
     batch_size: 16
 
 model:
-  _target_: icicl.models.tnp.TNPD
-  encoder: ${tnpd_encoder}
-  decoder: ${tnpd_decoder}
+  _target_: icicl.models.pnp.PNP
+  encoder: ${pnp_encoder}
+  decoder: ${pnp_decoder}
   likelihood: ${likelihood}
 
-tnpd_encoder:
-  _target_: icicl.models.tnp.TNPDEncoder
-  transformer_encoder: ${transformer_encoder}
+pnp_encoder:
+  _target_: icicl.models.pnp.PNPEncoder
+  perceiver_encoder: ${perceiver_encoder}
   xy_encoder: ${xy_encoder}
 
-transformer_encoder:
-  _target_: icicl.networks.transformer.TransformerEncoder
-  encoder_layer: ${mhsa_layer}
+perceiver_encoder:
+  _target_: icicl.networks.transformer.PerceiverEncoder
+  num_latents: 8
+  mhsa_layer: ${mhsa_layer}
+  mhca_layer: ${encoder_mhca_layer}
   num_layers: 3
 
 mhsa_layer:
   _target_: icicl.networks.transformer.MultiHeadSelfAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 2
+  head_dim: 16
+  feedforward_dim: ${params.embed_dim}
+
+encoder_mhca_layer:
+  _target_: icicl.networks.transformer.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: 2
   head_dim: 16
@@ -60,14 +69,35 @@ xy_encoder:
   num_layers: 2
   width: 32
 
-tnpd_decoder:
-  _target_: icicl.models.tnp.TNPDDecoder
+pnp_decoder:
+  _target_: icicl.models.pnp.PNPDecoder
+  perceiver_decoder: ${perceiver_decoder}
   z_decoder: ${z_decoder}
+  x_encoder: ${x_encoder}
+
+perceiver_decoder:
+  _target_: icicl.networks.transformer.PerceiverDecoder
+  mhca_layer: ${decoder_mhca_layer}
+  num_layers: 3
+
+decoder_mhca_layer:
+  _target_: icicl.networks.transformer.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 2
+  head_dim: 16
+  feedforward_dim: ${params.embed_dim}
 
 z_decoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.embed_dim}
   out_dim: 2
+  num_layers: 2
+  width: 32
+
+x_encoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.dim}
+  out_dim: ${params.embed_dim}
   num_layers: 2
   width: 32
 
@@ -86,5 +116,5 @@ params:
 
 
 misc:
-  project: tnp_tests
+  project: pnp_tests
   name: v0
