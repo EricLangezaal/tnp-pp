@@ -4,7 +4,7 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
     max_num_ctx: 512
@@ -19,7 +19,7 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
     max_num_ctx: 512
@@ -43,23 +43,23 @@ pnp_encoder:
 
 perceiver_encoder:
   _target_: icicl.networks.transformer.PerceiverEncoder
-  num_latents: 8
+  num_latents: 16
   mhsa_layer: ${mhsa_layer}
   mhca_layer: ${encoder_mhca_layer}
-  num_layers: 3
+  num_layers: 5
 
 mhsa_layer:
   _target_: icicl.networks.transformer.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 2
-  head_dim: 16
+  num_heads: 4
+  head_dim: 32
   feedforward_dim: ${params.embed_dim}
 
 encoder_mhca_layer:
   _target_: icicl.networks.transformer.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 2
-  head_dim: 16
+  num_heads: 4
+  head_dim: 32
   feedforward_dim: ${params.embed_dim}
 
 xy_encoder:
@@ -67,7 +67,7 @@ xy_encoder:
   in_dim: ${eval:'1 + ${params.dim}'}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 32
+  width: 128
 
 pnp_decoder:
   _target_: icicl.models.pnp.PNPDecoder
@@ -83,8 +83,8 @@ perceiver_decoder:
 decoder_mhca_layer:
   _target_: icicl.networks.transformer.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 2
-  head_dim: 16
+  num_heads: 4
+  head_dim: 32
   feedforward_dim: ${params.embed_dim}
 
 z_decoder:
@@ -92,14 +92,14 @@ z_decoder:
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 32
+  width: 128
 
 x_encoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.dim}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 32
+  width: 128
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -112,7 +112,7 @@ optimiser:
 params:
   epochs: 200
   dim: 1
-  embed_dim: 32
+  embed_dim: 128
 
 
 misc:

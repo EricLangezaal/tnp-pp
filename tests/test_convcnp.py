@@ -25,7 +25,6 @@ def test_setconv(ndim: int):
     last_channels = dy
     kernel_size = 3
     num_channels = [32, 32, 32, 32, 32]
-    strides = [2, 2, 2, 2, 2]
 
     # Dimensionwise grid coordinates.
     xc = torch.randn(m, nc, ndim)
@@ -52,7 +51,6 @@ def test_setconv(ndim: int):
         last_channels=last_channels,
         kernel_size=kernel_size,
         num_channels=num_channels,
-        strides=strides,
     )
 
     convcnp_encoder = ConvCNPEncoder(unet, setconv_encoder)

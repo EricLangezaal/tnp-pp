@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import List
 
 import torch
 from check_shapes import check_shapes
@@ -25,8 +25,7 @@ class UNet(nn.Module):
         first_channels: int,
         last_channels: int,
         kernel_size: int,
-        num_channels: Tuple[int],
-        strides: Tuple[int],
+        num_channels: List[int],
         activation: nn.Module = nn.ReLU(),
         **kwargs,
     ):
@@ -46,11 +45,6 @@ class UNet(nn.Module):
             name: Name of the module.
             **kwargs: Additional keyword arguments.
         """
-        assert len(num_channels) == len(strides), (
-            f"UNet num_channels and strides must have the same length, found "
-            f"{len(num_channels)=} and {len(strides)=}."
-        )
-
         assert dim in [1, 2, 3], f"UNet dim must be in [1, 2, 3], found {dim=}."
 
         super().__init__(**kwargs)
