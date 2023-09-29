@@ -17,7 +17,6 @@ def main():
     trainer = pl.Trainer(
         logger=logger,
         max_epochs=epochs,
-        accelerator="cpu",
         limit_train_batches=gen_train.num_batches,
         limit_val_batches=gen_val.num_batches,
         log_every_n_steps=1,
