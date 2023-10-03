@@ -43,7 +43,7 @@ class GPGenerator(SyntheticGenerator, ABC):
         """
 
         # Set up GP kernel
-        kernel = self.set_up_kernel()
+        kernel = self.set_up_kernel().to(x)
         gt_pred = self.set_up_ground_truth_gp(kernel=kernel)
 
         # Set up covariance at input locations
