@@ -11,13 +11,11 @@ class LBANPEncoder(nn.Module):
         self,
         nested_perceiver_encoder: NestedPerceiverEncoder,
         xy_encoder: nn.Module,
-        x_encoder: nn.Module,
     ):
         super().__init__()
 
         self.nested_perceiver_encoder = nested_perceiver_encoder
         self.xy_encoder = xy_encoder
-        self.x_encoder = x_encoder
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, nq, dz]"
@@ -28,11 +26,11 @@ class LBANPEncoder(nn.Module):
         yc: torch.Tensor,
         xt: torch.Tensor,
     ) -> torch.Tensor:
-        _ = xt
-
         zc = torch.cat((xc, yc), dim=-1)
         zc = self.xy_encoder(zc)
-        zt = self.x_encoder(xt)
+
+        zt = torch.cat((xc, torch.zeros(xt.shape[:-1], yc.shape[-1])), dim=-1)
+        zt = self.xy_encoder(zt)
 
         zq = self.nested_perceiver_encoder(zc, zt)
         return zq

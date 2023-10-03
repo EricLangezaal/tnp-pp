@@ -183,5 +183,62 @@ class SPINEncoder(nn.Module):
         return xqd
 
 
+class SPINDecoder(nn.Module):
+    def __init__(
+        self,
+        num_latent_features: int,
+        xaba_layer: MultiHeadCrossAttentionLayer,
+        abla_layer: MultiHeadSelfAttentionLayer,
+        xabd_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert xaba_layer.embed_dim == abla_layer.embed_dim, "embed_dim mismatch."
+        assert (
+            xabd_layer.embed_dim == xaba_layer.embed_dim * num_latent_features
+        ), "embed_dim mismatch."
+
+        embed_dim = xaba_layer.embed_dim
+        self.latent_features = nn.Parameter(torch.randn(num_latent_features, embed_dim))
+
+        self.xaba_layers = _get_clones(xaba_layer, num_layers)
+        self.abla_layers = _get_clones(abla_layer, num_layers)
+        self.xabd_layers = _get_clones(xabd_layer, num_layers)
+
+    @check_shapes(
+        "xt: [m, n, d, e]", "xqc: [m, nq, dz]", "mask: [m, n, nq]", "return: [m, n, dz]"
+    )
+    def forward(
+        self, xt: torch.Tensor, xqc: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ):
+        _ = mask
+
+        xqt = einops.repeat(
+            self.latent_features, "f e -> m n f e", m=xt.shape[0], n=xt.shape[1]
+        )
+
+        # shape (m, n, f, e).
+        xqt, xqt_uncompress = compress_batch_dimensions(xqt, other_dims=2)
+        xt, _ = compress_batch_dimensions(xt, other_dims=2)
+
+        # Obtain latent attribute embeddings.
+        for (
+            xaba_layer,
+            abla_layer,
+        ) in zip(self.xaba_layers, self.abla_layers):
+            xqt = xaba_layer(xqt, xt)
+            xqt = abla_layer(xqt)
+
+        xqt = xqt_uncompress(xqt)
+        xqt, _ = compress_data_dimensions(xqt, other_dims=2)
+        # Cross-attention with context representation.
+        for xabd_layer in self.xabd_layers:
+            xqt = xabd_layer(xqt, xqc)
+
+        # shape (m, n, dz).
+        return xqt
+
+
 def _get_clones(module: nn.Module, n: int) -> nn.ModuleList:
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])
