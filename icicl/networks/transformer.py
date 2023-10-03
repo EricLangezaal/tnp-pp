@@ -240,5 +240,83 @@ class SPINDecoder(nn.Module):
         return xqt
 
 
+class ICNestedPerceiverEncoder(nn.Module):
+    def __init__(
+        self,
+        num_latents: int,
+        num_ic_latents: int,
+        mhsa_layer: MultiHeadSelfAttentionLayer,
+        mhca_ctoq_layer: MultiHeadCrossAttentionLayer,
+        mhca_qtot_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert mhsa_layer.embed_dim == mhca_ctoq_layer.embed_dim, "embed_dim mismatch."
+        assert mhsa_layer.embed_dim == mhca_qtot_layer.embed_dim, "embed_dim mismatch."
+
+        embed_dim = mhsa_layer.embed_dim
+        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
+        self.ic_latents = nn.Parameter(torch.randn(num_ic_latents, embed_dim))
+
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+        self.ic_mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.ic_mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.ic_mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, dx]",
+        "xic: [m, nic, ncic, dx]",
+        "xt: [m, nt, dx]",
+        "return: [m, nq, d]",
+    )
+    def forward(
+        self, xc: torch.Tensor, xic: torch.Tensor, xt: torch.Tensor
+    ) -> torch.Tensor:
+        xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
+        xqic = einops.repeat(
+            self.ic_latents, "l e -> m n l e", m=xic.shape[0], n=xic.shape[1]
+        )
+        # shape (m x nic, ncic, dx).
+        xic, _ = compress_batch_dimensions(xqic, other_dims=2)
+        for (
+            mhsa_layer,
+            mhca_ctoq_layer,
+            mhca_qtot_layer,
+            ic_mhsa_layer,
+            ic_mhca_ctoq_layer,
+            ic_mhca_qtot_layer,
+        ) in zip(
+            self.mhsa_layers,
+            self.mhca_ctoq_layers,
+            self.mhca_qtot_layers,
+            self.ic_mhsa_layers,
+            self.ic_mhca_ctoq_layers,
+            self.ic_mhca_qtot_layers,
+        ):
+            # Attention with context set.
+            xq = mhca_ctoq_layer(xq, xc)
+            xq = mhsa_layer(xq)
+            xt = mhca_qtot_layer(xt, xq)
+
+            # Attention with in-context datasets.
+            xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
+            xqic = ic_mhca_ctoq_layer(xqic, xic)
+            xqic = ic_mhsa_layer(xqic)
+            xqic = xqic_uncompress(xqic)
+
+            # shape (m, nic x ncic, dx)
+            xqic = einops.rearrange(xqic, "m n l e -> m (n l) e")
+            xt = ic_mhca_qtot_layer(xt, xqic)
+            xqic = einops.rearrange(
+                xqic, "m (n l) e -> m n l e", l=self.ic_latents.shape[0]
+            )
+
+        return xt
+
+
 def _get_clones(module: nn.Module, n: int) -> nn.ModuleList:
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])

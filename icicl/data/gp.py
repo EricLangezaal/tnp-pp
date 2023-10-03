@@ -1,3 +1,4 @@
+import random
 from abc import ABC, abstractmethod
 from typing import Callable, Optional, Tuple
 
@@ -5,9 +6,10 @@ import gpytorch
 import torch
 import torch.distributions as td
 
-from .data import GroundTruthPredictor, SyntheticGenerator
+from .data import GroundTruthPredictor, ICSyntheticGenerator, SyntheticGenerator
 
 KERNEL_TYPES = [
+    "random",
     "eq",
     "matern12",
     "matern32",
@@ -17,7 +19,7 @@ KERNEL_TYPES = [
 ]
 
 
-class GPGenerator(SyntheticGenerator, ABC):
+class GPGeneratorBase(ABC):
     def __init__(
         self,
         *,
@@ -29,17 +31,23 @@ class GPGenerator(SyntheticGenerator, ABC):
         self.noise_std = noise_std
 
     def sample_outputs(
-        self, x: torch.Tensor
-    ) -> Tuple[torch.Tensor, GroundTruthPredictor]:
+        self,
+        x: torch.Tensor,
+        xic: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, GroundTruthPredictor, torch.Tensor]:
         """Sample context and target outputs, given the inputs `x`.
 
         Arguments:
             x: Tensor of shape (batch_size, num_ctx + num_trg, dim) containing
                 the context and target inputs.
+            xic: Optional[Tensor] of shape (batch_size, num_dc, num_dc_ctx, dim)
+                containing the inputs of the in-context datasets.
 
         Returns:
             y: Tensor of shape (batch_size, num_ctx + num_trg, 1) containing
                 the context and target outputs.
+            yic: Optional[Tensor] of shape (batch_size, num_dc, num_dc_ctx, 1)
+                containing the outputs of the in-context datasets.
         """
 
         # Set up GP kernel
@@ -58,7 +66,23 @@ class GPGenerator(SyntheticGenerator, ABC):
         )
         y = py.sample().unsqueeze(-1)
 
-        return y.to(torch.float32), gt_pred
+        if xic is not None:
+            # Compute covariance at in-context input locations.
+            with torch.no_grad():
+                kxx = kernel(xic.to(torch.float64)).evaluate()
+
+            kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std**2.0
+
+            # Sample from GP with zero mean and covariance kxx.
+            py = td.MultivariateNormal(
+                loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
+                covariance_matrix=kxx,
+            )
+            yic = py.sample().unsqueeze(-1)
+
+            return y.to(torch.float32), gt_pred, yic.to(torch.float32)
+
+        return y.to(torch.float32), gt_pred, None
 
     @abstractmethod
     def set_up_kernel(self) -> gpytorch.kernels.Kernel:
@@ -81,7 +105,7 @@ class GPGenerator(SyntheticGenerator, ABC):
         return GPGroundTruthPredictor(kernel=kernel, noise_std=self.noise_std)
 
 
-class RandomScaleGPGenerator(GPGenerator):
+class RandomScaleGPGeneratorBase(GPGeneratorBase):
     noisy_mixture_long_lengthscale: float = 1.0
     weakly_periodic_period: float = 0.25
 
@@ -115,23 +139,28 @@ class RandomScaleGPGenerator(GPGenerator):
         )
         lengthscale = 10.0**log10_lengthscale
 
-        if self.kernel_type == "eq":
+        if self.kernel_type == "random":
+            kernel_type = random.choice(KERNEL_TYPES[1:])
+        else:
+            kernel_type = self.kernel_type
+
+        if kernel_type == "eq":
             kernel = gpytorch.kernels.RBFKernel()
             kernel.lengthscale = lengthscale
 
-        elif self.kernel_type == "matern12":
+        elif kernel_type == "matern12":
             kernel = gpytorch.kernels.MaternKernel(nu=0.5)
             kernel.lengthscale = lengthscale
 
-        elif self.kernel_type == "matern32":
+        elif kernel_type == "matern32":
             kernel = gpytorch.kernels.MaternKernel(nu=1.5)
             kernel.lengthscale = lengthscale
 
-        elif self.kernel_type == "matern52":
+        elif kernel_type == "matern52":
             kernel = gpytorch.kernels.MaternKernel(nu=2.5)
             kernel.lengthscale = lengthscale
 
-        elif self.kernel_type == "noisy_mixture":
+        elif kernel_type == "noisy_mixture":
             kernel1 = gpytorch.kernels.RBFKernel()
             kernel1.lengthscale = lengthscale
             kernel2 = gpytorch.kernels.RBFKernel()
@@ -139,14 +168,25 @@ class RandomScaleGPGenerator(GPGenerator):
 
             kernel = kernel1 + kernel2
 
-        elif self.kernel_type == "weakly_periodic":
+        elif kernel_type == "weakly_periodic":
             kernel1 = gpytorch.kernels.RBFKernel()
             kernel1.lengthscale = lengthscale
             kernel2 = gpytorch.kernels.PeriodicKernel()
             kernel2.period_length = self.weakly_periodic_period
             kernel = kernel1 + kernel2
 
+        else:
+            raise ValueError("Unknown kernel type.")
+
         return kernel
+
+
+class RandomScaleGPGenerator(RandomScaleGPGeneratorBase, SyntheticGenerator):
+    pass
+
+
+class ICRandomScaleGPGenerator(RandomScaleGPGeneratorBase, ICSyntheticGenerator):
+    pass
 
 
 class GPGroundTruthPredictor(GroundTruthPredictor):

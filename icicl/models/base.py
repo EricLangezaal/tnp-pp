@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -43,17 +41,16 @@ class ICNeuralProcess(nn.Module):
     @check_shapes(
         "xc: [m, nc, dx]",
         "yc: [m, nc, dy]",
+        "xic: [m, nic, ncic, dx]",
+        "yic: [m, nic, ncic, dy]",
         "xt: [m, nt, dx]",
-        "dc[all][all][0]: [., dx]",
-        "dc[all][all][1]: [., dy]",
-        "return: [m, nt, .]",
     )
     def forward(
         self,
         xc: torch.Tensor,
         yc: torch.Tensor,
+        xic: torch.Tensor,
+        yic: torch.Tensor,
         xt: torch.Tensor,
-        dc: List[List[Tuple[torch.Tensor, torch.Tensor]]],
-    ):
-        assert len(dc) == len(xc), "Batch sizes do not match."
-        return self.likelihood(self.decoder(self.encoder(xc, yc, xt, dc), xt))
+    ) -> torch.distributions.Distribution:
+        return self.likelihood(self.decoder(self.encoder(xc, yc, xic, yic, xt), xt))

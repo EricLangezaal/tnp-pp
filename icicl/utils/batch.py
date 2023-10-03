@@ -59,7 +59,7 @@ def data(x: torch.Tensor, other_dims: int) -> torch.Size:
 def compress_data_dimensions(
     x: torch.Tensor, other_dims: int
 ) -> Tuple[torch.Tensor, Callable]:
-    """Compress multiple data dimensions of a tensor into a single dat dimension.
+    """Compress multiple data dimensions of a tensor into a single data dimension.
 
     Args:
         x (tensor): Tensor to compress.
