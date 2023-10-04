@@ -2,14 +2,14 @@ generators:
   train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: random
-    min_log10_lengthscale: -0.602
-    max_log10_lengthscale: 0.602
+    kernel_type: noisy_periodic_mixture
+    min_log10_lengthscale: -0.301
+    max_log10_lengthscale: 0.301
     noise_std: 0.2
-    min_num_ctx: 1
-    max_num_ctx: 128
-    min_num_trg: 512
-    max_num_trg: 512
+    min_num_ctx: 32
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
     samples_per_epoch: 16_000
@@ -17,14 +17,14 @@ generators:
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: random
-    min_log10_lengthscale: -0.602
-    max_log10_lengthscale: 0.602
+    kernel_type: noisy_periodic_mixture
+    min_log10_lengthscale: -0.301
+    max_log10_lengthscale: 0.301
     noise_std: 0.2
-    min_num_ctx: 1
-    max_num_ctx: 128
-    min_num_trg: 512
-    max_num_trg: 512
+    min_num_ctx: 32
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
     samples_per_epoch: 4096
@@ -47,7 +47,7 @@ nested_perceiver_encoder:
   mhsa_layer: ${mhsa_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
-  num_layers: 3
+  num_layers: 5
 
 mhsa_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
@@ -104,4 +104,5 @@ params:
 
 misc:
   project: lbanp_tests
-  name: v0
+  name: noisy_periodic_mixture
+  resume_from_checkpoint: null
