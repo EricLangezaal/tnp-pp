@@ -20,6 +20,7 @@ def main():
         limit_train_batches=gen_train.num_batches,
         limit_val_batches=gen_val.num_batches,
         log_every_n_steps=1,
+        devices=1,
     )
     trainer.fit(model=lit_model, train_dataloaders=gen_train, val_dataloaders=gen_val)
 

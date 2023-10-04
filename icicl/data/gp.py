@@ -170,9 +170,12 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
 
         x = torch.cat((xc, xt), dim=-2)
         with torch.no_grad():
-            kxx = self.kernel(x).evaluate()
+            kxx = self.kernel.to(x.device)(x).evaluate()
 
-        kxx += torch.eye(x.shape[-2], dtype=torch.float64) * self.noise_std**2.0
+        kxx += (
+            torch.eye(x.shape[-2], dtype=torch.float64).to(x.device)
+            * self.noise_std**2.0
+        )
 
         kcc = kxx[:, :num_ctx, :num_ctx]
         kct = kxx[:, :num_ctx, num_ctx:]

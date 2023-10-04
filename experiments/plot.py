@@ -26,9 +26,10 @@ def plot(
     dim = batches[0].xc.shape[-1]
 
     if dim == 1:
-        x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim)[None, :, None]
-
         for i in range(num_fig):
+            x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim).to(
+                batches[i].xc.device
+            )[None, :, None]
             with torch.no_grad():
                 y_plot_pred_dist = model(
                     xc=batches[i].xc[:1], yc=batches[i].yc[:1], xt=x_plot[:1]
@@ -59,16 +60,16 @@ def plot(
 
             # Plot context and target points
             plt.scatter(
-                batches[i].xc[0, :, 0],
-                batches[i].yc[0, :, 0],
+                batches[i].xc[0, :, 0].cpu(),
+                batches[i].yc[0, :, 0].cpu(),
                 c="k",
                 label="Context",
                 s=20,
             )
 
             plt.scatter(
-                batches[i].xt[0, :, 0],
-                batches[i].yt[0, :, 0],
+                batches[i].xt[0, :, 0].cpu(),
+                batches[i].yt[0, :, 0].cpu(),
                 c="r",
                 label="Target",
                 s=20,
@@ -76,15 +77,15 @@ def plot(
 
             # Plot model predictions
             plt.plot(
-                x_plot[0, :, 0],
-                mean[0, :, 0],
+                x_plot[0, :, 0].cpu(),
+                mean[0, :, 0].cpu(),
                 c="tab:blue",
             )
 
             plt.fill_between(
-                x_plot[0, :, 0],
-                mean[0, :, 0] - 2.0 * std[0, :, 0],
-                mean[0, :, 0] + 2.0 * std[0, :, 0],
+                x_plot[0, :, 0].cpu(),
+                mean[0, :, 0].cpu() - 2.0 * std[0, :, 0].cpu(),
+                mean[0, :, 0].cpu() + 2.0 * std[0, :, 0].cpu(),
                 color="tab:blue",
                 alpha=0.2,
                 label="Model",
@@ -92,22 +93,22 @@ def plot(
 
             # Plot ground truth
             plt.plot(
-                x_plot[0, :, 0],
-                gt_mean[0, :],
+                x_plot[0, :, 0].cpu(),
+                gt_mean[0, :].cpu(),
                 "--",
                 color="tab:purple",
             )
 
             plt.plot(
-                x_plot[0, :, 0],
-                gt_mean[0, :] + 2 * gt_std[0, :],
+                x_plot[0, :, 0].cpu(),
+                gt_mean[0, :].cpu() + 2 * gt_std[0, :].cpu(),
                 "--",
                 color="tab:purple",
             )
 
             plt.plot(
-                x_plot[0, :, 0],
-                gt_mean[0, :] - 2 * gt_std[0, :],
+                x_plot[0, :, 0].cpu(),
+                gt_mean[0, :].cpu() - 2 * gt_std[0, :].cpu(),
                 "--",
                 color="tab:purple",
                 label="Ground truth",

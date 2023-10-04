@@ -43,7 +43,7 @@ pnp_encoder:
 
 perceiver_encoder:
   _target_: icicl.networks.transformer.PerceiverEncoder
-  num_latents: 16
+  num_latents: 3
   mhsa_layer: ${mhsa_layer}
   mhca_layer: ${encoder_mhca_layer}
   num_layers: 5
@@ -67,7 +67,7 @@ xy_encoder:
   in_dim: ${eval:'1 + ${params.dim}'}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 128
+  width: 64
 
 pnp_decoder:
   _target_: icicl.models.pnp.PNPDecoder
@@ -92,14 +92,14 @@ z_decoder:
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 128
+  width: 64
 
 x_encoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.dim}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 128
+  width: 64
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -112,7 +112,7 @@ optimiser:
 params:
   epochs: 200
   dim: 1
-  embed_dim: 128
+  embed_dim: 64
 
 
 misc:
