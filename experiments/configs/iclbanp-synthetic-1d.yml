@@ -6,16 +6,17 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 1
-    max_num_ctx: 128
+    min_num_ctx: 32
+    max_num_ctx: 64
     min_num_trg: 512
     max_num_trg: 512
     min_num_dc: 1
     max_num_dc: 1
-    min_num_dc_ctx: 1
+    min_num_dc_ctx: 64
     max_num_dc_ctx: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
+    ic_context_range: [[-3.0, 3.0]]
     samples_per_epoch: 16_000
     batch_size: 16
   val:
@@ -25,16 +26,17 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 1
-    max_num_ctx: 128
+    min_num_ctx: 32
+    max_num_ctx: 64
     min_num_trg: 512
     max_num_trg: 512
     min_num_dc: 1
     max_num_dc: 1
-    min_num_dc_ctx: 1
+    min_num_dc_ctx: 64
     max_num_dc_ctx: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
+    ic_context_range: [[-3.0, 3.0]]
     samples_per_epoch: 4096
     batch_size: 16
 
@@ -51,8 +53,8 @@ iclbanp_encoder:
 
 ic_nested_perceiver_encoder:
   _target_: icicl.networks.transformer.ICNestedPerceiverEncoder
-  num_latents: 8
-  num_ic_latents: 8
+  num_latents: 16
+  num_ic_latents: 16
   mhsa_layer: ${mhsa_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
@@ -108,9 +110,10 @@ optimiser:
 params:
   epochs: 200
   dim: 1
-  embed_dim: 32
+  embed_dim: 64
 
 
 misc:
-  project: lbanp_tests
+  project: iclbanp_tests
   name: v0
+  resume_from_checkpoint: null

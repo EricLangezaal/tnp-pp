@@ -9,7 +9,7 @@ from utils import (
 
 
 def main():
-    experiment = initialize_experiment()
+    experiment, checkpointer = initialize_experiment()
 
     model = experiment.model
     gen_train = experiment.generators.train
@@ -30,6 +30,8 @@ def main():
         val_result, batches = val_epoch(model=model, generator=gen_val, epoch=epoch)
 
         evaluation_summary("val", val_result)
+        checkpointer.update_best_and_last_checkpoint(model=model, val_result=val_result)
+
         plot(model=model, batches=batches, epoch=epoch, num_fig=5)
 
 

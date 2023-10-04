@@ -2,12 +2,12 @@ generators:
   train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: eq
+    kernel_type: random
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
-    max_num_ctx: 512
+    max_num_ctx: 128
     min_num_trg: 512
     max_num_trg: 512
     context_range: [[-2.0, 2.0]]
@@ -17,12 +17,12 @@ generators:
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: eq
+    kernel_type: random
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
-    max_num_ctx: 512
+    max_num_ctx: 128
     min_num_trg: 512
     max_num_trg: 512
     context_range: [[-2.0, 2.0]]
@@ -47,7 +47,7 @@ nested_perceiver_encoder:
   mhsa_layer: ${mhsa_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
-  num_layers: 5
+  num_layers: 3
 
 mhsa_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
@@ -99,7 +99,7 @@ optimiser:
 params:
   epochs: 200
   dim: 1
-  embed_dim: 32
+  embed_dim: 64
 
 
 misc:

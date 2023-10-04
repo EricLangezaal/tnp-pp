@@ -183,12 +183,10 @@ class SyntheticGenerator(DataGenerator, ABC):
         self,
         num_ctx: int,
         num_trg: Optional[int] = None,
-        num_dc: Optional[int] = None,
+        batch_shape: Optional[torch.Size] = None,
     ) -> torch.Tensor:
-        if num_dc is None:
+        if batch_shape is None:
             batch_shape = torch.Size((self.batch_size,))
-        else:
-            batch_shape = torch.Size((self.batch_size, num_dc))
 
         xc = (
             torch.rand((*batch_shape, num_ctx, self.dim))
@@ -233,6 +231,7 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
         max_num_dc: int,
         min_num_dc_ctx: int,
         max_num_dc_ctx: int,
+        ic_context_range: torch.Tensor,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -242,6 +241,8 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
         self.max_num_dc = torch.as_tensor(max_num_dc, dtype=torch.int)
         self.min_num_dc_ctx = torch.as_tensor(min_num_dc_ctx, dtype=torch.int)
         self.max_num_dc_ctx = torch.as_tensor(max_num_dc_ctx, dtype=torch.int)
+
+        self.ic_context_range = torch.as_tensor(ic_context_range, dtype=torch.float)
 
     def generate_batch(self) -> ICBatch:
         """Generate batch of data.
@@ -255,7 +256,7 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
         num_ctx, num_trg, num_dc, num_dc_ctx = self.sample_num_ctx_trg_dc()
 
         # Sample entire batch (context and target points)
-        batch = self.ic_sample_batch(
+        batch = self.sample_ic_batch(
             num_ctx=num_ctx,
             num_trg=num_trg,
             num_dc=num_dc,
@@ -295,7 +296,7 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
 
         return num_ctx, num_trg, num_dc, num_dc_ctx
 
-    def ic_sample_batch(
+    def sample_ic_batch(
         self, num_ctx: int, num_trg: int, num_dc: int, num_dc_ctx: int
     ) -> ICBatch:
         # Sample inputs.
@@ -304,7 +305,9 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
         xt = x[:, num_ctx:, :]
 
         # Sample IC inputs.
-        xic = self.sample_inputs(num_ctx=num_dc_ctx, num_dc=num_dc)
+        xic = self.sample_inputs(
+            num_ctx=num_dc_ctx, batch_shape=(self.batch_size, num_dc)
+        )
         y, gt_pred, yic = self.sample_outputs(x=x, xic=xic)
         yc = y[:, :num_ctx, :]
         yt = y[:, num_ctx:, :]

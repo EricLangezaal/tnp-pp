@@ -107,7 +107,7 @@ class GPGeneratorBase(ABC):
 
 class RandomScaleGPGeneratorBase(GPGeneratorBase):
     noisy_mixture_long_lengthscale: float = 1.0
-    weakly_periodic_period: float = 1.0
+    weakly_periodic_period: float = 3.0
 
     def __init__(
         self,
