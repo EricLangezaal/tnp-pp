@@ -29,28 +29,43 @@ def plot(
         x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim)[None, :, None]
 
         for i in range(num_fig):
-            with torch.no_grad():
-                y_plot_pred_dist = model(
-                    xc=batches[i].xc[:1], yc=batches[i].yc[:1], xt=x_plot[:1]
-                )
+            xc = batches[i].xc[:1]
+            yc = batches[i].yc[:1]
+            xt = batches[i].xt[:1]
+            yt = batches[i].yt[:1]
 
-                yt_pred_dist = model(
-                    xc=batches[i].xc[:1], yc=batches[i].yc[:1], xt=batches[i].xt[:1]
-                )
+            if hasattr(batches[i], "xic") and hasattr(batches[i], "yic"):
+                xic = batches[i].xic[:1]
+                yic = batches[i].yic[:1]
+            else:
+                xic = None
+                yic = None
+
+            gt_pred = batches[i].gt_pred
+
+            with torch.no_grad():
+                if xic is not None and yic is not None:
+                    y_plot_pred_dist = model(
+                        xc=xc, yc=yc, xic=xic, yic=yic, xt=x_plot[:1]
+                    )
+                    yt_pred_dist = model(xc=xc, yc=yc, xic=xic, yic=yic, xt=xt)
+                else:
+                    y_plot_pred_dist = model(xc=xc, yc=yc, xt=x_plot[:1])
+                    yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
                 mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
-                gt_mean, gt_std, _ = batches[i].gt_pred(
-                    xc=batches[i].xc[:1],
-                    yc=batches[i].yc[:1],
+                gt_mean, gt_std, _ = gt_pred(
+                    xc=xc,
+                    yc=yc,
                     xt=x_plot[:1],
                 )
 
-                model_nll = -yt_pred_dist.log_prob(batches[i].yt[:1]).mean()
-                _, _, gt_loglik = batches[i].gt_pred(
-                    xc=batches[i].xc[:1],
-                    yc=batches[i].yc[:1],
-                    xt=batches[i].xt[:1],
-                    yt=batches[i].yt[:1],
+                model_nll = -yt_pred_dist.log_prob(yt).mean()
+                _, _, gt_loglik = gt_pred(
+                    xc=xc,
+                    yc=yc,
+                    xt=xt,
+                    yt=yt,
                 )
                 gt_nll = -gt_loglik.mean() / batches[i].yt.shape[1]
 
@@ -59,16 +74,16 @@ def plot(
 
             # Plot context and target points
             plt.scatter(
-                batches[i].xc[0, :, 0],
-                batches[i].yc[0, :, 0],
+                xc[0, :, 0],
+                yc[0, :, 0],
                 c="k",
                 label="Context",
                 s=20,
             )
 
             plt.scatter(
-                batches[i].xt[0, :, 0],
-                batches[i].yt[0, :, 0],
+                xt[0, :, 0],
+                yt[0, :, 0],
                 c="r",
                 label="Target",
                 s=20,
@@ -118,13 +133,12 @@ def plot(
             plt.ylim(y_lim)
 
             # Set title
-            nc = batches[i].xc.shape[1]
-            lengthscale = batches[i].gt_pred.kernel.lengthscale.detach().item()
+            nc = xc.shape[1]
+            # lengthscale = gt_pred.kernel.lengthscale.detach().item()
             plt.title(
                 f"$N = {nc}$   "
-                f"$\\ell$ = {lengthscale:.2f}  "
-                f"NLL = {model_nll:.3f} \t"
-                f"GT NLL = {gt_nll:.3f}",
+                # f"$\\ell$ = {lengthscale:.2f}  "
+                f"NLL = {model_nll:.3f} \t" f"GT NLL = {gt_nll:.3f}",
                 fontsize=24,
             )
 
