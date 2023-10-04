@@ -19,6 +19,8 @@ from icicl.data.data import Batch, DataGenerator
     "yc: [m, nc, dy]",
     "xt: [m, nt, dx]",
     "yt: [m, nt, dy]",
+    "xic: [m, nic, ncic, dx]",
+    "yic: [m, nic, ncic, dy]",
     "return: []",
 )
 def np_loss_fn(
@@ -27,6 +29,8 @@ def np_loss_fn(
     yc: torch.Tensor,
     xt: torch.Tensor,
     yt: torch.Tensor,
+    xic: Optional[torch.Tensor] = None,
+    yic: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Perform a single training step, returning the loss, i.e.
     the negative log likelihood.
@@ -37,13 +41,18 @@ def np_loss_fn(
         yc: Tensor representing context outputs.
         xt: Tensor representing target inputs.
         yt: Tensor representing target outputs.
+        xic: Optional[Tensor] representing in-context inputs.
+        yic: Optional[Tensor] representing in-context outputs.
         optimizer: optimizer to use in the training step.
 
     Returns:
         loss: average negative log likelihood.
     """
+    if xic is not None and yic is not None:
+        pred_dist = model(xc, yc, xic, yic, xt)
+    else:
+        pred_dist = model(xc, yc, xt)
 
-    pred_dist = model(xc, yc, xt)
     loglik = pred_dist.log_prob(yt)
     return -loglik.mean()
 
@@ -66,6 +75,8 @@ def train_epoch(
             yc=batch.yc,
             xt=batch.xt,
             yt=batch.yt,
+            xic=batch.xic,
+            yic=batch.yic,
         )
         loss.backward()
         optimiser.step()
@@ -96,7 +107,16 @@ def val_epoch(
     for batch in tqdm(generator, total=generator.num_batches, desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
-            pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+            if batch.xic is not None and batch.yic is not None:
+                pred_dist = model(
+                    xc=batch.xc,
+                    yc=batch.yc,
+                    xic=batch.xic,
+                    yic=batch.yic,
+                    xt=batch.xt,
+                )
+            else:
+                pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
 
         loglik = pred_dist.log_prob(batch.yt).mean()
 

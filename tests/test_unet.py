@@ -16,8 +16,7 @@ def test_unet(ndim: int):
     first_channels = 32
     last_channels = 2
     kernel_size = 3
-    num_channels = (32, 32, 32, 32, 32)
-    strides = (2, 2, 2, 2, 2)
+    num_channels = [32, 32, 32, 32, 32]
 
     unet = UNet(
         dim=ndim,
@@ -26,7 +25,6 @@ def test_unet(ndim: int):
         last_channels=last_channels,
         kernel_size=kernel_size,
         num_channels=num_channels,
-        strides=strides,
     )
     z_grid = unet(z_grid)
 

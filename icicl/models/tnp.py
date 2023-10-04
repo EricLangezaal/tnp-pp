@@ -1,3 +1,4 @@
+import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -31,7 +32,7 @@ class TNPDEncoder(nn.Module):
         z = self.xy_encoder(z)
 
         # Construct mask.
-        mask = gen_tnpd_mask(xc, xt)
+        mask = gen_tnpd_mask(xc, xt, targets_self_attend=False)
 
         z = self.transformer_encoder(z, mask)
         return z
@@ -62,8 +63,61 @@ class TNPD(NeuralProcess):
         super().__init__(encoder, decoder, likelihood)
 
 
+class TNPlusEncoder(TNPDEncoder):
+    def __init__(
+        self,
+        transformer_encoder: TransformerEncoder,
+        xy_encoder: nn.Module,
+        embedding_token_dim: int,
+        dy: int = 1,
+    ):
+        super().__init__(transformer_encoder, xy_encoder)
+
+        self.context_embedding_token = nn.Parameter(torch.randn(embedding_token_dim))
+        self.target_embedding_token = nn.Parameter(
+            torch.randn(embedding_token_dim + dy)
+        )
+
+    @check_shapes(
+        "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, n, dz]"
+    )
+    def forward(
+        self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
+    ) -> torch.Tensor:
+        ec = einops.repeat(
+            self.context_embedding_token, "e -> m n e", m=xc.shape[0], n=xc.shape[1]
+        )
+        zc = torch.cat((xc, yc, ec), dim=-1)
+
+        et = einops.repeat(
+            self.target_embedding_token, "e -> m n e", m=xt.shape[0], n=xt.shape[1]
+        )
+        zt = torch.cat((xc, et), dim=-1)
+
+        z = torch.cat((zc, zt), dim=1)
+        z = self.xy_encoder(z)
+
+        # Construct mask.
+        mask = gen_tnpd_mask(xc, xt, targets_self_attend=True)
+
+        z = self.transformer_encoder(z, mask)
+        return z
+
+
+class TNPlus(NeuralProcess):
+    def __init__(
+        self,
+        encoder: TNPlusEncoder,
+        decoder: TNPDDecoder,
+        likelihood: nn.Module,
+    ):
+        super().__init__(encoder, decoder, likelihood)
+
+
 @check_shapes("xc: [m, nc, dx]", "xt: [m, nt, dx]", "return: [m, n, n]")
-def gen_tnpd_mask(xc: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
+def gen_tnpd_mask(
+    xc: torch.Tensor, xt: torch.Tensor, targets_self_attend: bool = False
+) -> torch.Tensor:
     m = xc.shape[0]
     nc = xc.shape[-2]
     nt = xt.shape[-2]
@@ -73,6 +127,8 @@ def gen_tnpd_mask(xc: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
     mask[:, :nc, :nc] = False
     for i in range(xt.shape[-2]):
         mask[:, nc + i, :nc] = False
-        # mask[:, nc + i, nc + i] = False
+
+        if targets_self_attend:
+            mask[:, nc + i, nc + i] = False
 
     return mask

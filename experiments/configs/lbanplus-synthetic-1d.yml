@@ -4,7 +4,7 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
     max_num_ctx: 512
@@ -12,14 +12,14 @@ generators:
     max_num_trg: 512
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
-    samples_per_epoch: 16384
+    samples_per_epoch: 16_000
     batch_size: 16
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
     max_num_ctx: 512
@@ -31,37 +31,56 @@ generators:
     batch_size: 16
 
 model:
-  _target_: icicl.models.tnp.TNPD
-  encoder: ${tnpd_encoder}
-  decoder: ${tnpd_decoder}
+  _target_: icicl.models.lbanp.LBANPlus
+  encoder: ${lbanplus_encoder}
+  decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
-tnpd_encoder:
-  _target_: icicl.models.tnp.TNPDEncoder
-  transformer_encoder: ${transformer_encoder}
+lbanplus_encoder:
+  _target_: icicl.models.lbanp.LBANPlusEncoder
+  nested_perceiver_encoder: ${nested_perceiver_encoder}
   xy_encoder: ${xy_encoder}
+  embedding_token_dim: ${params.embedding_token_dim}
+  dy: 1
 
-transformer_encoder:
-  _target_: icicl.networks.transformer.TransformerEncoder
-  encoder_layer: ${mhsa_layer}
-  num_layers: 3
+nested_perceiver_encoder:
+  _target_: icicl.networks.transformer.NestedPerceiverEncoder
+  num_latents: 16
+  mhsa_layer: ${mhsa_layer}
+  mhca_ctoq_layer: ${mhca_ctoq_layer}
+  mhca_qtot_layer: ${mhca_qtot_layer}
+  num_layers: 5
 
 mhsa_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 3
-  head_dim: 16
+  num_heads: 4
+  head_dim: ${eval:'${params.embed_dim} // 4'}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_ctoq_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 4
+  head_dim: ${eval:'${params.embed_dim} // 4'}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_qtot_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 4
+  head_dim: ${eval:'${params.embed_dim} // 4'}
   feedforward_dim: ${params.embed_dim}
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'1 + ${params.dim}'}
+  in_dim: ${eval:'${params.dim} + 1 + ${params.embedding_token_dim}'}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
-tnpd_decoder:
-  _target_: icicl.models.tnp.TNPDDecoder
+lbanp_decoder:
+  _target_: icicl.models.lbanp.LBANPDecoder
   z_decoder: ${z_decoder}
 
 z_decoder:
@@ -69,7 +88,7 @@ z_decoder:
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -86,5 +105,5 @@ params:
 
 
 misc:
-  project: tnp_tests
+  project: lbanplus_tests
   name: v0

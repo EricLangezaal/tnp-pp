@@ -1,77 +1,13 @@
 import copy
-from abc import ABC
 from typing import Optional
 
+import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from .attention import (
-    MultiHeadAttention,
-    MultiHeadCrossAttention,
-    MultiHeadSelfAttention,
-)
-
-
-class MultiHeadAttentionLayer(nn.Module, ABC):
-    def __init__(
-        self,
-        embed_dim: int,
-        num_heads: int,
-        head_dim: int,
-        attention: MultiHeadAttention,
-        feedforward_dim: Optional[int] = None,
-        p_dropout: float = 0.0,
-        activation: nn.Module = nn.ReLU(),
-        norm_first: bool = False,
-    ):
-        super().__init__()
-        feedforward_dim = embed_dim if feedforward_dim is None else feedforward_dim
-
-        self.embed_dim = embed_dim
-        self.attn = attention(embed_dim, num_heads, head_dim, p_dropout)
-
-        # Feedforward model.
-        self.ff_block = nn.Sequential(
-            nn.Linear(embed_dim, feedforward_dim),
-            activation,
-            nn.Dropout(p_dropout),
-            nn.Linear(feedforward_dim, embed_dim),
-            nn.Dropout(p_dropout),
-        )
-
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.norm_first = norm_first
-
-        self.attn_dropout = nn.Dropout(p_dropout)
-
-
-class MultiHeadSelfAttentionLayer(MultiHeadAttentionLayer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, attention=MultiHeadSelfAttention, **kwargs)
-
-    @check_shapes("x: [m, n, d]", "mask: [m, n, n]", "return: [m, n, d]")
-    def attn_block(
-        self,
-        x: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        x = self.attn(x, mask=mask)
-        return self.attn_dropout(x)
-
-    @check_shapes("x: [m, n, d]", "mask: [m, n, n]", "return: [m, n, d]")
-    def forward(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        if self.norm_first:
-            x = x + self.attn_block(self.norm1(x), mask)
-            x = x + self.ff_block(self.norm2(x))
-        else:
-            x = x + self.norm1(x + self.attn_block(x, mask))
-            x = self.norm2(x + self.ff_block(x))
-
-        return x
+from ..utils.batch import compress_batch_dimensions, compress_data_dimensions
+from .attention_layers import MultiHeadCrossAttentionLayer, MultiHeadSelfAttentionLayer
 
 
 class TransformerEncoder(nn.Module):
@@ -93,38 +29,6 @@ class TransformerEncoder(nn.Module):
             x = layer(x, mask)
 
         return x
-
-
-class MultiHeadCrossAttentionLayer(MultiHeadAttentionLayer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, attention=MultiHeadCrossAttention, **kwargs)
-
-    @check_shapes(
-        "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, n, n]", "return: [m, n, d]"
-    )
-    def attn_block(
-        self,
-        xq: torch.Tensor,
-        xkv: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        x = self.attn(xq, xkv, mask=mask)
-        return self.attn_dropout(x)
-
-    @check_shapes(
-        "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, n, n]", "return: [m, n, d]"
-    )
-    def forward(
-        self, xq: torch.Tensor, xkv: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        if self.norm_first:
-            xq = xq + self.attn_block(self.norm1(xq), self.norm1(xkv), mask)
-            xq = xq + self.ff_block(self.norm2(xq))
-        else:
-            xq = xq + self.norm1(xq + self.attn_block(xq, xkv, mask))
-            xq = self.norm2(xq + self.ff_block(xq))
-
-        return xq
 
 
 class PerceiverEncoder(nn.Module):
@@ -179,6 +83,239 @@ class PerceiverDecoder(nn.Module):
             x = mhca_layer(x, xq, mask)
 
         return x
+
+
+class NestedPerceiverEncoder(nn.Module):
+    def __init__(
+        self,
+        num_latents: int,
+        mhsa_layer: MultiHeadSelfAttentionLayer,
+        mhca_ctoq_layer: MultiHeadCrossAttentionLayer,
+        mhca_qtot_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert mhsa_layer.embed_dim == mhca_ctoq_layer.embed_dim, "embed_dim mismatch."
+        assert mhsa_layer.embed_dim == mhca_qtot_layer.embed_dim, "embed_dim mismatch."
+
+        embed_dim = mhsa_layer.embed_dim
+        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
+
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, dx]", "xt: [m, nt, dx]", "mask: [m, nq, n]", "return: [m, nq, d]"
+    )
+    def forward(
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        xq = self.latents.unsqueeze(0).repeat(xc.shape[0], 1, 1)
+        for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
+            self.mhsa_layers, self.mhca_ctoq_layers, self.mhca_qtot_layers
+        ):
+            xq = mhca_ctoq_layer(xq, xc, mask)
+            xq = mhsa_layer(xq)
+            xt = mhca_qtot_layer(xt, xq)
+
+        return xt
+
+
+class SPINEncoder(nn.Module):
+    def __init__(
+        self,
+        num_latent_features: int,
+        num_latent_datapoints: int,
+        xaba_layer: MultiHeadCrossAttentionLayer,
+        abla_layer: MultiHeadSelfAttentionLayer,
+        xabd_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert xaba_layer.embed_dim == abla_layer.embed_dim, "embed_dim mismatch."
+        assert (
+            xabd_layer.embed_dim == abla_layer.embed_dim * num_latent_features
+        ), "embed_dim mismatch."
+
+        embed_dim = xaba_layer.embed_dim
+        self.latent_features = nn.Parameter(torch.randn(num_latent_features, embed_dim))
+        self.latent_datapoints = nn.Parameter(
+            torch.randn(num_latent_datapoints, embed_dim * num_latent_features)
+        )
+
+        self.xaba_layers = _get_clones(xaba_layer, num_layers)
+        self.abla_layers = _get_clones(abla_layer, num_layers)
+        self.xabd_layers = _get_clones(xabd_layer, num_layers)
+
+    @check_shapes("x: [m, n, dx, e]", "mask: [m, nq, n]", "return: [m, nq, fe]")
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        xqf = einops.repeat(
+            self.latent_features, "f e -> m n f e", m=x.shape[0], n=x.shape[1]
+        )
+        xqd = einops.repeat(self.latent_datapoints, "nq fe -> m nq fe", m=x.shape[0])
+
+        # shape (m x n, dx, e).
+        x, _ = compress_batch_dimensions(x, other_dims=2)
+
+        for xaba_layer, abla_layer, xabd_layer in zip(
+            self.xaba_layers, self.abla_layers, self.xabd_layers
+        ):
+            # shape (m x n, nqf, e).
+            xqf, xqf_uncompress = compress_batch_dimensions(xqf, other_dims=2)
+
+            xqf = xaba_layer(xqf, x)
+            xqf = abla_layer(xqf)
+            xqf = xqf_uncompress(xqf)
+
+            # shape (m, n, nqf x e).
+            xqf, xqf_uncompress = compress_data_dimensions(xqf, other_dims=2)
+
+            # shape (m, nqd, nqf x e).
+            xqd = xabd_layer(xqd, xqf, mask=mask)
+
+            xqf = xqf_uncompress(xqf)
+
+        return xqd
+
+
+class SPINDecoder(nn.Module):
+    def __init__(
+        self,
+        num_latent_features: int,
+        xaba_layer: MultiHeadCrossAttentionLayer,
+        abla_layer: MultiHeadSelfAttentionLayer,
+        xabd_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert xaba_layer.embed_dim == abla_layer.embed_dim, "embed_dim mismatch."
+        assert (
+            xabd_layer.embed_dim == xaba_layer.embed_dim * num_latent_features
+        ), "embed_dim mismatch."
+
+        embed_dim = xaba_layer.embed_dim
+        self.latent_features = nn.Parameter(torch.randn(num_latent_features, embed_dim))
+
+        self.xaba_layers = _get_clones(xaba_layer, num_layers)
+        self.abla_layers = _get_clones(abla_layer, num_layers)
+        self.xabd_layers = _get_clones(xabd_layer, num_layers)
+
+    @check_shapes(
+        "xt: [m, n, d, e]", "xqc: [m, nq, dz]", "mask: [m, n, nq]", "return: [m, n, dz]"
+    )
+    def forward(
+        self, xt: torch.Tensor, xqc: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ):
+        _ = mask
+
+        xqt = einops.repeat(
+            self.latent_features, "f e -> m n f e", m=xt.shape[0], n=xt.shape[1]
+        )
+
+        # shape (m, n, f, e).
+        xqt, xqt_uncompress = compress_batch_dimensions(xqt, other_dims=2)
+        xt, _ = compress_batch_dimensions(xt, other_dims=2)
+
+        # Obtain latent attribute embeddings.
+        for (
+            xaba_layer,
+            abla_layer,
+        ) in zip(self.xaba_layers, self.abla_layers):
+            xqt = xaba_layer(xqt, xt)
+            xqt = abla_layer(xqt)
+
+        xqt = xqt_uncompress(xqt)
+        xqt, _ = compress_data_dimensions(xqt, other_dims=2)
+        # Cross-attention with context representation.
+        for xabd_layer in self.xabd_layers:
+            xqt = xabd_layer(xqt, xqc)
+
+        # shape (m, n, dz).
+        return xqt
+
+
+class ICNestedPerceiverEncoder(nn.Module):
+    def __init__(
+        self,
+        num_latents: int,
+        num_ic_latents: int,
+        mhsa_layer: MultiHeadSelfAttentionLayer,
+        mhca_ctoq_layer: MultiHeadCrossAttentionLayer,
+        mhca_qtot_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert mhsa_layer.embed_dim == mhca_ctoq_layer.embed_dim, "embed_dim mismatch."
+        assert mhsa_layer.embed_dim == mhca_qtot_layer.embed_dim, "embed_dim mismatch."
+
+        embed_dim = mhsa_layer.embed_dim
+        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
+        self.ic_latents = nn.Parameter(torch.randn(num_ic_latents, embed_dim))
+
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+        self.ic_mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.ic_mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.ic_mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, dx]",
+        "xic: [m, nic, ncic, dx]",
+        "xt: [m, nt, dx]",
+        "return: [m, nq, d]",
+    )
+    def forward(
+        self, xc: torch.Tensor, xic: torch.Tensor, xt: torch.Tensor
+    ) -> torch.Tensor:
+        xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
+        xqic = einops.repeat(
+            self.ic_latents, "l e -> m n l e", m=xic.shape[0], n=xic.shape[1]
+        )
+        # shape (m x nic, ncic, dx).
+        xic, _ = compress_batch_dimensions(xqic, other_dims=2)
+        for (
+            mhsa_layer,
+            mhca_ctoq_layer,
+            mhca_qtot_layer,
+            ic_mhsa_layer,
+            ic_mhca_ctoq_layer,
+            ic_mhca_qtot_layer,
+        ) in zip(
+            self.mhsa_layers,
+            self.mhca_ctoq_layers,
+            self.mhca_qtot_layers,
+            self.ic_mhsa_layers,
+            self.ic_mhca_ctoq_layers,
+            self.ic_mhca_qtot_layers,
+        ):
+            # Attention with context set.
+            xq = mhca_ctoq_layer(xq, xc)
+            xq = mhsa_layer(xq)
+            xt = mhca_qtot_layer(xt, xq)
+
+            # Attention with in-context datasets.
+            xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
+            xqic = ic_mhca_ctoq_layer(xqic, xic)
+            xqic = ic_mhsa_layer(xqic)
+            xqic = xqic_uncompress(xqic)
+
+            # shape (m, nic x ncic, dx)
+            xqic = einops.rearrange(xqic, "m n l e -> m (n l) e")
+            xt = ic_mhca_qtot_layer(xt, xqic)
+            xqic = einops.rearrange(
+                xqic, "m (n l) e -> m n l e", l=self.ic_latents.shape[0]
+            )
+
+        return xt
 
 
 def _get_clones(module: nn.Module, n: int) -> nn.ModuleList:

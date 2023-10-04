@@ -1,105 +1,101 @@
 generators:
   train:
-    _target_: icicl.data.gp.RandomScaleGPGenerator
+    _target_: icicl.data.gp.ICRandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: eq
+    kernel_type: random
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
-    max_num_ctx: 512
+    max_num_ctx: 128
     min_num_trg: 512
     max_num_trg: 512
+    min_num_dc: 1
+    max_num_dc: 1
+    min_num_dc_ctx: 1
+    max_num_dc_ctx: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
     samples_per_epoch: 16_000
     batch_size: 16
   val:
-    _target_: icicl.data.gp.RandomScaleGPGenerator
+    _target_: icicl.data.gp.ICRandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: eq
+    kernel_type: random
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 1
-    max_num_ctx: 512
+    max_num_ctx: 128
     min_num_trg: 512
     max_num_trg: 512
+    min_num_dc: 1
+    max_num_dc: 1
+    min_num_dc_ctx: 1
+    max_num_dc_ctx: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
     samples_per_epoch: 4096
     batch_size: 16
 
 model:
-  _target_: icicl.models.pnp.PNP
-  encoder: ${pnp_encoder}
-  decoder: ${pnp_decoder}
+  _target_: icicl.models.iclbanp.ICLBANP
+  encoder: ${iclbanp_encoder}
+  decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
-pnp_encoder:
-  _target_: icicl.models.pnp.PNPEncoder
-  perceiver_encoder: ${perceiver_encoder}
+iclbanp_encoder:
+  _target_: icicl.models.iclbanp.ICLBANPEncoder
+  ic_nested_perceiver_encoder: ${ic_nested_perceiver_encoder}
   xy_encoder: ${xy_encoder}
 
-perceiver_encoder:
-  _target_: icicl.networks.transformer.PerceiverEncoder
-  num_latents: 3
+ic_nested_perceiver_encoder:
+  _target_: icicl.networks.transformer.ICNestedPerceiverEncoder
+  num_latents: 8
+  num_ic_latents: 8
   mhsa_layer: ${mhsa_layer}
-  mhca_layer: ${encoder_mhca_layer}
-  num_layers: 5
+  mhca_ctoq_layer: ${mhca_ctoq_layer}
+  mhca_qtot_layer: ${mhca_qtot_layer}
+  num_layers: 3
 
 mhsa_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: 4
-  head_dim: 32
+  head_dim: ${eval:'${params.embed_dim} // 4'}
   feedforward_dim: ${params.embed_dim}
 
-encoder_mhca_layer:
+mhca_ctoq_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: 4
-  head_dim: 32
+  head_dim: ${eval:'${params.embed_dim} // 4'}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_qtot_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 4
+  head_dim: ${eval:'${params.embed_dim} // 4'}
   feedforward_dim: ${params.embed_dim}
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'1 + ${params.dim}'}
+  in_dim: ${eval:'${params.dim} + 1'}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 64
+  width: ${params.embed_dim}
 
-pnp_decoder:
-  _target_: icicl.models.pnp.PNPDecoder
-  perceiver_decoder: ${perceiver_decoder}
+lbanp_decoder:
+  _target_: icicl.models.lbanp.LBANPDecoder
   z_decoder: ${z_decoder}
-  x_encoder: ${x_encoder}
-
-perceiver_decoder:
-  _target_: icicl.networks.transformer.PerceiverDecoder
-  mhca_layer: ${decoder_mhca_layer}
-  num_layers: 3
-
-decoder_mhca_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
-  embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: 32
-  feedforward_dim: ${params.embed_dim}
 
 z_decoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 64
-
-x_encoder:
-  _target_: icicl.networks.mlp.MLP
-  in_dim: ${params.dim}
-  out_dim: ${params.embed_dim}
-  num_layers: 2
-  width: 64
+  width: ${params.embed_dim}
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -112,9 +108,9 @@ optimiser:
 params:
   epochs: 200
   dim: 1
-  embed_dim: 64
+  embed_dim: 32
 
 
 misc:
-  project: pnp_tests
+  project: lbanp_tests
   name: v0

@@ -8,7 +8,7 @@ from icicl.networks.transformer import MultiHeadSelfAttentionLayer, TransformerE
 
 
 @pytest.mark.parametrize("ndim", [1, 2])
-def test_transformer_encoder(ndim: int):
+def test_tnpd(ndim: int):
     # Test parameters.
     m = 16
     nc = 128
