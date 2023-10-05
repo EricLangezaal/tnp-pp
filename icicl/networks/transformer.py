@@ -346,7 +346,8 @@ class ParallelNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
 
             # shape (1, m x nc, dx).
             xq = einops.rearrange(xq, "m l e -> 1 (m l) e")
-            mhca_mask = torch.block_diag(*[torch.eye(l)] * m) > 0.5
+            mhca_mask = torch.block_diag(*[torch.ones(l, l)] * m) > 0.5
+            mhca_mask = einops.repeat(mhca_mask, "a b -> m a b", m=xq.shape[0])
 
             # Cross-attention betweeen latent sets.
             xq = mhca_layer(xq, mhca_mask)

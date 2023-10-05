@@ -27,6 +27,8 @@ class UNet(nn.Module):
         kernel_size: int,
         num_channels: List[int],
         activation: nn.Module = nn.ReLU(),
+        pool: nn.Module = nn.MaxPool1d,
+        pooling_size: int = 2,
         **kwargs,
     ):
         """Constructs a UNet-based convolutional architecture, consisting
@@ -42,7 +44,7 @@ class UNet(nn.Module):
             dim: Dimensionality of the input data.
             seed: Random seed.
             activation: Activation function to use.
-            name: Name of the module.
+            pooling_size: Size of the pooling.
             **kwargs: Additional keyword arguments.
         """
         assert dim in [1, 2, 3], f"UNet dim must be in [1, 2, 3], found {dim=}."
@@ -51,25 +53,25 @@ class UNet(nn.Module):
 
         self.dim = dim
         self.activation = activation
+        self.pooling = pool(pooling_size)
         self.convs = []
         self.transposed_convs = []
 
-        def shared_kwargs(i, o, k, s):
+        def shared_kwargs(i, o, k):
             return {
                 "in_channels": i,
                 "out_channels": o,
                 "kernel_size": k,
-                "stride": s,
-                "padding": s // 2,
+                "padding": k // 2,
             }
 
         # First convolutional layer
         self.first = CONV[dim](
-            **shared_kwargs(in_channels, first_channels, kernel_size, 1)
+            **shared_kwargs(in_channels, first_channels, kernel_size)
         )
 
         # UNet layers
-        for i in range(len(num_channels)):
+        for i, num_channel in enumerate(num_channels):
             if i == 0:
                 prev_channels = first_channels
                 upwards_multiplier = 1
@@ -83,9 +85,7 @@ class UNet(nn.Module):
                 next_channels = num_channels[-(i + 2)]
 
             self.convs.append(
-                CONV[dim](
-                    **shared_kwargs(prev_channels, num_channels[i], kernel_size, 2)
-                )
+                CONV[dim](**shared_kwargs(prev_channels, num_channel, kernel_size))
             )
 
             self.transposed_convs.append(
@@ -94,14 +94,13 @@ class UNet(nn.Module):
                         upwards_multiplier * num_channels[-(i + 1)],
                         next_channels,
                         kernel_size,
-                        2,
                     )
                 )
             )
 
         # Last convolutional layer
         self.last = TRANSPOSE_CONV[dim](
-            **shared_kwargs(2 * first_channels, last_channels, kernel_size, 1)
+            **shared_kwargs(2 * first_channels, last_channels, kernel_size)
         )
 
     @check_shapes("z: [m, ..., c]")
@@ -114,9 +113,16 @@ class UNet(nn.Module):
 
         for conv in self.convs:
             skips.append(z)
+            z = self.pooling(z)
             z = self.activation(conv(z))
 
         for conv, skip in zip(self.transposed_convs, skips[::-1]):
+            z = nn.functional.interpolate(
+                z,
+                scale_factor=self.pooling.kernel_size,
+                mode="linear",
+                align_corners=True,
+            )
             z = self.activation(conv(z))
 
             if z.shape[-1] < skip.shape[-1]:

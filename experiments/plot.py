@@ -29,14 +29,14 @@ def plot(
         x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim)[None, :, None]
 
         for i in range(num_fig):
-            xc = batches[i].xc[:1]
-            yc = batches[i].yc[:1]
-            xt = batches[i].xt[:1]
-            yt = batches[i].yt[:1]
+            xc = batches[i].xc
+            yc = batches[i].yc
+            xt = batches[i].xt
+            yt = batches[i].yt
 
             if hasattr(batches[i], "xic") and hasattr(batches[i], "yic"):
-                xic = batches[i].xic[:1]
-                yic = batches[i].yic[:1]
+                xic = batches[i].xic
+                yic = batches[i].yic
             else:
                 xic = None
                 yic = None
@@ -46,26 +46,32 @@ def plot(
             with torch.no_grad():
                 if xic is not None and yic is not None:
                     y_plot_pred_dist = model(
-                        xc=xc, yc=yc, xic=xic, yic=yic, xt=x_plot[:1]
+                        xc=xc,
+                        yc=yc,
+                        xic=xic,
+                        yic=yic,
+                        xt=x_plot[:1].repeat(xc.shape[0], 1, 1),
                     )
                     yt_pred_dist = model(xc=xc, yc=yc, xic=xic, yic=yic, xt=xt)
                 else:
-                    y_plot_pred_dist = model(xc=xc, yc=yc, xt=x_plot[:1])
+                    y_plot_pred_dist = model(
+                        xc=xc, yc=yc, xt=x_plot[:1].repeat(xc.shape[0], 1, 1)
+                    )
                     yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
-                mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
+                mean, std = y_plot_pred_dist.loc[:1], y_plot_pred_dist.scale[:1]
                 gt_mean, gt_std, _ = gt_pred(
-                    xc=xc,
-                    yc=yc,
+                    xc=xc[:1],
+                    yc=yc[:1],
                     xt=x_plot[:1],
                 )
 
-                model_nll = -yt_pred_dist.log_prob(yt).mean()
+                model_nll = -yt_pred_dist.log_prob(yt)[:1].mean()
                 _, _, gt_loglik = gt_pred(
-                    xc=xc,
-                    yc=yc,
-                    xt=xt,
-                    yt=yt,
+                    xc=xc[:1],
+                    yc=yc[:1],
+                    xt=xt[:1],
+                    yt=yt[:1],
                 )
                 gt_nll = -gt_loglik.mean() / batches[i].yt.shape[1]
 
