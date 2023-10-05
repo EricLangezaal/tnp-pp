@@ -301,8 +301,10 @@ class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
 
             # Attention with in-context datasets.
             xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
-            xqic = ic_mhca_ctoq_layer(xqic, xic)
-            xqic = ic_mhsa_layer(xqic)
+            # xqic = ic_mhca_ctoq_layer(xqic, xic)
+            # xqic = ic_mhsa_layer(xqic)
+            xqic = mhca_ctoq_layer(xqic, xic)
+            xqic = mhsa_layer(xqic)
             xqic = xqic_uncompress(xqic)
 
             # shape (m, nic x ncic, dx)
