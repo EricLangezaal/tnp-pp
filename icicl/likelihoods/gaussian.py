@@ -28,8 +28,14 @@ class NormalLikelihood(Likelihood):
 class HeteroscedasticNormalLikelihood(Likelihood):
     out_dim_multiplier = 2
 
+    def __init__(self, min_noise: float = 0.0):
+        super().__init__()
+
+        self.min_noise = min_noise
+
     def forward(self, x: torch.Tensor) -> td.Normal:
         assert x.shape[-1] % 2 == 0
 
         loc, log_var = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
-        return td.Normal(loc, nn.functional.softplus(log_var) ** 0.5)
+        scale = nn.functional.softplus(log_var) ** 0.5 + self.min_noise
+        return td.Normal(loc, scale)

@@ -111,6 +111,7 @@ def np_loss_fn(
         pred_dist = model(xc, yc, xt)
 
     loglik = pred_dist.log_prob(yt)
+
     return -loglik.mean()
 
 
@@ -184,20 +185,22 @@ def val_epoch(
 
         loglik = pred_dist.log_prob(batch.yt).mean()
 
-        gt_mean, gt_std, gt_loglik = batch.gt_pred(
-            xc=batch.xc,
-            yc=batch.yc,
-            xt=batch.xt,
-            yt=batch.yt,
-        )
-        gt_loglik = gt_loglik.mean() / batch.yt.shape[1]
+        if hasattr(batch, "gt_pred"):
+            gt_mean, gt_std, gt_loglik = batch.gt_pred(
+                xc=batch.xc,
+                yc=batch.yc,
+                xt=batch.xt,
+                yt=batch.yt,
+            )
+            gt_loglik = gt_loglik.mean() / batch.yt.shape[1]
+
+            result["gt_mean"].append(gt_mean)
+            result["gt_std"].append(gt_std)
+            result["gt_loglik"].append(gt_loglik)
 
         result["loglik"].append(loglik)
         result["pred_mean"].append(pred_dist.loc)
         result["pred_std"].append(pred_dist.scale)
-        result["gt_mean"].append(gt_mean)
-        result["gt_std"].append(gt_std)
-        result["gt_loglik"].append(gt_loglik)
 
     loglik = torch.stack(result["loglik"])
     loss = -loglik.mean()
@@ -241,9 +244,11 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
 
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
-    wandb.log(
-        {
-            f"{name}/loglik": torch.stack(result["loglik"]).mean(),
-            f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
-        }
-    )
+    wandb.log({f"{name}/loglik": torch.stack(result["loglik"]).mean()})
+
+    if hasattr(result, "gt_loglik"):
+        wandb.log(
+            {
+                f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
+            }
+        )

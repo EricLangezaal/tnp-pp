@@ -1,4 +1,5 @@
 from plot import plot
+from plot_mnist import plot_mnist
 from utils import (
     evaluation_summary,
     initialize_experiment,
@@ -32,7 +33,9 @@ def main():
         evaluation_summary("val", val_result)
         checkpointer.update_best_and_last_checkpoint(model=model, val_result=val_result)
 
-        plot(model=model, batches=batches, epoch=epoch, num_fig=5)
+        plot_mnist(
+            model=model, batches=batches, epoch=epoch, num_fig=min(5, len(batches))
+        )
 
 
 if __name__ == "__main__":

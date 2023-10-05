@@ -66,7 +66,7 @@ class DataGenerator(ABC):
 
         self.samples_per_epoch = samples_per_epoch
         self.batch_size = batch_size
-        self.num_batches = samples_per_epoch // batch_size + 1
+        self.num_batches = samples_per_epoch // batch_size
 
         # Set epoch counter.
         self.epoch = 0
