@@ -122,7 +122,7 @@ def train_epoch(
     step: int,
     loss_fn: Callable = np_loss_fn,
 ) -> int:
-    epoch = tqdm(generator, total=generator.num_batches, desc="Training")
+    epoch = tqdm(generator, total=len(generator), desc="Training")
 
     for batch in epoch:
         optimiser.zero_grad()
@@ -169,7 +169,7 @@ def val_epoch(
     }
     batches = []
 
-    for batch in tqdm(generator, total=generator.num_batches, desc="Validation"):
+    for batch in tqdm(generator, total=len(generator), desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
             if hasattr(batch, "xic") and hasattr(batch, "yic"):

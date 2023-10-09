@@ -71,6 +71,9 @@ class DataGenerator(ABC):
         # Set epoch counter.
         self.epoch = 0
 
+    def __len__(self):
+        return self.num_batches
+
     def __iter__(self):
         """Reset epoch counter and return self."""
         self.epoch = 0
