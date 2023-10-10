@@ -57,8 +57,8 @@ class MultiHeadAttention(nn.Module, ABC):
         dots = (q @ k.transpose(-1, -2)) * self.scale
 
         if mask is not None:
-            mask = mask.unsqueeze(1).repeat(1, self.num_heads, 1, 1)
-            dots = torch.masked_fill(dots, mask, -float("Inf"))
+            mask = einops.repeat(mask, "m n p -> m h n p", h=self.num_heads)
+            dots = torch.masked_fill(dots, mask, -float("inf"))
 
         attn = dots.softmax(dim=-1)
 

@@ -1,4 +1,5 @@
 import copy
+from abc import ABC
 from typing import Optional
 
 import einops
@@ -85,7 +86,7 @@ class PerceiverDecoder(nn.Module):
         return x
 
 
-class NestedPerceiverEncoder(nn.Module):
+class BaseNestedPerceiverEncoder(nn.Module, ABC):
     def __init__(
         self,
         num_latents: int,
@@ -106,13 +107,15 @@ class NestedPerceiverEncoder(nn.Module):
         self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
         self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
 
+
+class NestedPerceiverEncoder(BaseNestedPerceiverEncoder):
     @check_shapes(
         "xc: [m, nc, dx]", "xt: [m, nt, dx]", "mask: [m, nq, n]", "return: [m, nq, d]"
     )
     def forward(
         self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        xq = self.latents.unsqueeze(0).repeat(xc.shape[0], 1, 1)
+        xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
             self.mhsa_layers, self.mhca_ctoq_layers, self.mhca_qtot_layers
         ):
@@ -240,7 +243,7 @@ class SPINDecoder(nn.Module):
         return xqt
 
 
-class ICNestedPerceiverEncoder(nn.Module):
+class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
     def __init__(
         self,
         num_latents: int,
@@ -250,18 +253,12 @@ class ICNestedPerceiverEncoder(nn.Module):
         mhca_qtot_layer: MultiHeadCrossAttentionLayer,
         num_layers: int,
     ):
-        super().__init__()
-
-        assert mhsa_layer.embed_dim == mhca_ctoq_layer.embed_dim, "embed_dim mismatch."
-        assert mhsa_layer.embed_dim == mhca_qtot_layer.embed_dim, "embed_dim mismatch."
+        super().__init__(
+            num_latents, mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer, num_layers
+        )
 
         embed_dim = mhsa_layer.embed_dim
-        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
         self.ic_latents = nn.Parameter(torch.randn(num_ic_latents, embed_dim))
-
-        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
-        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
-        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
 
         self.ic_mhsa_layers = _get_clones(mhsa_layer, num_layers)
         self.ic_mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
@@ -281,7 +278,7 @@ class ICNestedPerceiverEncoder(nn.Module):
             self.ic_latents, "l e -> m n l e", m=xic.shape[0], n=xic.shape[1]
         )
         # shape (m x nic, ncic, dx).
-        xic, _ = compress_batch_dimensions(xqic, other_dims=2)
+        xic, _ = compress_batch_dimensions(xic, other_dims=2)
         for (
             mhsa_layer,
             mhca_ctoq_layer,
@@ -304,8 +301,10 @@ class ICNestedPerceiverEncoder(nn.Module):
 
             # Attention with in-context datasets.
             xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
-            xqic = ic_mhca_ctoq_layer(xqic, xic)
-            xqic = ic_mhsa_layer(xqic)
+            # xqic = ic_mhca_ctoq_layer(xqic, xic)
+            # xqic = ic_mhsa_layer(xqic)
+            xqic = mhca_ctoq_layer(xqic, xic)
+            xqic = mhsa_layer(xqic)
             xqic = xqic_uncompress(xqic)
 
             # shape (m, nic x ncic, dx)
@@ -314,6 +313,50 @@ class ICNestedPerceiverEncoder(nn.Module):
             xqic = einops.rearrange(
                 xqic, "m (n l) e -> m n l e", l=self.ic_latents.shape[0]
             )
+
+        return xt
+
+
+class ParallelNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
+    def __init__(self, *, mhca_layer: MultiHeadSelfAttentionLayer, **kwargs):
+        super().__init__(**kwargs)
+
+        self.mhca_layers = _get_clones(mhca_layer, len(self.mhsa_layers))
+
+    @check_shapes(
+        "xc: [m, nc, dx]",
+        "xt: [m, nt, dx]",
+        "mask: [m, nq, n]",
+        "return: [m, nq, d]",
+    )
+    def forward(
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        m = xc.shape[0]
+        l = self.latents.shape[0]
+
+        xq = einops.repeat(self.latents, "l e -> m l e", m=m)
+        for mhsa_layer, mhca_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
+            self.mhsa_layers,
+            self.mhca_layers,
+            self.mhca_ctoq_layers,
+            self.mhca_qtot_layers,
+        ):
+            # Cross-attention between context and latent sets.
+            xq = mhca_ctoq_layer(xq, xc, mask)
+            xq = mhsa_layer(xq)
+
+            # shape (1, m x nc, dx).
+            xq = einops.rearrange(xq, "m l e -> 1 (m l) e")
+            mhca_mask = torch.block_diag(*[torch.ones(l, l)] * m) > 0.5
+            mhca_mask = einops.repeat(mhca_mask, "a b -> m a b", m=xq.shape[0])
+
+            # Cross-attention betweeen latent sets.
+            xq = mhca_layer(xq, mhca_mask)
+
+            # Cross-attention between latent and target sets.
+            xq = einops.rearrange(xq, "1 (m l) e -> m l e", m=m)
+            xt = mhca_qtot_layer(xt, xq)
 
         return xt
 

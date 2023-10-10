@@ -1,55 +1,51 @@
 generators:
   train:
-    _target_: icicl.data.gp.RandomScaleGPGenerator
-    dim: ${params.dim}
-    kernel_type: noisy_periodic_mixture
-    min_log10_lengthscale: -0.301
-    max_log10_lengthscale: 0.301
-    noise_std: 0.2
-    min_num_ctx: 32
-    max_num_ctx: 64
-    min_num_trg: 128
-    max_num_trg: 128
-    context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    _target_: icicl.data.mnist.MNISTGenerator
+    min_prop_ctx: 0.1
+    max_prop_ctx: 0.5
+    data_dir: /Users/matt/projects/tnp-pp/data
+    train: True
+    download: False
     samples_per_epoch: 16_000
     batch_size: 16
   val:
-    _target_: icicl.data.gp.RandomScaleGPGenerator
-    dim: ${params.dim}
-    kernel_type: noisy_periodic_mixture
-    min_log10_lengthscale: -0.301
-    max_log10_lengthscale: 0.301
-    noise_std: 0.2
-    min_num_ctx: 32
-    max_num_ctx: 64
-    min_num_trg: 128
-    max_num_trg: 128
-    context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    _target_: icicl.data.mnist.MNISTGenerator
+    min_prop_ctx: 0.1
+    max_prop_ctx: 0.5
+    data_dir: /Users/matt/projects/tnp-pp/data
+    train: False
+    download: False
     samples_per_epoch: 4096
     batch_size: 16
 
 model:
-  _target_: icicl.models.lbanp.LBANP
-  encoder: ${lbanp_encoder}
+  _target_: icicl.models.plbanp.PLBANP
+  encoder: ${plbanp_encoder}
   decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
-lbanp_encoder:
-  _target_: icicl.models.lbanp.LBANPEncoder
-  nested_perceiver_encoder: ${nested_perceiver_encoder}
+plbanp_encoder:
+  _target_: icicl.models.plbanp.PLBANPEncoder
+  parallel_nested_perceiver_encoder: ${parallel_nested_perceiver_encoder}
   xy_encoder: ${xy_encoder}
 
-nested_perceiver_encoder:
-  _target_: icicl.networks.transformer.NestedPerceiverEncoder
-  num_latents: 16
+parallel_nested_perceiver_encoder:
+  _target_: icicl.networks.transformer.ParallelNestedPerceiverEncoder
+  num_latents: 64
   mhsa_layer: ${mhsa_layer}
+  mhca_layer: ${mhca_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
   num_layers: 5
 
 mhsa_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 4
+  head_dim: ${eval:'${params.embed_dim} // 4'}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: 4
@@ -90,6 +86,7 @@ z_decoder:
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+  min_noise: 0.1
 
 optimiser:
   _target_: torch.optim.Adam
@@ -98,11 +95,11 @@ optimiser:
 
 params:
   epochs: 200
-  dim: 1
+  dim: 2
   embed_dim: 64
 
 
 misc:
-  project: lbanp_tests
-  name: noisy_periodic_mixture
+  project: plbanp
+  name: mnist
   resume_from_checkpoint: null

@@ -1,6 +1,7 @@
 """https://github.com/cambridge-mlg/dpconvcnp/blob/main/experiments/utils.py"""
 
 import argparse
+import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
@@ -12,6 +13,62 @@ from tqdm.auto import tqdm
 
 import wandb
 from icicl.data.data import Batch, DataGenerator
+
+
+class ModelCheckpointer:
+    def __init__(self, checkpoint_dir: Optional[str] = None):
+        if checkpoint_dir is None:
+            checkpoint_dir = f"{wandb.run.dir}/checkpoints"
+
+        if not os.path.exists(checkpoint_dir):
+            os.mkdir(checkpoint_dir)
+
+        self.checkpoint_dir = checkpoint_dir
+        self.best_validation_loss = float("inf")
+
+    def update_best_and_last_checkpoint(
+        self,
+        model: nn.Module,
+        val_result: Dict[str, torch.Tensor],
+    ) -> None:
+        """Update the best and last checkpoints of the model.
+
+        Arguments:
+            model: model to save.
+            val_result: validation result dictionary.
+        """
+
+        loss_ci = val_result["mean_loss"] + 1.96 * val_result["std_loss"]
+
+        if loss_ci < self.best_validation_loss:
+            self.best_validation_loss = loss_ci
+            torch.save(
+                model.state_dict(), os.path.join(self.checkpoint_dir, "best.ckpt")
+            )
+
+        torch.save(model.state_dict(), os.path.join(self.checkpoint_dir, "last.ckpt"))
+
+    def load_best_checkpoint(
+        self, model: nn.Module, path: Optional[str] = None
+    ) -> None:
+        if path is None:
+            path = torch.load(os.path.join(self.checkpoint_dir, "best.ckpt"))
+
+        if os.path.exists(path):
+            model.load_state_dict(torch.load(path))
+        else:
+            raise FileNotFoundError(f"Checkpoint file {path} not found.")
+
+    def load_last_checkpoint(
+        self, model: nn.Module, path: Optional[str] = None
+    ) -> None:
+        if path is None:
+            path = torch.load(os.path.join(self.checkpoint_dir, "last.ckpt"))
+
+        if os.path.exists(path):
+            model.load_state_dict(torch.load(path))
+        else:
+            raise FileNotFoundError(f"Checkpoint file {path} not found.")
 
 
 @check_shapes(
@@ -54,6 +111,7 @@ def np_loss_fn(
         pred_dist = model(xc, yc, xt)
 
     loglik = pred_dist.log_prob(yt)
+
     return -loglik.mean()
 
 
@@ -64,10 +122,17 @@ def train_epoch(
     step: int,
     loss_fn: Callable = np_loss_fn,
 ) -> int:
-    epoch = tqdm(generator, total=generator.num_batches, desc="Training")
+    epoch = tqdm(generator, total=len(generator), desc="Training")
 
     for batch in epoch:
         optimiser.zero_grad()
+
+        if not hasattr(batch, "xic") or not hasattr(batch, "yic"):
+            xic = None
+            yic = None
+        else:
+            xic = batch.xic
+            yic = batch.yic
 
         loss = loss_fn(
             model=model,
@@ -75,8 +140,8 @@ def train_epoch(
             yc=batch.yc,
             xt=batch.xt,
             yt=batch.yt,
-            xic=batch.xic,
-            yic=batch.yic,
+            xic=xic,
+            yic=yic,
         )
         loss.backward()
         optimiser.step()
@@ -104,10 +169,10 @@ def val_epoch(
     }
     batches = []
 
-    for batch in tqdm(generator, total=generator.num_batches, desc="Validation"):
+    for batch in tqdm(generator, total=len(generator), desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
-            if batch.xic is not None and batch.yic is not None:
+            if hasattr(batch, "xic") and hasattr(batch, "yic"):
                 pred_dist = model(
                     xc=batch.xc,
                     yc=batch.yc,
@@ -120,28 +185,34 @@ def val_epoch(
 
         loglik = pred_dist.log_prob(batch.yt).mean()
 
-        gt_mean, gt_std, gt_loglik = batch.gt_pred(
-            xc=batch.xc,
-            yc=batch.yc,
-            xt=batch.xt,
-            yt=batch.yt,
-        )
-        gt_loglik = gt_loglik.mean()
+        if hasattr(batch, "gt_pred"):
+            gt_mean, gt_std, gt_loglik = batch.gt_pred(
+                xc=batch.xc,
+                yc=batch.yc,
+                xt=batch.xt,
+                yt=batch.yt,
+            )
+            gt_loglik = gt_loglik.mean() / batch.yt.shape[1]
+
+            result["gt_mean"].append(gt_mean)
+            result["gt_std"].append(gt_std)
+            result["gt_loglik"].append(gt_loglik)
 
         result["loglik"].append(loglik)
         result["pred_mean"].append(pred_dist.loc)
         result["pred_std"].append(pred_dist.scale)
-        result["gt_mean"].append(gt_mean)
-        result["gt_std"].append(gt_std)
-        result["gt_loglik"].append(gt_loglik)
 
-    loss = -torch.stack(result["loglik"]).mean()
+    loglik = torch.stack(result["loglik"])
+    loss = -loglik.mean()
     wandb.log({"val/loss": loss, "epoch": epoch})
+
+    result["mean_loss"] = -loglik.mean()
+    result["std_loss"] = -loglik.std()
 
     return result, batches
 
 
-def initialize_experiment() -> Tuple[Any, DictConfig]:
+def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     # Make argument parser with config argument.
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str)
@@ -158,16 +229,26 @@ def initialize_experiment() -> Tuple[Any, DictConfig]:
 
     # Initialise wandb.
     wandb.init(
-        project=experiment.misc.project, name=experiment.misc.name, config=config_dict
+        project=experiment.misc.project,
+        name=experiment.misc.name,
+        config=config_dict,
     )
 
-    return experiment
+    checkpointer = ModelCheckpointer()
+    if experiment.misc.resume_from_checkpoint is not None:
+        checkpointer.load_best_checkpoint(
+            experiment.model, experiment.misc.resume_from_checkpoint
+        )
+
+    return experiment, checkpointer
 
 
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
-    wandb.log(
-        {
-            f"{name}/loglik": torch.stack(result["loglik"]).mean(),
-            f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
-        }
-    )
+    wandb.log({f"{name}/loglik": torch.stack(result["loglik"]).mean()})
+
+    if hasattr(result, "gt_loglik"):
+        wandb.log(
+            {
+                f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
+            }
+        )

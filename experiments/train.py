@@ -1,4 +1,5 @@
 from plot import plot
+from plot_mnist import plot_mnist
 from utils import (
     evaluation_summary,
     initialize_experiment,
@@ -9,7 +10,7 @@ from utils import (
 
 
 def main():
-    experiment = initialize_experiment()
+    experiment, checkpointer = initialize_experiment()
 
     model = experiment.model
     gen_train = experiment.generators.train
@@ -30,7 +31,9 @@ def main():
         val_result, batches = val_epoch(model=model, generator=gen_val, epoch=epoch)
 
         evaluation_summary("val", val_result)
-        plot(model=model, batches=batches, epoch=epoch, num_fig=5)
+        checkpointer.update_best_and_last_checkpoint(model=model, val_result=val_result)
+
+        plot(model=model, batches=batches, epoch=epoch, num_fig=min(5, len(batches)))
 
 
 if __name__ == "__main__":

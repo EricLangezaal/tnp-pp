@@ -11,7 +11,7 @@ generators:
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    target_range: [[-4.0, 4.0]]
     samples_per_epoch: 16_000
     batch_size: 16
   val:
@@ -26,30 +26,38 @@ generators:
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    target_range: [[-4.0, 4.0]]
     samples_per_epoch: 4096
     batch_size: 16
 
 model:
-  _target_: icicl.models.lbanp.LBANP
-  encoder: ${lbanp_encoder}
+  _target_: icicl.models.plbanp.PLBANP
+  encoder: ${plbanp_encoder}
   decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
-lbanp_encoder:
-  _target_: icicl.models.lbanp.LBANPEncoder
-  nested_perceiver_encoder: ${nested_perceiver_encoder}
+plbanp_encoder:
+  _target_: icicl.models.plbanp.PLBANPEncoder
+  parallel_nested_perceiver_encoder: ${parallel_nested_perceiver_encoder}
   xy_encoder: ${xy_encoder}
 
-nested_perceiver_encoder:
-  _target_: icicl.networks.transformer.NestedPerceiverEncoder
+parallel_nested_perceiver_encoder:
+  _target_: icicl.networks.transformer.ParallelNestedPerceiverEncoder
   num_latents: 16
   mhsa_layer: ${mhsa_layer}
+  mhca_layer: ${mhca_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
   num_layers: 5
 
 mhsa_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: 4
+  head_dim: ${eval:'${params.embed_dim} // 4'}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: 4
@@ -103,6 +111,6 @@ params:
 
 
 misc:
-  project: lbanp_tests
+  project: plbanp_tests
   name: noisy_periodic_mixture
   resume_from_checkpoint: null

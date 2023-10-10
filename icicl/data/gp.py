@@ -16,6 +16,8 @@ KERNEL_TYPES = [
     "matern52",
     "noisy_mixture",
     "weakly_periodic",
+    "periodic",
+    "noisy_periodic_mixture",
 ]
 
 
@@ -107,7 +109,7 @@ class GPGeneratorBase(ABC):
 
 class RandomScaleGPGeneratorBase(GPGeneratorBase):
     noisy_mixture_long_lengthscale: float = 1.0
-    weakly_periodic_period: float = 0.25
+    weakly_periodic_period: float = 1.0
 
     def __init__(
         self,
@@ -140,7 +142,8 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         lengthscale = 10.0**log10_lengthscale
 
         if self.kernel_type == "random":
-            kernel_type = random.choice(KERNEL_TYPES[1:])
+            # kernel_type = random.choice(KERNEL_TYPES[1:])
+            kernel_type = random.choice(["eq", "periodic"])
         else:
             kernel_type = self.kernel_type
 
@@ -173,6 +176,17 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
             kernel1.lengthscale = lengthscale
             kernel2 = gpytorch.kernels.PeriodicKernel()
             kernel2.period_length = self.weakly_periodic_period
+            kernel = kernel1 + kernel2
+
+        elif kernel_type == "periodic":
+            kernel = gpytorch.kernels.PeriodicKernel()
+            kernel.period_length = lengthscale
+
+        elif kernel_type == "noisy_periodic_mixture":
+            kernel1 = gpytorch.kernels.PeriodicKernel()
+            kernel1.period_length = lengthscale
+            kernel2 = gpytorch.kernels.RBFKernel()
+            kernel2.lengthscale = self.noisy_mixture_long_lengthscale
             kernel = kernel1 + kernel2
 
         else:
