@@ -347,8 +347,8 @@ class ICMNISTGenerator(MNISTGenerator):
         # Sample dataset.
         xc = torch.stack([x_[mask] for x_, mask in zip(x[:, 0, ...], mc)])
         yc = torch.stack([y_[mask] for y_, mask in zip(y[:, 0, ...], mc)])
-        xt = torch.stack([x_[mask] for x_, mask in zip(x[:, 0, ...], mc)])
-        yt = torch.stack([y_[mask] for y_, mask in zip(y[:, 0, ...], mc)])
+        xt = torch.stack([x_[~mask] for x_, mask in zip(x[:, 0, ...], mc)])
+        yt = torch.stack([y_[~mask] for y_, mask in zip(y[:, 0, ...], mc)])
 
         # Sample in-context dataset.
         xic = torch.stack(
