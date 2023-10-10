@@ -33,9 +33,7 @@ def main():
         evaluation_summary("val", val_result)
         checkpointer.update_best_and_last_checkpoint(model=model, val_result=val_result)
 
-        plot_mnist(
-            model=model, batches=batches, epoch=epoch, num_fig=min(5, len(batches))
-        )
+        plot(model=model, batches=batches, epoch=epoch, num_fig=min(5, len(batches)))
 
 
 if __name__ == "__main__":
