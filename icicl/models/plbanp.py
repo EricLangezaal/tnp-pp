@@ -30,10 +30,14 @@ class PLBANPEncoder(nn.Module):
         yc: torch.Tensor,
         xt: torch.Tensor,
     ) -> torch.Tensor:
+        yt = torch.zeros(xt.shape[:-1] + yc.shape[-1:])
+        yc = torch.cat((yc, torch.zeros(yc.shape[:-1] + (1,))), dim=-1)
+        yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,))), dim=-1)
+
         zc = torch.cat((xc, yc), dim=-1)
         zc = self.xy_encoder(zc)
 
-        zt = torch.cat((xt, torch.zeros(*xt.shape[:-1], yc.shape[-1])), dim=-1)
+        zt = torch.cat((xt, yt), dim=-1)
         zt = self.xy_encoder(zt)
 
         zt = self.parallel_nested_perceiver_encoder(zc, zt)
