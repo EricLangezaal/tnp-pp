@@ -86,8 +86,8 @@ class MultiHeadCrossTEAttention(MultiHeadTEAttention):
     def forward(
         self,
         xq: torch.Tensor,
-        xkv: torch.Tensor,
+        xk: torch.Tensor,
         yv: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ):
-        return super().propagate(xq, xkv, yv, mask)
+        return super().propagate(xq, xk, yv, mask)

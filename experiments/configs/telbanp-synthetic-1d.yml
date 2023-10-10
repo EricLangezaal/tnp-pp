@@ -8,11 +8,11 @@ generators:
     noise_std: 0.2
     min_num_ctx: 32
     max_num_ctx: 64
-    min_num_trg: 64
+    min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
-    samples_per_epoch: 16384
+    samples_per_epoch: 16_000
     batch_size: 16
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
@@ -23,7 +23,7 @@ generators:
     noise_std: 0.2
     min_num_ctx: 32
     max_num_ctx: 64
-    min_num_trg: 64
+    min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
@@ -31,37 +31,62 @@ generators:
     batch_size: 16
 
 model:
-  _target_: icicl.models.tetnp.TETNPD
-  encoder: ${tetnpd_encoder}
-  decoder: ${tnpd_decoder}
+  _target_: icicl.models.telbanp.TELBANP
+  encoder: ${telbanp_encoder}
+  decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
-tetnpd_encoder:
-  _target_: icicl.models.tetnp.TETNPDEncoder
-  transformer_encoder: ${tetransformer_encoder}
+telbanp_encoder:
+  _target_: icicl.models.telbanp.TELBANPEncoder
+  nested_perceiver_encoder: ${nested_teperceiver_encoder}
   y_encoder: ${y_encoder}
 
-tetransformer_encoder:
-  _target_: icicl.networks.tetransformer.TETransformerEncoder
-  encoder_layer: ${mhstea_layer}
-  num_layers: 3
+nested_teperceiver_encoder:
+  _target_: icicl.networks.tetransformer.NestedTEPerceiverEncoder
+  dim: ${params.dim}
+  num_latents: ${params.num_latents}
+  mhsa_layer: ${mhsa_layer}
+  mhca_ctoq_layer: ${mhca_ctoq_layer}
+  mhca_qtot_layer: ${mhca_qtot_layer}
+  num_layers: ${params.num_layers}
 
-mhstea_layer:
+mhsa_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadSelfTEAttentionLayer
   embed_dim: ${params.embed_dim}
   head_dim: ${params.embed_dim}
-  kernel: ${kernel}
+  kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
 
-# kernel:
-#   _target_: icicl.networks.kernels.RBFKernel
-#   dim: ${params.dim}
-#   init_lengthscale: 0.1
-
-kernel:
+mhsa_kernel:
   _target_: icicl.networks.kernels.MLPKernel
   dim: ${params.dim}
-  num_layers: 2
+  num_layers: 1
+  width: 16
+
+mhca_ctoq_layer:
+  _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
+  embed_dim: ${params.embed_dim}
+  head_dim: ${params.embed_dim}
+  kernel: ${mhca_ctoq_kernel}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_ctoq_kernel:
+  _target_: icicl.networks.kernels.MLPKernel
+  dim: ${params.dim}
+  num_layers: 1
+  width: 16
+
+mhca_qtot_layer:
+  _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
+  embed_dim: ${params.embed_dim}
+  head_dim: ${params.embed_dim}
+  kernel: ${mhca_qtot_kernel}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_qtot_kernel:
+  _target_: icicl.networks.kernels.MLPKernel
+  dim: ${params.dim}
+  num_layers: 1
   width: 16
 
 y_encoder:
@@ -71,8 +96,8 @@ y_encoder:
   num_layers: 2
   width: ${params.embed_dim}
 
-tnpd_decoder:
-  _target_: icicl.models.tnp.TNPDDecoder
+lbanp_decoder:
+  _target_: icicl.models.lbanp.LBANPDecoder
   z_decoder: ${z_decoder}
 
 z_decoder:
@@ -93,10 +118,12 @@ optimiser:
 params:
   epochs: 200
   dim: 1
-  embed_dim: 32
+  embed_dim: 64
+  num_latents: 16
+  num_layers: 3
 
 
 misc:
-  project: tetnpd
+  project: telbanp
   name: synthetic-1d
   resume_from_checkpoint: null

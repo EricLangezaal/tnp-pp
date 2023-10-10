@@ -79,7 +79,7 @@ class MultiHeadSelfTEAttentionLayer(MultiHeadTEAttentionLayer):
         return y
 
 
-class MultiHeadCrossAttentionLayer(MultiHeadTEAttentionLayer):
+class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, attention=MultiHeadCrossTEAttention, **kwargs)
 
@@ -103,6 +103,7 @@ class MultiHeadCrossAttentionLayer(MultiHeadTEAttentionLayer):
     @check_shapes(
         "xq: [m, nq, d]",
         "xk: [m, nkv, d]",
+        "yq: [m, nq, dy]",
         "yv: [m, nkv, dy]",
         "mask: [m, nq, nkv]",
         "return: [m, nq, dy]",
@@ -111,14 +112,15 @@ class MultiHeadCrossAttentionLayer(MultiHeadTEAttentionLayer):
         self,
         xq: torch.Tensor,
         xk: torch.Tensor,
+        yq: torch.Tensor,
         yv: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if self.norm_first:
-            yv = yv + self.attn_block(xq, xk, self.norm1(yv), mask)
-            yv = yv + self.ff_block(self.norm2(yv))
+            yq = yq + self.attn_block(xq, xk, self.norm1(yv), mask)
+            yq = yq + self.ff_block(self.norm2(yq))
         else:
-            yv = yv + self.norm1(yv + self.attn_block(xq, xk, yv, mask))
-            yv = self.norm2(yv + self.ff_block(yv))
+            yq = yq + self.norm1(yq + self.attn_block(xq, xk, yv, mask))
+            yq = self.norm2(yq + self.ff_block(yq))
 
-        return yv
+        return yq
