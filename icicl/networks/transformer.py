@@ -14,22 +14,48 @@ from .attention_layers import MultiHeadCrossAttentionLayer, MultiHeadSelfAttenti
 class TransformerEncoder(nn.Module):
     def __init__(
         self,
-        encoder_layer: MultiHeadSelfAttentionLayer,
+        mhsa_layer: MultiHeadSelfAttentionLayer,
         num_layers: int,
     ):
         super().__init__()
 
-        self.layers = _get_clones(encoder_layer, num_layers)
-        self.num_layers = num_layers
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
 
     @check_shapes("x: [m, n, d]", "mask: [m, n, n]", "return: [m, n, d]")
     def forward(
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        for layer in self.layers:
-            x = layer(x, mask)
+        for mhsa_layer in self.mhsa_layers:
+            x = mhsa_layer(x, mask)
 
         return x
+
+
+class TNPDTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        mhsa_layer: MultiHeadSelfAttentionLayer,
+        mhca_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert mhca_layer.embed_dim == mhsa_layer.embed_dim, "embed_dim mismatch."
+
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.mhca_layers = _get_clones(mhca_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, d]", "xt: [m, nt, d]", "mask: [m, nt, nc]", "return: [m, nt, d]"
+    )
+    def forward(
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
+            xc = mhsa_layer(xc)
+            xt = mhca_layer(xt, xc, mask)
+
+        return xt
 
 
 class PerceiverEncoder(nn.Module):
