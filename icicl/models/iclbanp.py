@@ -37,7 +37,6 @@ class ICLBANPEncoder(nn.Module):
     ) -> torch.Tensor:
         yc, yt = preprocess_observations(xt, yc)
         yic = torch.cat((yic, torch.zeros(yic.shape[:-1] + (1,)).to(yic)), dim=-1)
-        yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,)).to(yt)), dim=-1)
 
         zc = torch.cat((xc, yc), dim=-1)
         zc = self.xy_encoder(zc)
