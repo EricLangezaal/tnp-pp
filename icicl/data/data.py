@@ -17,20 +17,20 @@ class GroundTruthPredictor(ABC):
 
 @dataclass
 class Batch:
-    x: Optional[torch.Tensor] = None
-    y: Optional[torch.Tensor] = None
+    x: torch.Tensor
+    y: torch.Tensor
 
-    xc: Optional[torch.Tensor] = None
-    yc: Optional[torch.Tensor] = None
+    xc: torch.Tensor
+    yc: torch.Tensor
 
-    xt: Optional[torch.Tensor] = None
-    yt: Optional[torch.Tensor] = None
+    xt: torch.Tensor
+    yt: torch.Tensor
 
 
 @dataclass
 class ICBatch(Batch):
-    xic: Optional[torch.Tensor] = None
-    yic: Optional[torch.Tensor] = None
+    xic: torch.Tensor
+    yic: torch.Tensor
 
 
 @dataclass
@@ -45,7 +45,7 @@ class SyntheticBatch(Batch):
 
 
 @dataclass
-class ICSyntheticBatch(ICBatch, SyntheticBatch):
+class ICSyntheticBatch(SyntheticBatch, ICBatch):
     pass
 
 
@@ -175,6 +175,8 @@ class SyntheticGenerator(DataGenerator, ABC):
         yt = y[:, num_ctx:, :]
 
         return SyntheticBatch(
+            x=x,
+            y=y,
             xc=xc,
             yc=yc,
             xt=xt,
@@ -316,6 +318,8 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
         yt = y[:, num_ctx:, :]
 
         return ICSyntheticBatch(
+            x=x,
+            y=y,
             xc=xc,
             yc=yc,
             xt=xt,

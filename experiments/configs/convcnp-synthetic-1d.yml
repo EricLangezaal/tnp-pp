@@ -56,6 +56,13 @@ unet:
   num_blocks: 5
   kernel_size: 5
 
+# cnn:
+#   _target_: icicl.networks.cnn.CNN
+#   dim: ${params.dim}
+#   num_channels: 2
+#   num_blocks: 5
+#   kernel_size: 5
+
 convcnp_decoder:
   _target_: icicl.networks.setconv.SetConvDecoder
   dim: ${params.dim}
@@ -74,7 +81,6 @@ params:
   epochs: 200
   dim: 1
   points_per_unit: 32
-
 
 misc:
   project: convcnp
