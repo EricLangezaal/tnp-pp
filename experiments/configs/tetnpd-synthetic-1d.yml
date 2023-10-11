@@ -4,12 +4,12 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 1
-    max_num_ctx: 512
-    min_num_trg: 512
-    max_num_trg: 512
+    min_num_ctx: 32
+    max_num_ctx: 64
+    min_num_trg: 64
+    max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
     samples_per_epoch: 16384
@@ -19,46 +19,57 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 1
-    max_num_ctx: 512
-    min_num_trg: 512
-    max_num_trg: 512
+    min_num_ctx: 32
+    max_num_ctx: 64
+    min_num_trg: 64
+    max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
     samples_per_epoch: 4096
     batch_size: 16
 
 model:
-  _target_: icicl.models.tnp.TNPD
-  encoder: ${tnpd_encoder}
+  _target_: icicl.models.tetnp.TETNPD
+  encoder: ${tetnpd_encoder}
   decoder: ${tnpd_decoder}
   likelihood: ${likelihood}
 
-tnpd_encoder:
-  _target_: icicl.models.tnp.TNPDEncoder
-  transformer_encoder: ${transformer_encoder}
-  xy_encoder: ${xy_encoder}
+tetnpd_encoder:
+  _target_: icicl.models.tetnp.TETNPDEncoder
+  transformer_encoder: ${tetransformer_encoder}
+  y_encoder: ${y_encoder}
 
-transformer_encoder:
-  _target_: icicl.networks.transformer.TransformerEncoder
-  encoder_layer: ${mhsa_layer}
+tetransformer_encoder:
+  _target_: icicl.networks.tetransformer.TETransformerEncoder
+  encoder_layer: ${mhstea_layer}
   num_layers: 3
 
-mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+mhstea_layer:
+  _target_: icicl.networks.teattention_layers.MultiHeadSelfTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 3
-  head_dim: 16
+  head_dim: ${params.embed_dim}
+  kernel: ${kernel}
   feedforward_dim: ${params.embed_dim}
 
-xy_encoder:
+# kernel:
+#   _target_: icicl.networks.kernels.RBFKernel
+#   dim: ${params.dim}
+#   init_lengthscale: 0.1
+
+kernel:
+  _target_: icicl.networks.kernels.MLPKernel
+  dim: ${params.dim}
+  num_layers: 2
+  width: 16
+
+y_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + ${params.dim}'}
+  in_dim: 2
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder
@@ -69,7 +80,7 @@ z_decoder:
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -86,5 +97,6 @@ params:
 
 
 misc:
-  project: tnp_tests
-  name: v0
+  project: tetnpd
+  name: synthetic-1d
+  resume_from_checkpoint: null
