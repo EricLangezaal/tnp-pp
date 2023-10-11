@@ -12,7 +12,7 @@ from torch import nn
 from tqdm.auto import tqdm
 
 import wandb
-from icicl.data.data import Batch, DataGenerator
+from icicl.data.data import Batch, DataGenerator, ICBatch, SyntheticBatch
 
 
 class ModelCheckpointer:
@@ -127,22 +127,22 @@ def train_epoch(
     for batch in epoch:
         optimiser.zero_grad()
 
-        if not hasattr(batch, "xic") or not hasattr(batch, "yic"):
-            xic = None
-            yic = None
+        if isinstance(batch, ICBatch):
+            loss = loss_fn(
+                model=model,
+                xc=batch.xc,
+                yc=batch.yc,
+                xt=batch.xt,
+                yt=batch.yt,
+                xic=batch.xic,
+                yic=batch.yic,
+            )
         else:
-            xic = batch.xic
-            yic = batch.yic
+            assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
+            loss = loss_fn(
+                model=model, xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
+            )
 
-        loss = loss_fn(
-            model=model,
-            xc=batch.xc,
-            yc=batch.yc,
-            xt=batch.xt,
-            yt=batch.yt,
-            xic=xic,
-            yic=yic,
-        )
         loss.backward()
         optimiser.step()
 
@@ -172,7 +172,7 @@ def val_epoch(
     for batch in tqdm(generator, total=len(generator), desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
-            if hasattr(batch, "xic") and hasattr(batch, "yic"):
+            if isinstance(batch, ICBatch):
                 pred_dist = model(
                     xc=batch.xc,
                     yc=batch.yc,
@@ -181,11 +181,12 @@ def val_epoch(
                     xt=batch.xt,
                 )
             else:
+                assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
                 pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
 
         loglik = pred_dist.log_prob(batch.yt).mean()
 
-        if hasattr(batch, "gt_pred"):
+        if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
             gt_mean, gt_std, gt_loglik = batch.gt_pred(
                 xc=batch.xc,
                 yc=batch.yc,

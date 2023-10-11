@@ -12,7 +12,7 @@ generators:
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
-    samples_per_epoch: 16_000
+    samples_per_epoch: 16
     batch_size: 16
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
@@ -27,7 +27,7 @@ generators:
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
     target_range: [[-3.0, 3.0]]
-    samples_per_epoch: 4096
+    samples_per_epoch: 16
     batch_size: 16
 
 model:
@@ -103,6 +103,6 @@ params:
 
 
 misc:
-  project: lbanp_tests
-  name: noisy_periodic_mixture
+  project: lbanp
+  name: test
   resume_from_checkpoint: null

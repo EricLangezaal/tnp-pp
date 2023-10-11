@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 import wandb
-from icicl.data.mnist import MNISTBatch
+from icicl.data.image import ICImageBatch, ImageBatch
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -16,38 +16,34 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 def plot_mnist(
     model: nn.Module,
-    batches: List[MNISTBatch],
+    batches: List[ImageBatch],
     epoch: int = 0,
     num_fig: int = 5,
     figsize: Tuple[float, float] = (24.0, 8.0),
 ):
     for i in range(num_fig):
-        x = batches[i].x
-        y = batches[i].y
-        xc = batches[i].xc
-        yc = batches[i].yc
-        xt = batches[i].xt
-        yt = batches[i].yt
-        mc = batches[i].mc
+        batch = batches[i]
 
-        if hasattr(batches[i], "xic") and hasattr(batches[i], "yic"):
-            xic = batches[i].xic
-            yic = batches[i].yic
-        else:
-            xic = None
-            yic = None
+        x = batch.x
+        y = batch.y
+        xc = batch.xc
+        yc = batch.yc
+        xt = batch.xt
+        yt = batch.yt
+        mc = batch.mc
 
         with torch.no_grad():
-            if xic is not None and yic is not None:
+            if isinstance(batch, ICImageBatch):
                 y_plot_pred_dist = model(
                     xc=xc,
                     yc=yc,
-                    xic=xic,
-                    yic=yic,
+                    xic=batch.xic,
+                    yic=batch.yic,
                     xt=x,
                 )
-                yt_pred_dist = model(xc=xc, yc=yc, xic=xic, yic=yic, xt=xt)
+                yt_pred_dist = model(xc=xc, yc=yc, xic=batch.xic, yic=batch.yic, xt=xt)
             else:
+                assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
                 y_plot_pred_dist = model(xc=xc, yc=yc, xt=x)
                 yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 

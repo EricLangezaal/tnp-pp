@@ -10,7 +10,11 @@ class GroundTruthPredictor(ABC):
         pass
 
     def __call__(
-        self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor, yt: torch.Tensor
+        self,
+        xc: torch.Tensor,
+        yc: torch.Tensor,
+        xt: torch.Tensor,
+        yt: Optional[torch.Tensor] = None,
     ) -> Any:
         raise NotImplementedError
 
