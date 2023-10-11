@@ -35,7 +35,7 @@ def test_tnpd(ndim: int):
     transformer_encoder = TransformerEncoder(
         encoder_layer=transformer_encoder_layer, num_layers=num_layers
     )
-    xy_encoder = MLP(dy + ndim, embed_dim, num_layers=2, width=64)
+    xy_encoder = MLP(dy + ndim + 1, embed_dim, num_layers=2, width=64)
     z_decoder = MLP(embed_dim, dy, num_layers=2, width=64)
 
     tnpd_encoder = TNPDEncoder(

@@ -60,7 +60,7 @@ mhca_qtot_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'${params.dim} + 1'}
+  in_dim: ${eval:'${params.dim} + 2'}
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}

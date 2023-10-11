@@ -2,9 +2,9 @@ generators:
   train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: noisy_periodic_mixture
-    min_log10_lengthscale: -0.301
-    max_log10_lengthscale: 0.301
+    kernel_type: eq
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 32
     max_num_ctx: 64
@@ -17,9 +17,9 @@ generators:
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: noisy_periodic_mixture
-    min_log10_lengthscale: -0.301
-    max_log10_lengthscale: 0.301
+    kernel_type: eq
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
     min_num_ctx: 32
     max_num_ctx: 64
@@ -31,48 +31,67 @@ generators:
     batch_size: 16
 
 model:
-  _target_: icicl.models.lbanp.LBANP
-  encoder: ${lbanp_encoder}
+  _target_: icicl.models.telbanp.TELBANP
+  encoder: ${telbanp_encoder}
   decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
-lbanp_encoder:
-  _target_: icicl.models.lbanp.LBANPEncoder
-  nested_perceiver_encoder: ${nested_perceiver_encoder}
-  xy_encoder: ${xy_encoder}
+telbanp_encoder:
+  _target_: icicl.models.telbanp.TELBANPEncoder
+  nested_perceiver_encoder: ${nested_teperceiver_encoder}
+  y_encoder: ${y_encoder}
 
-nested_perceiver_encoder:
-  _target_: icicl.networks.transformer.NestedPerceiverEncoder
-  num_latents: 16
+nested_teperceiver_encoder:
+  _target_: icicl.networks.tetransformer.NestedTEPerceiverEncoder
+  dim: ${params.dim}
+  num_latents: ${params.num_latents}
   mhsa_layer: ${mhsa_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
-  num_layers: 5
+  num_layers: ${params.num_layers}
 
 mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  _target_: icicl.networks.teattention_layers.MultiHeadSelfTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  head_dim: ${params.embed_dim}
+  kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
+
+mhsa_kernel:
+  _target_: icicl.networks.kernels.MLPKernel
+  dim: ${params.dim}
+  num_layers: 1
+  width: 16
 
 mhca_ctoq_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  head_dim: ${params.embed_dim}
+  kernel: ${mhca_ctoq_kernel}
   feedforward_dim: ${params.embed_dim}
+
+mhca_ctoq_kernel:
+  _target_: icicl.networks.kernels.MLPKernel
+  dim: ${params.dim}
+  num_layers: 1
+  width: 16
 
 mhca_qtot_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  head_dim: ${params.embed_dim}
+  kernel: ${mhca_qtot_kernel}
   feedforward_dim: ${params.embed_dim}
 
-xy_encoder:
+mhca_qtot_kernel:
+  _target_: icicl.networks.kernels.MLPKernel
+  dim: ${params.dim}
+  num_layers: 1
+  width: 16
+
+y_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'${params.dim} + 2'}
+  in_dim: 2
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
@@ -100,9 +119,11 @@ params:
   epochs: 200
   dim: 1
   embed_dim: 64
+  num_latents: 16
+  num_layers: 3
 
 
 misc:
-  project: lbanp_tests
-  name: noisy_periodic_mixture
+  project: telbanp
+  name: synthetic-1d
   resume_from_checkpoint: null

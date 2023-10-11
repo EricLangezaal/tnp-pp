@@ -2,27 +2,24 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..networks.transformer import ParallelNestedPerceiverEncoder
+from ..networks.tetransformer import NestedTEPerceiverEncoder
 from .base import NeuralProcess
 from .lbanp import LBANPDecoder
 
 
-class PLBANPEncoder(nn.Module):
+class TELBANPEncoder(nn.Module):
     def __init__(
         self,
-        parallel_nested_perceiver_encoder: ParallelNestedPerceiverEncoder,
-        xy_encoder: nn.Module,
+        nested_perceiver_encoder: NestedTEPerceiverEncoder,
+        y_encoder: nn.Module,
     ):
         super().__init__()
 
-        self.parallel_nested_perceiver_encoder = parallel_nested_perceiver_encoder
-        self.xy_encoder = xy_encoder
+        self.nested_perceiver_encoder = nested_perceiver_encoder
+        self.y_encoder = y_encoder
 
     @check_shapes(
-        "xc: [m, nc, dx]",
-        "yc: [m, nc, dy]",
-        "xt: [m, nt, dx]",
-        "return: [m, nq, dz]",
+        "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, nq, dz]"
     )
     def forward(
         self,
@@ -34,20 +31,17 @@ class PLBANPEncoder(nn.Module):
         yc = torch.cat((yc, torch.zeros(yc.shape[:-1] + (1,))), dim=-1)
         yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,))), dim=-1)
 
-        zc = torch.cat((xc, yc), dim=-1)
-        zc = self.xy_encoder(zc)
+        zc = self.y_encoder(yc)
+        zt = self.y_encoder(yt)
 
-        zt = torch.cat((xt, yt), dim=-1)
-        zt = self.xy_encoder(zt)
-
-        zt = self.parallel_nested_perceiver_encoder(zc, zt)
+        zt = self.nested_perceiver_encoder(xc, xt, zc, zt)
         return zt
 
 
-class PLBANP(NeuralProcess):
+class TELBANP(NeuralProcess):
     def __init__(
         self,
-        encoder: PLBANPEncoder,
+        encoder: TELBANPEncoder,
         decoder: LBANPDecoder,
         likelihood: nn.Module,
     ):

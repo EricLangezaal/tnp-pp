@@ -34,13 +34,18 @@ class ICLBANPEncoder(nn.Module):
         yic: torch.Tensor,
         xt: torch.Tensor,
     ) -> torch.Tensor:
+        yt = torch.zeros(xt.shape[:-1] + yc.shape[-1:])
+        yc = torch.cat((yc, torch.zeros(yc.shape[:-1] + (1,))), dim=-1)
+        yic = torch.cat((yic, torch.zeros(yic.shape[:-1] + (1,))), dim=-1)
+        yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,))), dim=-1)
+
         zc = torch.cat((xc, yc), dim=-1)
         zc = self.xy_encoder(zc)
 
         zic = torch.cat((xic, yic), dim=-1)
         zic = self.xy_encoder(zic)
 
-        zt = torch.cat((xt, torch.zeros(*xt.shape[:-1], yc.shape[-1])), dim=-1)
+        zt = torch.cat((xt, yt), dim=-1)
         zt = self.xy_encoder(zt)
 
         zt = self.ic_nested_perceiver_encoder(zc, zic, zt)

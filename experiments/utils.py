@@ -246,7 +246,7 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
     wandb.log({f"{name}/loglik": torch.stack(result["loglik"]).mean()})
 
-    if hasattr(result, "gt_loglik"):
+    if "gt_loglik" in result:
         wandb.log(
             {
                 f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
