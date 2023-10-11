@@ -4,7 +4,7 @@ from utils import initialize_experiment, np_loss_fn
 
 
 def main():
-    experiment = initialize_experiment()
+    experiment, _ = initialize_experiment()
 
     model = experiment.model
     gen_train = experiment.generators.train

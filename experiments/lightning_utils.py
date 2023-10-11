@@ -25,7 +25,13 @@ class LitWrapper(pl.LightningModule):
     def training_step(self, batch: SyntheticBatch, batch_idx: int) -> torch.Tensor:
         _ = batch_idx
 
-        loss = self.loss_fn(self.model, batch.xc, batch.yc, batch.xt, batch.yt)
+        if hasattr(batch, "xic") and hasattr(batch, "yic"):
+            loss = self.loss_fn(
+                self.model, batch.xc, batch.yc, batch.xt, batch.yt, batch.xic, batch.yic
+            )
+        else:
+            loss = self.loss_fn(self.model, batch.xc, batch.yc, batch.xt, batch.yt)
+
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
@@ -33,7 +39,17 @@ class LitWrapper(pl.LightningModule):
         _ = batch_idx
         result = {"batch": batch}
 
-        pred_dist = self.model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+        if hasattr(batch, "xic") and hasattr(batch, "yic"):
+            pred_dist = self.model(
+                xc=batch.xc,
+                yc=batch.yc,
+                xic=batch.xic,
+                yic=batch.yic,
+                xt=batch.xt,
+            )
+        else:
+            pred_dist = self.model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+
         loglik = pred_dist.log_prob(batch.yt).mean()
         result["loglik"] = loglik
 
@@ -41,7 +57,7 @@ class LitWrapper(pl.LightningModule):
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
-            gt_loglik = gt_loglik.mean() / batch.yc.shape[-2]
+            gt_loglik = gt_loglik.mean() / batch.yc.shape[1]
             result["gt_loglik"] = gt_loglik
 
         self.val_outputs.append(result)
