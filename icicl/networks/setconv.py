@@ -215,11 +215,11 @@ def make_grid(
         torch.meshgrid(
             *[torch.range(-N[i], N[i], dtype=xmin.dtype) for i in range(dim)]
         ),
-        dim=-1,
+        axis=-1,
     )  # shape (n1, n2, ..., ndim, dim)
 
     for _ in range(dim):
-        x_mid = torch.unsqueeze(x_mid, dim=-2)
+        x_mid = torch.unsqueeze(x_mid, axis=-2)
 
     # Multiply integer grid by the grid spacing and add midpoint
     grid = x_mid + grid[None, ...] / points_per_unit

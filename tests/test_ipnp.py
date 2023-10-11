@@ -90,7 +90,6 @@ def test_ipnp(ndim: int):
         spin_decoder=spin_decoder,
         attribute_encoder=attribute_encoder,
         z_decoder=z_decoder,
-        dy=dy,
     )
     likelihood = NormalLikelihood(noise=1e-1)
 

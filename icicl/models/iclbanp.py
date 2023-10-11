@@ -3,6 +3,7 @@ from check_shapes import check_shapes
 from torch import nn
 
 from ..networks.transformer import ICNestedPerceiverEncoder
+from ..utils.helpers import preprocess_observations
 from .base import ICNeuralProcess
 from .lbanp import LBANPDecoder
 
@@ -34,10 +35,9 @@ class ICLBANPEncoder(nn.Module):
         yic: torch.Tensor,
         xt: torch.Tensor,
     ) -> torch.Tensor:
-        yt = torch.zeros(xt.shape[:-1] + yc.shape[-1:])
-        yc = torch.cat((yc, torch.zeros(yc.shape[:-1] + (1,))), dim=-1)
-        yic = torch.cat((yic, torch.zeros(yic.shape[:-1] + (1,))), dim=-1)
-        yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,))), dim=-1)
+        yc, yt = preprocess_observations(xt, yc)
+        yic = torch.cat((yic, torch.zeros(yic.shape[:-1] + (1,)).to(yic)), dim=-1)
+        yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,)).to(yt)), dim=-1)
 
         zc = torch.cat((xc, yc), dim=-1)
         zc = self.xy_encoder(zc)

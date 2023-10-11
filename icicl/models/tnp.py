@@ -3,6 +3,7 @@ from check_shapes import check_shapes
 from torch import nn
 
 from ..networks.transformer import TransformerEncoder
+from ..utils.helpers import preprocess_observations
 from .base import NeuralProcess
 
 
@@ -23,9 +24,7 @@ class TNPDEncoder(nn.Module):
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
     ) -> torch.Tensor:
-        yt = torch.zeros(xt.shape[:-1] + yc.shape[-1:])
-        yc = torch.cat((yc, torch.zeros(yc.shape[:-1] + (1,))), dim=-1)
-        yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,))), dim=-1)
+        yc, yt = preprocess_observations(xt, yc)
 
         x = torch.cat((xc, xt), dim=-2)
         y = torch.cat((yc, yt), dim=-2)

@@ -1,9 +1,12 @@
+from typing import Tuple
+
 import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
 from ..networks.transformer import SPINDecoder, SPINEncoder
+from ..utils.helpers import preprocess_observations
 from .base import NeuralProcess
 
 
@@ -19,12 +22,18 @@ class IPNPEncoder(nn.Module):
         self.attribute_encoder = attribute_encoder
 
     @check_shapes(
-        "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, nq, dz]"
+        "xc: [m, nc, dx]",
+        "yc: [m, nc, dy]",
+        "xt: [m, nt, dx]",
+        "return[0]: [m, nq, dz]",
+        "return[1]: [m, nt, dy_]",
     )
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
     ) -> torch.Tensor:
         _ = xt
+
+        yc, yt = preprocess_observations(xt, yc)
 
         zc = torch.cat((xc, yc), dim=-1)
         zc = einops.rearrange(zc, "m n d -> (m n d) 1")
@@ -38,7 +47,7 @@ class IPNPEncoder(nn.Module):
         )
 
         zq = self.spin_encoder(zc)
-        return zq
+        return zq, yt
 
 
 class IPNPDecoder(nn.Module):
@@ -47,18 +56,25 @@ class IPNPDecoder(nn.Module):
         spin_decoder: SPINDecoder,
         attribute_encoder: nn.Module,
         z_decoder: nn.Module,
-        dy: int = 1,
     ):
         super().__init__()
 
         self.spin_decoder = spin_decoder
         self.attribute_encoder = attribute_encoder
         self.z_decoder = z_decoder
-        self.dy = dy
 
-    @check_shapes("zq: [m, nq, dz]", "xt: [m, nt, dx]", "return: [m, nt, dy]")
-    def forward(self, zq: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
-        zt = torch.cat((xt, torch.zeros(*xt.shape[:-1], self.dy)), dim=-1)
+    @check_shapes(
+        "out[0]: [m, nq, dz]",
+        "out[1]: [m, nt, dy]",
+        "xt: [m, nt, dx]",
+        "return: [m, nt, dy]",
+    )
+    def forward(
+        self, out: Tuple[torch.Tensor, torch.Tensor], xt: torch.Tensor
+    ) -> torch.Tensor:
+        zq, yt_ = out
+
+        zt = torch.cat((xt, yt_), dim=-1)
         zt = einops.rearrange(zt, "m n d -> (m n d) 1")
         zt = self.attribute_encoder(zt)
         zt = einops.rearrange(
@@ -66,7 +82,7 @@ class IPNPDecoder(nn.Module):
             "(m n d) e -> m n d e",
             m=xt.shape[0],
             n=xt.shape[1],
-            d=xt.shape[-1] + self.dy,
+            d=xt.shape[-1] + yt_.shape[-1],
         )
 
         zt = self.spin_decoder(zt, zq)
