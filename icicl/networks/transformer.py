@@ -260,8 +260,6 @@ class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
         embed_dim = mhsa_layer.embed_dim
         self.ic_latents = nn.Parameter(torch.randn(num_ic_latents, embed_dim))
 
-        self.ic_mhsa_layers = _get_clones(mhsa_layer, num_layers)
-        self.ic_mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
         self.ic_mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
 
     @check_shapes(
@@ -279,19 +277,10 @@ class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
         )
         # shape (m x nic, ncic, dx).
         xic, _ = compress_batch_dimensions(xic, other_dims=2)
-        for (
-            mhsa_layer,
-            mhca_ctoq_layer,
-            mhca_qtot_layer,
-            ic_mhsa_layer,
-            ic_mhca_ctoq_layer,
-            ic_mhca_qtot_layer,
-        ) in zip(
+        for (mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer, ic_mhca_qtot_layer,) in zip(
             self.mhsa_layers,
             self.mhca_ctoq_layers,
             self.mhca_qtot_layers,
-            self.ic_mhsa_layers,
-            self.ic_mhca_ctoq_layers,
             self.ic_mhca_qtot_layers,
         ):
             # Attention with context set.
@@ -301,8 +290,6 @@ class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
 
             # Attention with in-context datasets.
             xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
-            # xqic = ic_mhca_ctoq_layer(xqic, xic)
-            # xqic = ic_mhsa_layer(xqic)
             xqic = mhca_ctoq_layer(xqic, xic)
             xqic = mhsa_layer(xqic)
             xqic = xqic_uncompress(xqic)

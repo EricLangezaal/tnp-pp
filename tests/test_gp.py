@@ -65,10 +65,13 @@ def test_ic_gp(kernel: str):
     max_num_ctx = 512
     min_num_trg = 512
     max_num_trg = 512
+    min_num_dc_ctx = 1
+    max_num_dc_ctx = 512
     min_num_dc = 1
     max_num_dc = 1
     context_range = ((-2.0, 2.0),)
     target_range = ((-3.0, 3.0),)
+    ic_context_range = ((-3.0, 3.0),)
 
     samples_per_epoch = 2
     batch_size = 3
@@ -89,6 +92,9 @@ def test_ic_gp(kernel: str):
         target_range=target_range,
         min_num_dc=min_num_dc,
         max_num_dc=max_num_dc,
+        min_num_dc_ctx=min_num_dc_ctx,
+        max_num_dc_ctx=max_num_dc_ctx,
+        ic_context_range=ic_context_range,
     )
 
     # Training params.

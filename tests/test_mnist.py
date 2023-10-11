@@ -77,7 +77,6 @@ def test_mnist_generator_ic():
     train = True
     download = True
     samples_per_epoch = 200
-    sample_label_per_batch = True
     min_num_dc = 1
     max_num_dc = 1
     min_prop_dc_ctx = 0.5
@@ -95,7 +94,6 @@ def test_mnist_generator_ic():
         train=train,
         download=download,
         samples_per_epoch=samples_per_epoch,
-        same_label_per_batch=sample_label_per_batch,
     )
 
     for _ in range(epochs):

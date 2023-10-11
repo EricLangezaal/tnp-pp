@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from icicl.networks.conv import UNet
+from icicl.networks.cnn import UNet
 
 
 @pytest.mark.parametrize("ndim", [1, 2])
@@ -12,19 +12,13 @@ def test_unet(ndim: int):
     points_per_dim = 100
     z_grid = torch.randn(m, *[points_per_dim] * ndim, dy + 1)
 
-    in_channels = dy + 1
-    first_channels = 32
-    last_channels = 2
-    kernel_size = 3
-    num_channels = [32, 32, 32, 32, 32]
+    num_channels = dy + 1
+    num_blocks = 5
 
     unet = UNet(
         dim=ndim,
-        in_channels=in_channels,
-        first_channels=first_channels,
-        last_channels=last_channels,
-        kernel_size=kernel_size,
         num_channels=num_channels,
+        num_blocks=num_blocks,
     )
     z_grid = unet(z_grid)
 

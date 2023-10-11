@@ -65,11 +65,14 @@ class SingleLabelBatchSampler:
         )[: self.num_batches]
 
         for label in batch_labels:
-            batch = [
-                self.label_list[int(label)][next(samplers[int(label)])]
-                for _ in range(self.batch_size)
-            ]
-            yield batch
+            try:
+                batch = [
+                    self.label_list[int(label)][next(samplers[int(label)])]
+                    for _ in range(self.batch_size)
+                ]
+                yield batch
+            except StopIteration:
+                yield None
 
 
 class MNISTGenerator:
@@ -265,7 +268,10 @@ class ICMNISTGenerator(MNISTGenerator):
         batch_size = 1 + max_num_dc
 
         super().__init__(
-            batch_size=batch_size, samples_per_epoch=samples_per_epoch, **kwargs
+            batch_size=batch_size,
+            samples_per_epoch=samples_per_epoch,
+            same_label_per_batch=True,
+            **kwargs,
         )
 
         self.min_num_dc = min_num_dc
