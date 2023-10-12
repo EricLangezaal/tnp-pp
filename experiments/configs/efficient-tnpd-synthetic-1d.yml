@@ -37,7 +37,7 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.tnp.TNPDEncoder
+  _target_: icicl.models.tnp.EfficientTNPDEncoder
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 

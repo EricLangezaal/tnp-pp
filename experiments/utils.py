@@ -121,9 +121,9 @@ def train_epoch(
     optimiser: torch.optim.Optimizer,
     step: int,
     loss_fn: Callable = np_loss_fn,
-) -> int:
+) -> Tuple[int, Dict[str, Any]]:
     epoch = tqdm(generator, total=len(generator), desc="Training")
-
+    losses = []
     for batch in epoch:
         optimiser.zero_grad()
 
@@ -146,12 +146,19 @@ def train_epoch(
         loss.backward()
         optimiser.step()
 
+        losses.append(loss.detach())
         wandb.log({"train/loss": loss, "step": step})
         epoch.set_postfix({"train/loss": loss.item()})
 
         step += 1
 
-    return step
+    train_result = {
+        "loglik": -torch.stack(losses),
+        "mean_loglik": -torch.stack(losses).mean(),
+        "std_loglik": torch.stack(losses).std(),
+    }
+
+    return step, train_result
 
 
 def val_epoch(
@@ -207,8 +214,10 @@ def val_epoch(
     loss = -loglik.mean()
     wandb.log({"val/loss": loss, "epoch": epoch})
 
-    result["mean_loss"] = -loglik.mean()
-    result["std_loss"] = -loglik.std()
+    result["mean_loglik"] = loglik.mean()
+    result["std_loglik"] = loglik.std()
+    result["mean_loss"] = -result["mean_loglik"]
+    result["std_loss"] = -result["std_loglik"]
 
     return result, batches
 
@@ -245,7 +254,8 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
 
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
-    wandb.log({f"{name}/loglik": torch.stack(result["loglik"]).mean()})
+    if "mean_loglik" in result:
+        wandb.log({f"{name}/loglik": result["mean_loglik"]})
 
     if "gt_loglik" in result:
         wandb.log(

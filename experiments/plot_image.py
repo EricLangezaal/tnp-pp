@@ -14,7 +14,7 @@ matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
-def plot_mnist(
+def plot_image(
     model: nn.Module,
     batches: List[ImageBatch],
     epoch: int = 0,
@@ -61,9 +61,10 @@ def plot_mnist(
             ~mc[:1, :],
             y[:1, :, 0].numpy(),
         )
-        y_plot = einops.rearrange(y_plot, "1 (n m) -> n m", n=28, m=28)
-        mean = einops.rearrange(mean[..., 0], "1 (n m) -> n m", n=28, m=28)
-        std = einops.rearrange(std[..., 0], "1 (n m) -> n m", n=28, m=28)
+        w = y_plot.shape[-1] // 2
+        y_plot = einops.rearrange(y_plot, "1 (n m) -> n m", n=w, m=w)
+        mean = einops.rearrange(mean[..., 0], "1 (n m) -> n m", n=w, m=w)
+        std = einops.rearrange(std[..., 0], "1 (n m) -> n m", n=w, m=w)
 
         axes[0].imshow(y_plot)
         axes[1].imshow(mean)
