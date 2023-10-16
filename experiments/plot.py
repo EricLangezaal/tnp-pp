@@ -26,7 +26,9 @@ def plot(
     dim = batches[0].xc.shape[-1]
 
     if dim == 1:
-        x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim)[None, :, None]
+        x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim).to(
+            batches[0].xc
+        )[None, :, None]
         for i in range(num_fig):
             batch = batches[i]
             xc = batch.xc
@@ -61,16 +63,16 @@ def plot(
 
             # Plot context and target points
             plt.scatter(
-                xc[0, :, 0],
-                yc[0, :, 0],
+                xc[0, :, 0].numpy(),
+                yc[0, :, 0].numpy(),
                 c="k",
                 label="Context",
                 s=20,
             )
 
             plt.scatter(
-                xt[0, :, 0],
-                yt[0, :, 0],
+                xt[0, :, 0].numpy(),
+                yt[0, :, 0].numpy(),
                 c="r",
                 label="Target",
                 s=20,

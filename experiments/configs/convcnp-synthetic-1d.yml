@@ -53,9 +53,9 @@ setconv_encoder:
 cnn:
   _target_: icicl.networks.cnn.UNet
   dim: ${params.dim}
-  num_channels: [64, 64, 64]
-  num_blocks: 5
-  kernel_size: 5
+  num_channels: [64, 64, 64, 64, 64]
+  num_blocks: 9
+  kernel_size: 19
 
 # cnn:
 #   _target_: icicl.networks.cnn.CNN
@@ -96,7 +96,7 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 1e-3
+  lr: 3e-4
 
 params:
   epochs: 200

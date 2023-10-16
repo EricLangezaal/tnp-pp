@@ -216,6 +216,8 @@ def make_grid(
             *[torch.range(-N[i], N[i], dtype=xmin.dtype) for i in range(dim)]
         ),
         axis=-1,
+    ).to(
+        x_mid
     )  # shape (n1, n2, ..., ndim, dim)
 
     for _ in range(dim):
