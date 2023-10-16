@@ -49,7 +49,7 @@ class ConvBlock(nn.Module):
         self.activation = activation
         padding = kernel_size // 2
 
-        Conv = make_depth_sep_conv(Conv)
+        # Conv = make_depth_sep_conv(Conv)
         self.conv = Conv(
             in_channels, out_channels, kernel_size, padding=padding, **kwargs
         )
@@ -87,7 +87,10 @@ class ResConvBlock(nn.Module):
         padding = kernel_size // 2
 
         if num_conv_layers == 2:
-            self.conv1 = make_depth_sep_conv(Conv)(
+            # self.conv1 = make_depth_sep_conv(Conv)(
+            #     in_channels, in_channels, kernel_size, padding=padding, bias=bias
+            # )
+            self.conv1 = Conv(
                 in_channels, in_channels, kernel_size, padding=padding, bias=bias
             )
 
@@ -156,7 +159,7 @@ class CNN(nn.Module):
         self.in_out_channels = self._get_in_out_channels(num_channels, num_blocks)
         self.conv_blocks = nn.ModuleList(
             [
-                ResConvBlock(in_c, out_c, CONV[dim], **kwargs)
+                ConvBlock(in_c, out_c, CONV[dim], **kwargs)
                 for in_c, out_c in self.in_out_channels
             ]
         )
@@ -199,8 +202,8 @@ class UNet(CNN):
     def __init__(
         self,
         dim: int,
-        num_channels: int,
-        num_blocks: int,
+        num_channels: Union[int, List[int]],
+        num_blocks: Optional[int] = None,
         max_num_channels: int = 256,
         pooling_size: int = 2,
         **kwargs,
@@ -261,10 +264,14 @@ class UNet(CNN):
 
         assert num_blocks % 2 == 1, f"n_blocks={num_blocks} not odd."
 
-        # e.g. if n_channels=16, n_blocks=5: [16, 32, 64].
-        channel_list = [
-            factor_chan**i * num_channels for i in range(num_blocks // 2 + 1)
-        ]
+        if isinstance(num_channels, int):
+            # e.g. if n_channels=16, n_blocks=5: [16, 32, 64].
+            channel_list = [
+                factor_chan**i * num_channels for i in range(num_blocks // 2 + 1)
+            ]
+        else:
+            channel_list = list(num_channels)
+
         # e.g.: [16, 32, 64, 64, 32, 16].
         channel_list = channel_list + channel_list[::-1]
 
