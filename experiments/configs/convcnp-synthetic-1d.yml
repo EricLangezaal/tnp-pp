@@ -3,30 +3,30 @@ generators:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
-    min_log10_lengthscale: -0.601
-    max_log10_lengthscale: 0.602
+    min_log10_lengthscale: -0.301
+    max_log10_lengthscale: 0.301
     noise_std: 0.2
     min_num_ctx: 32
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    target_range: [[-5.0, 5.0]]
     samples_per_epoch: 16_000
     batch_size: 16
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
-    min_log10_lengthscale: -0.602
-    max_log10_lengthscale: 0.602
+    min_log10_lengthscale: -0.301
+    max_log10_lengthscale: 0.301
     noise_std: 0.2
     min_num_ctx: 32
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    target_range: [[-5.0, 5.0]]
     samples_per_epoch: 4096
     batch_size: 16
 
@@ -38,36 +38,57 @@ model:
 
 convcnp_encoder:
   _target_: icicl.models.convcnp.ConvCNPEncoder
-  conv_net: ${unet}
+  conv_net: ${cnn}
   setconv_encoder: ${setconv_encoder}
+  resizer: ${encoder_resizer}
 
 setconv_encoder:
   _target_: icicl.networks.setconv.SetConvEncoder
   dim: ${params.dim}
   points_per_unit: ${params.points_per_unit}
-  init_lengthscale: 0.1
+  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
   margin: 0.1
   train_lengthscale: True
 
-unet:
+cnn:
   _target_: icicl.networks.cnn.UNet
   dim: ${params.dim}
-  num_channels: 2
+  num_channels: [64, 64, 64]
   num_blocks: 5
   kernel_size: 5
 
 # cnn:
 #   _target_: icicl.networks.cnn.CNN
 #   dim: ${params.dim}
-#   num_channels: 2
+#   num_channels: 64
 #   num_blocks: 5
-#   kernel_size: 5
+#   kernel_size: 19
+#   # num_conv_layers: 2
+
+encoder_resizer:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: 2
+  out_dim: 64
+  num_layers: 2
+  width: 64
 
 convcnp_decoder:
+  _target_: icicl.models.convcnp.ConvCNPDecoder
+  setconv_decoder: ${setconv_decoder}
+  resizer: ${decoder_resizer}
+
+setconv_decoder:
   _target_: icicl.networks.setconv.SetConvDecoder
   dim: ${params.dim}
-  init_lengthscale: 0.1
+  init_lengthscale: .1
   scaling_factor: ${eval:'${params.points_per_unit} ** ${params.dim}'}
+
+decoder_resizer:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: 64
+  out_dim: 2
+  num_layers: 2
+  width: 64
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -75,12 +96,12 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 5e-4
+  lr: 1e-3
 
 params:
   epochs: 200
   dim: 1
-  points_per_unit: 32
+  points_per_unit: 64
 
 misc:
   project: convcnp

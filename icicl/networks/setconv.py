@@ -44,7 +44,7 @@ class SetConvEncoder(nn.Module):
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
     ) -> torch.Tensor:
-        yc = torch.concat((yc, torch.ones_like(yc)), dim=-1)
+        yc = torch.cat((yc, torch.ones(*yc.shape[:-1], 1).to(yc)), dim=-1)
 
         # Build dimension wise grids.
         if self.xmin is None or self.xmax is None:
@@ -263,11 +263,11 @@ def compute_eq_weights(
 
     # Compute pairwise distances between x1 and x2
     dist2 = torch.sum(
-        (x1 - x2) / lengthscales,
+        ((x1 - x2) / lengthscales).pow(2),
         dim=-1,
     )  # shape (batch_size, num_x1, num_x2)
 
     # Compute weights
-    weights = torch.exp(-0.5 * dist2**2.0)  # shape (batch_size, num_x1, num_x2)
+    weights = torch.exp(-0.5 * dist2)  # shape (batch_size, num_x1, num_x2)
 
     return weights
