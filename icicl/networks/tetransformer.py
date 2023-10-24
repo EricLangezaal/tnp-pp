@@ -25,15 +25,15 @@ class TETransformerEncoder(nn.Module):
         self.num_layers = num_layers
 
     @check_shapes(
-        "x: [m, n, dx]", "y: [m, n, dy]", "mask: [m, n, n]", "return: [m, n, dy]"
+        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, n, n]", "return: [m, n, dy]"
     )
     def forward(
-        self, x: torch.Tensor, y: torch.Tensor, mask: Optional[torch.Tensor] = None
+        self, x: torch.Tensor, t: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         for layer in self.layers:
-            y = layer(x, y, mask)
+            x = layer(x, t, mask)
 
-        return y
+        return x
 
 
 class TEPerceiverEncoder(nn.Module):
@@ -58,18 +58,18 @@ class TEPerceiverEncoder(nn.Module):
         self.num_layers = num_layers
 
     @check_shapes(
-        "x: [m, n, d]", "y: [m, n, dy]", "mask: [m, nq, n]", "return: [m, nq, dy]"
+        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, nq, n]", "return: [m, nq, dx]"
     )
     def forward(
-        self, x: torch.Tensor, y: torch.Tensor, mask: Optional[torch.Tensor] = None
+        self, x: torch.Tensor, t: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        yq = einops.repeat(self.latent_tokens, "l e -> m l e", m=x.shape[0])
-        xq = einops.repeat(self.latent_inputs, "l d -> m l d", m=x.shape[0])
+        xq = einops.repeat(self.latent_tokens, "l e -> m l e", m=x.shape[0])
+        tq = einops.repeat(self.latent_inputs, "l d -> m l d", m=x.shape[0])
         for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
-            yq = mhca_layer(xq, x, yq, y, mask)
-            yq = mhsa_layer(xq, yq)
+            xq = mhca_layer(xq, x, tq, t, mask)
+            xq = mhsa_layer(xq, tq)
 
-        return yq
+        return xq
 
 
 class TEPerceiverDecoder(nn.Module):
@@ -84,24 +84,25 @@ class TEPerceiverDecoder(nn.Module):
         self.num_layers = num_layers
 
     @check_shapes(
-        "x: [m, n, d]",
-        "xq: [m, nq, d]",
-        "yq: [m, nq, dy]",
+        "x: [m, n, dx]",
+        "xq: [m, nq, dx]",
+        "t: [m, n, dt]",
+        "tq: [m, nq, dt]",
         "mask: [m, n, nq]",
-        "return: [m, n, d]",
+        "return: [m, n, dx]",
     )
     def forward(
         self,
         x: torch.Tensor,
         xq: torch.Tensor,
-        y: torch.Tensor,
-        yq: torch.Tensor,
+        t: torch.Tensor,
+        tq: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         for mhca_layer in self.mhca_layers:
-            y = mhca_layer(x, xq, y, yq, mask)
+            x = mhca_layer(x, xq, t, tq, mask)
 
-        return y
+        return x
 
 
 class BaseNestedTEPerceiverEncoder(nn.Module, ABC):
@@ -132,29 +133,29 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
     @check_shapes(
         "xc: [m, nc, dx]",
         "xt: [m, nt, dx]",
-        "yc: [m, nc, dy]",
-        "yt: [m, nt, dy]",
+        "tc: [m, nc, dt]",
+        "tt: [m, nt, dt]",
         "mask: [m, nq, n]",
-        "return: [m, nq, d]",
+        "return: [m, nq, dx]",
     )
     def forward(
         self,
         xc: torch.Tensor,
         xt: torch.Tensor,
-        yc: torch.Tensor,
-        yt: torch.Tensor,
+        tc: torch.Tensor,
+        tt: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        yq = einops.repeat(self.latent_tokens, "l e -> m l e", m=xc.shape[0])
-        xq = einops.repeat(self.latent_inputs, "l d -> m l d", m=xc.shape[0])
+        xq = einops.repeat(self.latent_tokens, "l e -> m l e", m=xc.shape[0])
+        tq = einops.repeat(self.latent_inputs, "l d -> m l d", m=xc.shape[0])
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
             self.mhsa_layers, self.mhca_ctoq_layers, self.mhca_qtot_layers
         ):
-            yq = mhca_ctoq_layer(xq, xc, yq, yc, mask)
-            yq = mhsa_layer(xq, yq)
-            yt = mhca_qtot_layer(xt, xq, yt, yq)
+            xq = mhca_ctoq_layer(xq, xc, tq, tc, mask)
+            xq = mhsa_layer(xq, tq)
+            xt = mhca_qtot_layer(xt, xq, tt, tq)
 
-        return yt
+        return xt
 
 
 def _get_clones(module: nn.Module, n: int) -> nn.ModuleList:

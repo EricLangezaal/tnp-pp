@@ -17,11 +17,13 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
     def __init__(
         self,
         embed_dim: int,
+        num_heads: int,
         head_dim: int,
         attention: MultiHeadTEAttention,
         kernel: Kernel,
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
+        token_attention: bool = True,
         activation: nn.Module = nn.ReLU(),
         norm_first: bool = False,
     ):
@@ -29,7 +31,9 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
         feedforward_dim = embed_dim if feedforward_dim is None else feedforward_dim
 
         self.embed_dim = embed_dim
-        self.attn = attention(kernel, embed_dim, head_dim, p_dropout)
+        self.attn = attention(
+            kernel, embed_dim, num_heads, head_dim, p_dropout, token_attention
+        )
 
         # Feedforward model.
         self.ff_block = nn.Sequential(
@@ -52,31 +56,31 @@ class MultiHeadSelfTEAttentionLayer(MultiHeadTEAttentionLayer):
         super().__init__(*args, attention=MultiHeadSelfTEAttention, **kwargs)
 
     @check_shapes(
-        "x: [m, n, d]", "y: [m, n, dy]", "mask: [m, n, n]", "return: [m, n, dy]"
+        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, n, n]", "return: [m, n, dx]"
     )
     def attn_block(
         self,
         x: torch.Tensor,
-        y: torch.Tensor,
+        t: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        y = self.attn(x, y, mask=mask)
-        return self.attn_dropout(y)
+        x = self.attn(x, t, mask=mask)
+        return self.attn_dropout(x)
 
     @check_shapes(
-        "x: [m, n, d]", "y: [m, n, dy]", "mask: [m, n, n]", "return: [m, n, dy]"
+        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, n, n]", "return: [m, n, dx]"
     )
     def forward(
-        self, x: torch.Tensor, y: torch.Tensor, mask: Optional[torch.Tensor] = None
+        self, x: torch.Tensor, t: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         if self.norm_first:
-            y = y + self.attn_block(x, self.norm1(y), mask)
-            y = y + self.ff_block(self.norm2(y))
+            x = x + self.attn_block(self.norm1(x), t, mask)
+            x = x + self.ff_block(self.norm2(x))
         else:
-            y = y + self.norm1(y + self.attn_block(x, y, mask))
-            y = self.norm2(y + self.ff_block(y))
+            x = x + self.norm1(x + self.attn_block(x, t, mask))
+            x = self.norm2(x + self.ff_block(x))
 
-        return y
+        return x
 
 
 class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
@@ -84,43 +88,45 @@ class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
         super().__init__(*args, attention=MultiHeadCrossTEAttention, **kwargs)
 
     @check_shapes(
-        "xq: [m, nq, d]",
-        "xk: [m, nkv, d]",
-        "yv: [m, nkv, dy]",
-        "mask: [m, nq, nkv]",
-        "return: [m, nq, dy]",
+        "xq: [m, nq, dx]",
+        "xk: [m, nk, dx]",
+        "tq: [m, nq, dt]",
+        "tk: [m, nk, dt]",
+        "mask: [m, nq, nk]",
+        "return: [m, nq, dx]",
     )
     def attn_block(
         self,
         xq: torch.Tensor,
         xk: torch.Tensor,
-        yv: torch.Tensor,
+        tq: torch.Tensor,
+        tk: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        yv = self.attn(xq, xk, yv, mask=mask)
-        return self.attn_dropout(yv)
+        xq = self.attn(xq, xk, tq, tk, mask=mask)
+        return self.attn_dropout(xq)
 
     @check_shapes(
-        "xq: [m, nq, d]",
-        "xk: [m, nkv, d]",
-        "yq: [m, nq, dy]",
-        "yv: [m, nkv, dy]",
-        "mask: [m, nq, nkv]",
-        "return: [m, nq, dy]",
+        "xq: [m, nq, dx]",
+        "xk: [m, nk, dx]",
+        "tq: [m, nq, dt]",
+        "tk: [m, nk, dt]",
+        "mask: [m, nq, nk]",
+        "return: [m, nq, dx]",
     )
     def forward(
         self,
         xq: torch.Tensor,
         xk: torch.Tensor,
-        yq: torch.Tensor,
-        yv: torch.Tensor,
+        tq: torch.Tensor,
+        tk: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if self.norm_first:
-            yq = yq + self.attn_block(xq, xk, self.norm1(yv), mask)
-            yq = yq + self.ff_block(self.norm2(yq))
+            xq = xq + self.attn_block(self.norm1(xq), self.norm1(xk), tq, tk, mask)
+            xq = xq + self.ff_block(self.norm2(xq))
         else:
-            yq = yq + self.norm1(yq + self.attn_block(xq, xk, yv, mask))
-            yq = self.norm2(yq + self.ff_block(yq))
+            xq = xq + self.norm1(xq + self.attn_block(xq, xk, tq, tk, mask))
+            xq = self.norm2(xq + self.ff_block(xq))
 
-        return yq
+        return xq

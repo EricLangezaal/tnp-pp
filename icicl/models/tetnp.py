@@ -34,7 +34,7 @@ class TETNPDEncoder(nn.Module):
         # Construct mask.
         mask = gen_tnpd_mask(xc, xt, targets_self_attend=True)
 
-        z = self.transformer_encoder(x, z, mask)
+        z = self.transformer_encoder(z, x, mask)
         return z
 
 

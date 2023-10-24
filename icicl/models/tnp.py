@@ -12,11 +12,15 @@ class TNPDEncoder(nn.Module):
         self,
         transformer_encoder: TransformerEncoder,
         xy_encoder: nn.Module,
+        targets_self_attend: bool = True,
+        ar_mode: bool = False,
     ):
         super().__init__()
 
         self.transformer_encoder = transformer_encoder
         self.xy_encoder = xy_encoder
+        self.targets_self_attend = targets_self_attend
+        self.ar_mode = ar_mode
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, n, dz]"
@@ -32,7 +36,9 @@ class TNPDEncoder(nn.Module):
         z = self.xy_encoder(z)
 
         # Construct mask.
-        mask = gen_tnpd_mask(xc, xt, targets_self_attend=True)
+        mask = gen_tnpd_mask(
+            xc, xt, targets_self_attend=self.targets_self_attend, ar_mode=self.ar_mode
+        )
 
         z = self.transformer_encoder(z, mask)
         return z
@@ -118,7 +124,10 @@ class EfficientTNPD(NeuralProcess):
 
 @check_shapes("xc: [m, nc, dx]", "xt: [m, nt, dx]", "return: [m, n, n]")
 def gen_tnpd_mask(
-    xc: torch.Tensor, xt: torch.Tensor, targets_self_attend: bool = False
+    xc: torch.Tensor,
+    xt: torch.Tensor,
+    targets_self_attend: bool = False,
+    ar_mode: bool = False,
 ) -> torch.Tensor:
     m = xc.shape[0]
     nc = xc.shape[-2]
@@ -126,7 +135,13 @@ def gen_tnpd_mask(
     n = nc + nt
 
     mask = torch.ones(m, n, n) > 0.5
-    mask[:, :nc, :nc] = False
+
+    if ar_mode:
+        tril_idx = torch.tril_indices(nc, nc)
+        mask[:, tril_idx[0], tril_idx[1]] = False
+    else:
+        mask[:, :nc, :nc] = False
+
     for i in range(xt.shape[-2]):
         mask[:, nc + i, :nc] = False
 

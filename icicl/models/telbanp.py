@@ -33,7 +33,7 @@ class TELBANPEncoder(nn.Module):
         zc = self.y_encoder(yc)
         zt = self.y_encoder(yt)
 
-        zt = self.nested_perceiver_encoder(xc, xt, zc, zt)
+        zt = self.nested_perceiver_encoder(zc, zt, xc, xt)
         return zt
 
 

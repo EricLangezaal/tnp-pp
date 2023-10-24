@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import Optional
 
+import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -13,10 +14,10 @@ class Kernel(nn.Module, ABC):
 
 
 class RBFKernel(Kernel):
-    def __init__(self, dim: int, init_lengthscale: float):
+    def __init__(self, in_dim: int, out_dim: int = 1, init_lengthscale: float = 0.1):
         super().__init__()
 
-        init_lengthscale = torch.as_tensor(dim * [init_lengthscale])
+        init_lengthscale = torch.as_tensor(in_dim * [out_dim * [init_lengthscale]])
         self.lengthscale_param = nn.Parameter(
             (torch.tensor(init_lengthscale).exp() - 1).log()
         )
@@ -25,36 +26,47 @@ class RBFKernel(Kernel):
     def lengthscale(self):
         return 1e-5 + nn.functional.softplus(self.lengthscale_param)
 
-    @check_shapes("diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, n1, n2]")
+    @check_shapes(
+        "diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, h, n1, n2]"
+    )
     def forward(
         self, diff: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        lengthscale = self.lengthscale[None, None, None, :]
-        dist = (diff / lengthscale).sum(-1)
+        lengthscale = self.lengthscale[None, None, None, ...]
+        diff = diff[..., None]
+
+        # (m, n1, n2, h).
+        dist = (diff / lengthscale).sum(-2, keepdim=False)
         dots = torch.exp(-0.5 * dist**2.0)
 
         if mask is not None:
+            mask = einops.rearrange(mask, "m n1 n2 -> m n1 n2 h", h=dots.shape[-1])
             dots = torch.mask_fill(dots, mask, 0)
+
+        dots = einops.rearrange(dots, "m n1 n2 h -> m h n1 n2")
 
         return dots
 
 
 class MLPKernel(Kernel):
-    def __init__(self, dim: int, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__()
 
-        self.mlp = MLP(in_dim=dim, out_dim=1, **kwargs)
+        self.mlp = MLP(**kwargs)
 
-    @check_shapes("diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, n1, n2]")
+    @check_shapes(
+        "diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, h, n1, n2]"
+    )
     def forward(
         self, diff: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        dots = self.mlp(diff).squeeze(-1)
+        dots = self.mlp(diff)
 
         if mask is not None:
+            mask = einops.repeat(mask, "m n1 n2 -> m n1 n2 h", h=dots.shape[-1])
             dots = torch.masked_fill(dots, mask, -float("inf"))
 
-        dots = dots.softmax(dim=-1)
+        dots = einops.rearrange(dots, "m n1 n2 h -> m h n1 n2")
 
         return dots
 
