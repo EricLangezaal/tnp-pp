@@ -43,24 +43,27 @@ tetnpd_encoder:
 
 tetransformer_encoder:
   _target_: icicl.networks.tetransformer.TETransformerEncoder
-  encoder_layer: ${mhstea_layer}
+  encoder_layer: ${mhsa_layer}
   num_layers: 3
 
-mhstea_layer:
+mhsa_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadSelfTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  head_dim: ${params.embed_dim}
-  kernel: ${kernel}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
+  token_attention: True
 
 # kernel:
 #   _target_: icicl.networks.kernels.RBFKernel
 #   dim: ${params.dim}
 #   init_lengthscale: 0.1
 
-kernel:
+mhsa_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  dim: ${params.dim}
+  in_dim: ${params.dim}
+  out_dim: ${params.num_heads}
   num_layers: 2
   width: 16
 
@@ -94,9 +97,12 @@ params:
   epochs: 200
   dim: 1
   embed_dim: 32
+  num_heads: 4
+  head_dim: 8
 
 
 misc:
   project: tetnpd
   name: synthetic-1d
   resume_from_checkpoint: null
+  eval: False

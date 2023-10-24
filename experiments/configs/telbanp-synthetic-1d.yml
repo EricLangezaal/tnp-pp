@@ -53,39 +53,53 @@ nested_teperceiver_encoder:
 mhsa_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadSelfTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  head_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
+  token_attention: True
 
 mhsa_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  dim: ${params.dim}
+  in_dim: ${params.dim}
+  out_dim: ${params.num_heads}
   num_layers: 1
   width: 16
+
+# mhsa_kernel:
+#   _target_: icicl.networks.kernels.RBFKernel
+#   in_dim: ${params.dim}
+#   out_dim: ${params.num_heads}
 
 mhca_ctoq_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  head_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   kernel: ${mhca_ctoq_kernel}
   feedforward_dim: ${params.embed_dim}
+  token_attention: True
 
 mhca_ctoq_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  dim: ${params.dim}
+  in_dim: ${params.dim}
+  out_dim: ${params.num_heads}
   num_layers: 1
   width: 16
 
 mhca_qtot_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
   embed_dim: ${params.embed_dim}
-  head_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   kernel: ${mhca_qtot_kernel}
   feedforward_dim: ${params.embed_dim}
+  token_attention: True
 
 mhca_qtot_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  dim: ${params.dim}
+  in_dim: ${params.dim}
+  out_dim: ${params.num_heads}
   num_layers: 1
   width: 16
 
@@ -113,17 +127,20 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 5e-4
+  lr: 3e-4
 
 params:
   epochs: 200
   dim: 1
-  embed_dim: 64
+  embed_dim: 32
+  num_heads: 1
+  head_dim: 32
   num_latents: 16
-  num_layers: 3
+  num_layers: 5
 
 
 misc:
   project: telbanp
   name: synthetic-1d
   resume_from_checkpoint: null
+  eval: False
