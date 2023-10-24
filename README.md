@@ -4,7 +4,9 @@
 `python experiments/train.py --config experiments/configs/convcnp-synthetic-1d`
 
 ### Requirements
-`conda env create -f environment.yml`
+`pip install -r requirements.txt`
+
+`pip install -e ./`
 
 ### Configuration files
 Configuration files are composed from `.yml` files using [Hydra](https://hydra.cc/docs/intro/).
