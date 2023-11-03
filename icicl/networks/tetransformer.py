@@ -36,6 +36,43 @@ class TETransformerEncoder(nn.Module):
         return x
 
 
+class TETNPDTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        mhsa_layer: MultiHeadSelfTEAttentionLayer,
+        mhca_layer: MultiHeadCrossTEAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert mhca_layer.embed_dim == mhsa_layer.embed_dim, "embed_dim mismatch."
+
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.mhca_layers = _get_clones(mhca_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, dx]",
+        "xt: [m, nt, dx]",
+        "tc: [m, nc, dt]",
+        "tt: [m, nt, dt]",
+        "mask: [m, nt, nc]",
+        "return: [m, nt, d]",
+    )
+    def forward(
+        self,
+        xc: torch.Tensor,
+        xt: torch.Tensor,
+        tc: torch.Tensor,
+        tt: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
+            xc = mhsa_layer(xc, tc)
+            xt = mhca_layer(xt, xc, tt, tc, mask)
+
+        return xt
+
+
 class TEPerceiverEncoder(nn.Module):
     def __init__(
         self,
