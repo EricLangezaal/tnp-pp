@@ -2,6 +2,7 @@
 
 import argparse
 import os
+from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
@@ -166,14 +167,7 @@ def val_epoch(
     generator: DataGenerator,
     epoch: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], List[Batch]]:
-    result: Dict = {
-        "loglik": [],
-        "pred_mean": [],
-        "pred_std": [],
-        "gt_mean": [],
-        "gt_std": [],
-        "gt_loglik": [],
-    }
+    result = defaultdict(list)
     batches = []
 
     for batch in tqdm(generator, total=len(generator), desc="Validation"):
