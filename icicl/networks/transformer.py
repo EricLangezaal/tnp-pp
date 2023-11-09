@@ -144,7 +144,7 @@ class ISetTransformerEncoder(nn.Module):
             xq = mhca_ctoq_layer(xq, x, mask)
             x = mhca_qtoc_layer(x, xq)
 
-        return xq
+        return x
 
 
 class BaseNestedPerceiverEncoder(nn.Module, ABC):
