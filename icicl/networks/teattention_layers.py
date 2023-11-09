@@ -24,6 +24,7 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
         token_attention: bool = True,
+        token_kernel: bool = False,
         activation: nn.Module = nn.ReLU(),
         norm_first: bool = False,
     ):
@@ -32,7 +33,13 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
 
         self.embed_dim = embed_dim
         self.attn = attention(
-            kernel, embed_dim, num_heads, head_dim, p_dropout, token_attention
+            kernel,
+            embed_dim,
+            num_heads,
+            head_dim,
+            p_dropout,
+            token_attention,
+            token_kernel,
         )
 
         # Feedforward model.

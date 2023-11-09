@@ -1,11 +1,12 @@
 from abc import ABC
-from typing import Optional
+from typing import Callable, Optional
 
 import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
+from ..utils.group_actions import translation
 from .kernels import Kernel
 
 
@@ -18,6 +19,8 @@ class MultiHeadTEAttention(nn.Module, ABC):
         head_dim: int,
         p_dropout: float = 0.0,
         token_attention: bool = True,
+        token_kernel: bool = False,
+        group_action: Callable = translation,
     ):
         super().__init__()
 
@@ -41,6 +44,12 @@ class MultiHeadTEAttention(nn.Module, ABC):
         if token_attention:
             self.to_k = nn.Linear(embed_dim, inner_dim, bias=False)
             self.to_q = nn.Linear(embed_dim, inner_dim, bias=False)
+
+        # Whether or not to feed tokens into kernel alongside.
+        self.token_kernel = token_kernel
+
+        # Group action on inputs prior to kernel.
+        self.group_action = group_action
 
     @check_shapes(
         "xq: [m, nq, dx]",
@@ -73,13 +82,15 @@ class MultiHeadTEAttention(nn.Module, ABC):
         Returns:
             torch.Tensor: Output of attention mechanism.
         """
-        # Compute translation equivariant attention.
-        tq_ = tq[:, :, None, :]
-        tk_ = tk[:, None, :, :]
-
-        # Compute pairwise differences.
+        # Compute output of group action.
         # (m, nq, nkv, dx).
-        diff = tq_ - tk_
+        diff = self.group_action(tq, tk)
+
+        if self.token_kernel:
+            # Append (xq, xk) to inputs into kernel.
+            xq_ = einops.repeat(xq, "m nq d -> m nq nk d", nk=xk.shape[1])
+            xk_ = einops.repeat(xq, "m nk d -> m nq nk d", nq=xq.shape[1])
+            diff = torch.cat((diff, xq_, xk_), dim=-1)
 
         # (m, {1, h}, nq, nkv).
         dots = self.kernel(diff, mask)
