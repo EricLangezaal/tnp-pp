@@ -54,6 +54,7 @@ mhsa_layer:
   kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
   token_attention: True
+  token_kernel: False
 
 # kernel:
 #   _target_: icicl.networks.kernels.RBFKernel
@@ -62,6 +63,7 @@ mhsa_layer:
 
 mhsa_kernel:
   _target_: icicl.networks.kernels.MLPKernel
+  # in_dim: ${eval:'${params.dim} + ${params.embed_dim} * 2'}
   in_dim: ${params.dim}
   out_dim: ${params.num_heads}
   num_layers: 2
@@ -91,7 +93,7 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 5e-4
+  lr: 3e-4
 
 params:
   epochs: 200
