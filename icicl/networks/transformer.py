@@ -112,6 +112,41 @@ class PerceiverDecoder(nn.Module):
         return x
 
 
+class ISetTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        num_latents: int,
+        mhca_ctoq_layer: MultiHeadCrossAttentionLayer,
+        mhca_qtoc_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtoc_layer.embed_dim
+        ), "embed_dim mismatch."
+
+        embed_dim = mhca_ctoq_layer.embed_dim
+        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
+
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
+        self.num_layers = num_layers
+
+    @check_shapes("x: [m, n, d]", "mask: [m, nq, n]", "return: [m, nq, d]")
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        xq = self.latents.unsqueeze(0).repeat(x.shape[0], 1, 1)
+        for mhca_ctoq_layer, mhca_qtoc_layer in zip(
+            self.mhca_ctoq_layers, self.mhca_qtoc_layers
+        ):
+            xq = mhca_ctoq_layer(xq, x, mask)
+            x = mhca_qtoc_layer(x, xq)
+
+        return xq
+
+
 class BaseNestedPerceiverEncoder(nn.Module, ABC):
     def __init__(
         self,
@@ -147,6 +182,48 @@ class NestedPerceiverEncoder(BaseNestedPerceiverEncoder):
         ):
             xq = mhca_ctoq_layer(xq, xc, mask)
             xq = mhsa_layer(xq)
+            xt = mhca_qtot_layer(xt, xq)
+
+        return xt
+
+
+class NestedISetTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        num_latents: int,
+        mhca_ctoq_layer: MultiHeadSelfAttentionLayer,
+        mhca_qtoc_layer: MultiHeadCrossAttentionLayer,
+        mhca_qtot_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+    ):
+        super().__init__()
+
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtoc_layer.embed_dim
+        ), "embed_dim mismatch."
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtot_layer.embed_dim
+        ), "embed_dim mismatch."
+
+        embed_dim = mhca_ctoq_layer.embed_dim
+        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
+
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
+        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, dx]", "xt: [m, nt, dx]", "mask: [m, nq, n]", "return: [m, nq, d]"
+    )
+    def forward(
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
+        for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
+            self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
+        ):
+            xq = mhca_ctoq_layer(xq, xc, mask)
+            xc = mhca_qtoc_layer(xc, xq)
             xt = mhca_qtot_layer(xt, xq)
 
         return xt
