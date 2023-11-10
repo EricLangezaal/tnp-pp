@@ -54,7 +54,8 @@ mhsa_layer:
   kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
   token_attention: True
-  token_kernel: False
+  kernel_accepts_tokens: False
+  phi_t: ${phi_t}
 
 # kernel:
 #   _target_: icicl.networks.kernels.RBFKernel
@@ -66,6 +67,13 @@ mhsa_kernel:
   # in_dim: ${eval:'${params.dim} + ${params.embed_dim} * 2'}
   in_dim: ${params.dim}
   out_dim: ${params.num_heads}
+  num_layers: 2
+  width: 16
+
+phi_t:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.num_heads}
+  out_dim: 1
   num_layers: 2
   width: 16
 

@@ -1,10 +1,11 @@
 from abc import ABC
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
+from ..utils.group_actions import translation
 from .kernels import Kernel
 from .teattention import (
     MultiHeadCrossTEAttention,
@@ -24,7 +25,9 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
         token_attention: bool = True,
-        token_kernel: bool = False,
+        kernel_accepts_tokens: bool = False,
+        group_action: Callable = translation,
+        phi_t: Optional[nn.Module] = None,
         activation: nn.Module = nn.ReLU(),
         norm_first: bool = False,
     ):
@@ -39,7 +42,9 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
             head_dim,
             p_dropout,
             token_attention,
-            token_kernel,
+            kernel_accepts_tokens,
+            group_action,
+            phi_t,
         )
 
         # Feedforward model.

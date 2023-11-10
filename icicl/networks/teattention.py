@@ -19,8 +19,9 @@ class MultiHeadTEAttention(nn.Module, ABC):
         head_dim: int,
         p_dropout: float = 0.0,
         token_attention: bool = True,
-        token_kernel: bool = False,
+        kernel_accepts_tokens: bool = False,
         group_action: Callable = translation,
+        phi_t: Optional[nn.Module] = None,
     ):
         super().__init__()
 
@@ -46,10 +47,13 @@ class MultiHeadTEAttention(nn.Module, ABC):
             self.to_q = nn.Linear(embed_dim, inner_dim, bias=False)
 
         # Whether or not to feed tokens into kernel alongside.
-        self.token_kernel = token_kernel
+        self.kernel_accepts_tokens = kernel_accepts_tokens
 
         # Group action on inputs prior to kernel.
         self.group_action = group_action
+
+        # Additional transformation on spatio-temporal locations.
+        self.phi_t = phi_t
 
     @check_shapes(
         "xq: [m, nq, dx]",
@@ -86,7 +90,7 @@ class MultiHeadTEAttention(nn.Module, ABC):
         # (m, nq, nkv, dx).
         diff = self.group_action(tq, tk)
 
-        if self.token_kernel:
+        if self.kernel_accepts_tokens:
             # Append (xq, xk) to inputs into kernel.
             xq_ = einops.repeat(xq, "m nq d -> m nq nk d", nk=xk.shape[1])
             xk_ = einops.repeat(xq, "m nk d -> m nq nk d", nq=xq.shape[1])
@@ -123,6 +127,14 @@ class MultiHeadTEAttention(nn.Module, ABC):
         out = attn @ v
         out = einops.rearrange(out, "b h n d -> b n (h d)")
         out = self.to_out(out)
+
+        # Also update spatio-temporal locations if necessary.
+        # Analgous to equation 4 in equivariant GNNs.
+        if self.phi_t:
+            attn = einops.rearrange(attn, "m h n p -> m n p h")
+            t_dots = self.phi_t(attn)
+            tq = tq + (1 / tk.shape[-2]) * (diff * t_dots).sum(-2)
+
         return out
 
 
