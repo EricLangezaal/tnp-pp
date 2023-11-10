@@ -43,25 +43,8 @@ tetnpd_encoder:
 
 transformer_encoder:
   _target_: icicl.networks.tetransformer.TETNPDTransformerEncoder
-  mhsa_layer: ${mhsa_layer}
   mhca_layer: ${mhca_layer}
   num_layers: 3
-
-mhsa_layer:
-  _target_: icicl.networks.teattention_layers.MultiHeadSelfTEAttentionLayer
-  embed_dim: ${params.embed_dim}
-  num_heads: ${params.num_heads}
-  head_dim: ${params.head_dim}
-  feedforward_dim: ${params.embed_dim}
-  kernel: ${mhsa_kernel}
-  token_attention: True
-
-mhsa_kernel:
-  _target_: icicl.networks.kernels.MLPKernel
-  in_dim: ${params.dim}
-  out_dim: ${params.num_heads}
-  num_layers: 2
-  width: 16
 
 mhca_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer

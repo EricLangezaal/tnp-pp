@@ -39,15 +39,11 @@ class TETransformerEncoder(nn.Module):
 class TETNPDTransformerEncoder(nn.Module):
     def __init__(
         self,
-        mhsa_layer: MultiHeadSelfTEAttentionLayer,
         mhca_layer: MultiHeadCrossTEAttentionLayer,
         num_layers: int,
     ):
         super().__init__()
 
-        assert mhca_layer.embed_dim == mhsa_layer.embed_dim, "embed_dim mismatch."
-
-        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
         self.mhca_layers = _get_clones(mhca_layer, num_layers)
 
     @check_shapes(
@@ -66,9 +62,9 @@ class TETNPDTransformerEncoder(nn.Module):
         tt: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
-            xc = mhsa_layer(xc, tc)
+        for mhca_layer in self.mhca_layers:
             xt = mhca_layer(xt, xc, tt, tc, mask)
+            xc = mhca_layer(xc, xc, tc, tc)
 
         return xt
 
