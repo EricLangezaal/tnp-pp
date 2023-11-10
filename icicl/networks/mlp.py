@@ -34,16 +34,11 @@ class MLP(nn.Module):
     ):
         super().__init__()
 
-        # Check that one of the two specifications is given.
-        layers_given = layers is not None
-        num_layers_given = num_layers is not None and width is not None
-        if not (layers_given or num_layers_given):
-            raise ValueError(
-                "Must specify either `layers` or `num_layers` and `width`."
-            )
-
-        # Make sure that `layers` is a tuple of various widths.
-        if not layers_given and num_layers_given:
+        if layers is None:
+            # Check that one of the two specifications is given.
+            assert (
+                num_layers is not None and width is not None
+            ), "Must specify either `layers` or `num_layers` and `width`."
             layers = (width,) * num_layers
 
         # Default to ReLUs.
