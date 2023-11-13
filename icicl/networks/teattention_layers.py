@@ -68,7 +68,11 @@ class MultiHeadSelfTEAttentionLayer(MultiHeadTEAttentionLayer):
         super().__init__(*args, attention=MultiHeadSelfTEAttention, **kwargs)
 
     @check_shapes(
-        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, n, n]", "return: [m, n, dx]"
+        "x: [m, n, dx]",
+        "t: [m, n, dt]",
+        "mask: [m, n, n]",
+        "return[0]: [m, n, dx]",
+        "return[1]: [m, n, dt]",
     )
     def attn_block(
         self,
@@ -76,23 +80,29 @@ class MultiHeadSelfTEAttentionLayer(MultiHeadTEAttentionLayer):
         t: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        x = self.attn(x, t, mask=mask)
-        return self.attn_dropout(x)
+        x, t = self.attn(x, t, mask=mask)
+        return self.attn_dropout(x), t
 
     @check_shapes(
-        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, n, n]", "return: [m, n, dx]"
+        "x: [m, n, dx]",
+        "t: [m, n, dt]",
+        "mask: [m, n, n]",
+        "return[0]: [m, n, dx]",
+        "return[1]: [m, n, dt]",
     )
     def forward(
         self, x: torch.Tensor, t: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         if self.norm_first:
-            x = x + self.attn_block(self.norm1(x), t, mask)
+            x_update, t = self.attn_block(self.norm1(x), t, mask)
+            x = x + x_update
             x = x + self.ff_block(self.norm2(x))
         else:
-            x = x + self.norm1(x + self.attn_block(x, t, mask))
+            x_update, t = self.attn_block(x, t, mask)
+            x = x_update + self.norm1(x_update)
             x = self.norm2(x + self.ff_block(x))
 
-        return x
+        return x, t
 
 
 class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
@@ -105,7 +115,8 @@ class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
         "tq: [m, nq, dt]",
         "tk: [m, nk, dt]",
         "mask: [m, nq, nk]",
-        "return: [m, nq, dx]",
+        "return[0]: [m, nq, dx]",
+        "return[1]: [m, nq, dt]",
     )
     def attn_block(
         self,
@@ -115,8 +126,8 @@ class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
         tk: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        xq = self.attn(xq, xk, tq, tk, mask=mask)
-        return self.attn_dropout(xq)
+        xq, tq = self.attn(xq, xk, tq, tk, mask=mask)
+        return self.attn_dropout(xq), tq
 
     @check_shapes(
         "xq: [m, nq, dx]",
@@ -124,7 +135,8 @@ class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
         "tq: [m, nq, dt]",
         "tk: [m, nk, dt]",
         "mask: [m, nq, nk]",
-        "return: [m, nq, dx]",
+        "return[0]: [m, nq, dx]",
+        "return[1]: [m, nq, dt]",
     )
     def forward(
         self,
@@ -135,10 +147,14 @@ class MultiHeadCrossTEAttentionLayer(MultiHeadTEAttentionLayer):
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         if self.norm_first:
-            xq = xq + self.attn_block(self.norm1(xq), self.norm1(xk), tq, tk, mask)
+            xq_update, tq = self.attn_block(
+                self.norm1(xq), self.norm1(xk), tq, tk, mask
+            )
+            xq = xq + xq_update
             xq = xq + self.ff_block(self.norm2(xq))
         else:
-            xq = xq + self.norm1(xq + self.attn_block(xq, xk, tq, tk, mask))
+            xq_update, tq = self.attn_block(xq, xk, tq, tk, mask)
+            xq = xq + self.norm1(xq_update)
             xq = self.norm2(xq + self.ff_block(xq))
 
-        return xq
+        return xq, tq

@@ -31,7 +31,7 @@ class TETransformerEncoder(nn.Module):
         self, x: torch.Tensor, t: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         for layer in self.layers:
-            x = layer(x, t, mask)
+            x, t = layer(x, t, mask)
 
         return x
 
@@ -63,8 +63,8 @@ class TETNPDTransformerEncoder(nn.Module):
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         for mhca_layer in self.mhca_layers:
-            xt = mhca_layer(xt, xc, tt, tc, mask)
-            xc = mhca_layer(xc, xc, tc, tc)
+            xt, tt = mhca_layer(xt, xc, tt, tc, mask)
+            xc, tc = mhca_layer(xc, xc, tc, tc)
 
         return xt
 
@@ -99,8 +99,8 @@ class TEPerceiverEncoder(nn.Module):
         xq = einops.repeat(self.latent_tokens, "l e -> m l e", m=x.shape[0])
         tq = einops.repeat(self.latent_inputs, "l d -> m l d", m=x.shape[0])
         for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
-            xq = mhca_layer(xq, x, tq, t, mask)
-            xq = mhsa_layer(xq, tq)
+            xq, tq = mhca_layer(xq, x, tq, t, mask)
+            xq, tq = mhsa_layer(xq, tq)
 
         return xq
 
@@ -133,7 +133,7 @@ class TEPerceiverDecoder(nn.Module):
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         for mhca_layer in self.mhca_layers:
-            x = mhca_layer(x, xq, t, tq, mask)
+            x, t = mhca_layer(x, xq, t, tq, mask)
 
         return x
 
@@ -184,9 +184,9 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
             self.mhsa_layers, self.mhca_ctoq_layers, self.mhca_qtot_layers
         ):
-            xq = mhca_ctoq_layer(xq, xc, tq, tc, mask)
-            xq = mhsa_layer(xq, tq)
-            xt = mhca_qtot_layer(xt, xq, tt, tq)
+            xq, tq = mhca_ctoq_layer(xq, xc, tq, tc, mask)
+            xq, tq = mhsa_layer(xq, tq)
+            xt, tt = mhca_qtot_layer(xt, xq, tt, tq)
 
         return xt
 

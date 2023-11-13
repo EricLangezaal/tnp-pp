@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 import einops
 import torch
@@ -62,7 +62,8 @@ class MultiHeadTEAttention(nn.Module, ABC):
         "tq: [m, nq, dt]",
         "tk: [m, nkv, dt]",
         "mask: [m, nq, nkv]",
-        "return: [m, nq, dx]",
+        "return[0]: [m, nq, dx]",
+        "return[1]: [m, nq, dt]",
     )
     def propagate(
         self,
@@ -72,7 +73,7 @@ class MultiHeadTEAttention(nn.Module, ABC):
         tq: torch.Tensor,
         tk: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Computes multi-head translation equivariant attention.
 
         Args:
@@ -133,21 +134,25 @@ class MultiHeadTEAttention(nn.Module, ABC):
         if self.phi_t:
             attn = einops.rearrange(attn, "m h n p -> m n p h")
             t_dots = self.phi_t(attn)
-            tq = tq + (1 / tk.shape[-2]) * (diff * t_dots).sum(-2)
+            tq_new = tq + (1 / tk.shape[-2]) * (diff * t_dots).sum(-2)
 
-        return out
+        return out, tq_new
 
 
 class MultiHeadSelfTEAttention(MultiHeadTEAttention):
     @check_shapes(
-        "x: [m, n, dx]", "t: [m, n, dt]", "mask: [m, n, n]", "return: [m, n, dx]"
+        "x: [m, n, dx]",
+        "t: [m, n, dt]",
+        "mask: [m, n, n]",
+        "return[0]: [m, n, dx]",
+        "return[1]: [m, n, dt]",
     )
     def forward(
         self,
         x: torch.Tensor,
         t: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return super().propagate(x, x, x, t, t, mask)
 
 
@@ -158,7 +163,8 @@ class MultiHeadCrossTEAttention(MultiHeadTEAttention):
         "tq: [m, nq, dt]",
         "tk: [m, nk, dt]",
         "mask: [m, nq, nk]",
-        "return: [m, nq, dx]",
+        "return[0]: [m, nq, dx]",
+        "return[1]: [m, nq, dt]",
     )
     def forward(
         self,
@@ -167,5 +173,5 @@ class MultiHeadCrossTEAttention(MultiHeadTEAttention):
         tq: torch.Tensor,
         tk: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return super().propagate(xq, xk, xk, tq, tk, mask)
