@@ -37,11 +37,11 @@ class RBFKernel(Kernel):
 
         # (m, n1, n2, h).
         dist = (diff / lengthscale).sum(-2, keepdim=False)
-        dots = torch.exp(-0.5 * dist**2.0)
+        dots = -0.5 * dist**2.0
 
         if mask is not None:
-            mask = einops.rearrange(mask, "m n1 n2 -> m n1 n2 h", h=dots.shape[-1])
-            dots = torch.mask_fill(dots, mask, 0)
+            mask = einops.repeat(mask, "m n1 n2 -> m n1 n2 h", h=dots.shape[-1])
+            dots = torch.masked_fill(dots, mask, -float("inf"))
 
         dots = einops.rearrange(dots, "m n1 n2 h -> m h n1 n2")
 
