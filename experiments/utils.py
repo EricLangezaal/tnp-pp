@@ -5,6 +5,7 @@ import os
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import einops
 import torch
 from check_shapes import check_shapes
 from hydra.utils import instantiate
@@ -14,6 +15,7 @@ from tqdm.auto import tqdm
 
 import wandb
 from icicl.data.data import Batch, DataGenerator, ICBatch, SyntheticBatch
+from icicl.utils.batch import compress_batch_dimensions
 
 
 class ModelCheckpointer:
@@ -257,3 +259,66 @@ def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
                 f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
             }
         )
+
+
+def ar_predict(
+    model: nn.Module,
+    xc: torch.Tensor,
+    yc: torch.Tensor,
+    xt: torch.Tensor,
+    num_samples: int,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Samples from the joint predictive probability distribution. Assumes order of xt is given.
+
+    Args:
+        model (nn.Module): NeuralProcess model.
+        xc (torch.Tensor): Context inputs.
+        yc (torch.Tensor): Context outputs.
+        xt (torch.Tensor): Target inputs.
+        yt (torch.Tensor): Target outputs.
+        num_samples (int): Number of predictive samples to generate and use to estimate likelihood.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: Samples and log probabilities drawn from the joint distribution.
+    """
+
+    samples_list: List[torch.Tensor] = []
+    sample_logprobs_list: List[torch.Tensor] = []
+
+    # Expand tensors for efficient computation.
+    xc_ = einops.repeat(xc, "m n d -> s m n d", s=num_samples)
+    yc_ = einops.repeat(yc, "m n d -> s m n d", s=num_samples)
+    xt_ = einops.repeat(xt, "m n d -> s m n d", s=num_samples)
+    xc_, _ = compress_batch_dimensions(xc_, other_dims=2)
+    yc_, _ = compress_batch_dimensions(yc_, other_dims=2)
+    xt_, _ = compress_batch_dimensions(xt_, other_dims=2)
+
+    # AR mode for loop.
+    for i in range(xt_.shape[1]):
+        with torch.no_grad():
+            # Compute conditional distribution, sample and evaluate log probabilities.
+            pred_dist = model(xc=xc_, yc=yc_, xt=xt_[:, i : i + 1])
+            pred = pred_dist.rsample()
+            pred_logprob = pred_dist.log_prob(pred)
+
+            # Store samples and probabilities.
+            pred = pred.detach()
+            pred_logprob = pred_logprob.detach()
+            samples_list.append(pred)
+            sample_logprobs_list.append(pred_logprob)
+
+            # Update context.
+            xc_ = torch.cat([xc_, xt_[:, i : i + 1]], dim=1)
+            yc_ = torch.cat([yc_, pred], dim=1)
+
+    # Compute log probability of sample.
+    samples = torch.cat(samples_list, dim=1)
+    sample_logprobs = torch.cat(sample_logprobs_list, dim=1)
+
+    samples = einops.rearrange(samples, "(s m) n d -> s m n d", s=num_samples)
+    sample_logprobs = einops.rearrange(
+        sample_logprobs, "(s m) n d -> s m n d", s=num_samples
+    )
+    sample_logprobs = sample_logprobs.mean(0)
+
+    return samples, sample_logprobs
