@@ -4,6 +4,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import torch
 from torch import nn
+from utils import ar_predict
 
 import wandb
 from icicl.data.data import Batch, ICBatch, SyntheticBatch
@@ -20,7 +21,9 @@ def plot(
     figsize: Tuple[float, float] = (8.0, 6.0),
     x_range: Tuple[float, float] = (-5.0, 5.0),
     y_lim: Tuple[float, float] = (-3.0, 3.0),
-    points_per_dim: int = 512,
+    points_per_dim: int = 256,
+    plot_ar_mode: bool = False,
+    num_ar_samples: int = 20,
 ):
     # Get dimension of input data
     dim = batches[0].xc.shape[-1]
@@ -31,10 +34,10 @@ def plot(
         )[None, :, None]
         for i in range(num_fig):
             batch = batches[i]
-            xc = batch.xc
-            yc = batch.yc
-            xt = batch.xt
-            yt = batch.yt
+            xc = batch.xc[:1]
+            yc = batch.yc[:1]
+            xt = batch.xt[:1]
+            yt = batch.yt[:1]
 
             with torch.no_grad():
                 if isinstance(batch, ICBatch):
@@ -43,20 +46,18 @@ def plot(
                         yc=yc,
                         xic=batch.xic,
                         yic=batch.yic,
-                        xt=x_plot[:1].repeat(xc.shape[0], 1, 1),
+                        xt=x_plot,
                     )
                     yt_pred_dist = model(
                         xc=xc, yc=yc, xic=batch.xic, yic=batch.yic, xt=xt
                     )
                 else:
                     assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
-                    y_plot_pred_dist = model(
-                        xc=xc, yc=yc, xt=x_plot[:1].repeat(xc.shape[0], 1, 1)
-                    )
+                    y_plot_pred_dist = model(xc=xc, yc=yc, xt=x_plot)
                     yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
-                model_nll = -yt_pred_dist.log_prob(yt)[:1].mean()
-                mean, std = y_plot_pred_dist.loc[:1], y_plot_pred_dist.scale[:1]
+                model_nll = -yt_pred_dist.log_prob(yt).mean()
+                mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
 
             # Make figure for plotting
             fig = plt.figure(figsize=figsize)
@@ -93,6 +94,8 @@ def plot(
                 alpha=0.2,
                 label="Model",
             )
+
+            title_str = f"$N = {xc.shape[1]}$ NLL = {model_nll:.3f}"
 
             if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
                 with torch.no_grad():
@@ -132,19 +135,32 @@ def plot(
                     label="Ground truth",
                 )
 
-                plt.title(
-                    f"$N = {xc.shape[1]}$   "
-                    # f"$\\ell$ = {lengthscale:.2f}  "
-                    f"NLL = {model_nll:.3f} \t" f"GT NLL = {gt_nll:.3f}",
-                    fontsize=24,
+                title_str += f" GT NLL = {gt_nll:.3f}"
+
+            if plot_ar_mode and not isinstance(batch, ICBatch):
+                ar_x_plot = torch.linspace(xc.max(), x_range[1], 50).to(batches[0].xc)[
+                    None, :, None
+                ]
+                _, ar_sample_logprobs = ar_predict(
+                    model, xc=xc, yc=yc, xt=xt, num_samples=num_ar_samples
                 )
-            else:
-                plt.title(
-                    f"$N = {xc.shape[1]}$   "
-                    # f"$\\ell$ = {lengthscale:.2f}  "
-                    f"NLL = {model_nll:.3f} \t",
-                    fontsize=24,
+                ar_samples, _ = ar_predict(
+                    model, xc=xc, yc=yc, xt=ar_x_plot, num_samples=num_ar_samples
                 )
+
+                for ar_sample in ar_samples[:1]:
+                    plt.plot(
+                        ar_x_plot[0, :, 0].cpu(),
+                        ar_sample[0, :, 0].cpu(),
+                        color="tab:blue",
+                        alpha=0.4,
+                        label="AR samples",
+                    )
+
+                ar_nll = -ar_sample_logprobs.mean()
+                title_str += f" AR NLL: {ar_nll:.3f}"
+
+            plt.title(title_str, fontsize=24)
 
             # Set axis limits
             plt.xlim(x_range)

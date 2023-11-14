@@ -42,7 +42,12 @@ def main():
             )
         else:
             plot(
-                model=model, batches=batches, epoch=epoch, num_fig=min(5, len(batches))
+                model=model,
+                batches=batches,
+                epoch=epoch,
+                num_fig=min(5, len(batches)),
+                plot_ar_mode=True,
+                num_ar_samples=20,
             )
 
 
