@@ -35,18 +35,17 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.tnp.TNPDEncoder
+  _target_: icicl.models.tnp.EfficientTNPDEncoder
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-  ar_mode: False
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TransformerEncoder
-  mhsa_layer: ${mhsa_layer}
-  num_layers: 5
+  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  num_layers: 3
 
-mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -57,7 +56,7 @@ xy_encoder:
   in_dim: ${eval:'2 + ${params.dim}'}
   out_dim: ${params.embed_dim}
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder
@@ -68,7 +67,7 @@ z_decoder:
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -89,4 +88,4 @@ params:
 misc:
   project: tnp
   name: sawtooth-1d
-  resume_from_checkpoint: /Users/matt/projects/tnp-pp/wandb/run-20231024_153755-ty13mw0b/files/checkpoints/best.ckpt
+  resume_from_checkpoint: null

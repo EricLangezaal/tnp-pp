@@ -5,7 +5,7 @@ import torch
 from plot import plot
 from torch import nn
 
-from icicl.data.data import Batch
+from icicl.data.data import Batch, ICBatch, SyntheticBatch
 
 
 class LitWrapper(pl.LightningModule):
@@ -25,7 +25,7 @@ class LitWrapper(pl.LightningModule):
     def training_step(self, batch: Batch, batch_idx: int) -> torch.Tensor:
         _ = batch_idx
 
-        if hasattr(batch, "xic") and hasattr(batch, "yic"):
+        if isinstance(batch, ICBatch):
             loss = self.loss_fn(
                 self.model, batch.xc, batch.yc, batch.xt, batch.yt, batch.xic, batch.yic
             )
@@ -39,7 +39,7 @@ class LitWrapper(pl.LightningModule):
         _ = batch_idx
         result = {"batch": batch}
 
-        if hasattr(batch, "xic") and hasattr(batch, "yic"):
+        if isinstance(batch, ICBatch):
             pred_dist = self.model(
                 xc=batch.xc,
                 yc=batch.yc,
@@ -53,7 +53,7 @@ class LitWrapper(pl.LightningModule):
         loglik = pred_dist.log_prob(batch.yt).mean()
         result["loglik"] = loglik
 
-        if hasattr(batch, "gt_pred"):
+        if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
