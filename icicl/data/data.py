@@ -168,7 +168,7 @@ class SyntheticGenerator(DataGenerator, ABC):
 
         return num_ctx, num_trg
 
-    def sample_batch(self, num_ctx: int, num_trg: int) -> Batch:
+    def sample_batch(self, num_ctx: int, num_trg: int) -> SyntheticBatch:
         # Sample inputs, then outputs given inputs
         x = self.sample_inputs(num_ctx=num_ctx, num_trg=num_trg)
         y, gt_pred, _ = self.sample_outputs(x=x)

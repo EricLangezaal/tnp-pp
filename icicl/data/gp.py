@@ -36,7 +36,7 @@ class GPGeneratorBase(ABC):
         self,
         x: torch.Tensor,
         xic: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, GroundTruthPredictor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, GroundTruthPredictor, Optional[torch.Tensor]]:
         """Sample context and target outputs, given the inputs `x`.
 
         Arguments:
@@ -204,7 +204,7 @@ class ICRandomScaleGPGenerator(RandomScaleGPGeneratorBase, ICSyntheticGenerator)
 
 
 class GPGroundTruthPredictor(GroundTruthPredictor):
-    def __init__(self, kernel: Callable, noise_std: float):
+    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float):
         self.kernel = kernel
         self.noise_std = noise_std
 
