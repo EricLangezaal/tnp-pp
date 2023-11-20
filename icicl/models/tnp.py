@@ -97,26 +97,11 @@ class EfficientTNPDEncoder(nn.Module):
         return zt
 
 
-class EfficientTNPDDecoder(nn.Module):
-    def __init__(
-        self,
-        z_decoder: nn.Module,
-    ):
-        super().__init__()
-
-        self.z_decoder = z_decoder
-
-    @check_shapes("zt: [m, nt, dz]", "xt: [m, nt, dx]", "return: [m, nt, dy]")
-    def forward(self, zt: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
-        _ = xt
-        return self.z_decoder(zt)
-
-
 class EfficientTNPD(NeuralProcess):
     def __init__(
         self,
         encoder: EfficientTNPDEncoder,
-        decoder: EfficientTNPDDecoder,
+        decoder: TNPDDecoder,
         likelihood: nn.Module,
     ):
         super().__init__(encoder, decoder, likelihood)
@@ -134,7 +119,7 @@ def gen_tnpd_mask(
     nt = xt.shape[-2]
     n = nc + nt
 
-    mask = torch.ones(m, n, n) > 0.5
+    mask = torch.ones(m, n, n).to(xc) > 0.5
 
     if ar_mode:
         tril_idx = torch.tril_indices(nc, nc)
