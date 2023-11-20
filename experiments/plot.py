@@ -44,12 +44,12 @@ def plot(
                     y_plot_pred_dist = model(
                         xc=xc,
                         yc=yc,
-                        xic=batch.xic,
-                        yic=batch.yic,
+                        xic=batch.xic[:1],
+                        yic=batch.yic[:1],
                         xt=x_plot,
                     )
                     yt_pred_dist = model(
-                        xc=xc, yc=yc, xic=batch.xic, yic=batch.yic, xt=xt
+                        xc=xc, yc=yc, xic=batch.xic[:1], yic=batch.yic[:1], xt=xt
                     )
                 else:
                     assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
