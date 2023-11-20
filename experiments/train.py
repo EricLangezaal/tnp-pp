@@ -46,7 +46,7 @@ def main():
                 batches=batches,
                 epoch=epoch,
                 num_fig=min(5, len(batches)),
-                plot_ar_mode=True,
+                plot_ar_mode=experiment.misc.plot_ar_mode,
                 num_ar_samples=20,
             )
 

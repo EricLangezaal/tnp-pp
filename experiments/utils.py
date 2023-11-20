@@ -212,8 +212,8 @@ def val_epoch(
 
     result["mean_loglik"] = loglik.mean()
     result["std_loglik"] = loglik.std()
-    result["mean_loss"] = -result["mean_loglik"]
-    result["std_loss"] = -result["std_loglik"]
+    result["mean_loss"] = -loglik.mean()
+    result["std_loss"] = -loglik.std()
 
     return result, batches
 

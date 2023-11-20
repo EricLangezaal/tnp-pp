@@ -20,7 +20,7 @@ def plot(
     num_fig: int = 5,
     figsize: Tuple[float, float] = (8.0, 6.0),
     x_range: Tuple[float, float] = (-5.0, 5.0),
-    y_lim: Tuple[float, float] = (-3.0, 3.0),
+    y_lim: Tuple[float, float] = (-5.0, 5.0),
     points_per_dim: int = 256,
     plot_ar_mode: bool = False,
     num_ar_samples: int = 20,
