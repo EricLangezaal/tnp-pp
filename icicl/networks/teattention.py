@@ -135,6 +135,8 @@ class MultiHeadTEAttention(nn.Module, ABC):
             attn = einops.rearrange(attn, "m h n p -> m n p h")
             t_dots = self.phi_t(attn)
             tq_new = tq + (1 / tk.shape[-2]) * (diff * t_dots).sum(-2)
+        else:
+            tq_new = tq
 
         return out, tq_new
 
