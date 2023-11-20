@@ -3,9 +3,11 @@ from typing import Any, Callable, List
 import lightning.pytorch as pl
 import torch
 from plot import plot
+from plot_image import plot_image
 from torch import nn
 
 from icicl.data.data import Batch, ICBatch, SyntheticBatch
+from icicl.data.image import ImageGenerator
 
 
 class LitWrapper(pl.LightningModule):
@@ -27,7 +29,13 @@ class LitWrapper(pl.LightningModule):
 
         if isinstance(batch, ICBatch):
             loss = self.loss_fn(
-                self.model, batch.xc, batch.yc, batch.xt, batch.yt, batch.xic, batch.yic
+                self.model,
+                batch.xc,
+                batch.yc,
+                batch.xt,
+                batch.yt,
+                batch.xic,
+                batch.yic,
             )
         else:
             loss = self.loss_fn(self.model, batch.xc, batch.yc, batch.xt, batch.yt)
@@ -77,12 +85,20 @@ class LitWrapper(pl.LightningModule):
             gt_loglik = torch.stack(results["gt_loglik"]).mean()
             self.log("val/gt_loglik", gt_loglik)
 
-        plot(
-            self.model,
-            results["batch"],
-            epoch=self.current_epoch,
-            num_fig=min(5, len(results["batch"])),
-        )
+        if isinstance(self.trainer.val_dataloaders, ImageGenerator):
+            plot_image(
+                model=self.model,
+                batches=results["batch"],
+                epoch=self.current_epoch,
+                num_fig=min(5, len(results["batch"])),
+            )
+        else:
+            plot(
+                model=self.model,
+                batches=results["batch"],
+                epoch=self.current_epoch,
+                num_fig=min(5, len(results["batch"])),
+            )
 
     def configure_optimizers(self):
         return self.optimiser
