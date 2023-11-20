@@ -31,7 +31,7 @@ generators:
     batch_size: 16
 
 model:
-  _target_: icicl.models.tetnp.EfficientTETNPD
+  _target_: icicl.models.tetnp.TETNPD
   encoder: ${tetnpd_encoder}
   decoder: ${tnpd_decoder}
   likelihood: ${likelihood}

@@ -1,3 +1,5 @@
+from typing import Union
+
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -38,16 +40,6 @@ class TETNPDEncoder(nn.Module):
         return z
 
 
-class TETNPD(NeuralProcess):
-    def __init__(
-        self,
-        encoder: TETNPDEncoder,
-        decoder: TNPDDecoder,
-        likelihood: nn.Module,
-    ):
-        super().__init__(encoder, decoder, likelihood)
-
-
 class EfficientTETNPDEncoder(nn.Module):
     def __init__(
         self,
@@ -74,10 +66,10 @@ class EfficientTETNPDEncoder(nn.Module):
         return zt
 
 
-class EfficientTETNPD(NeuralProcess):
+class TETNPD(NeuralProcess):
     def __init__(
         self,
-        encoder: EfficientTETNPDEncoder,
+        encoder: Union[TETNPDEncoder, EfficientTETNPDEncoder],
         decoder: TNPDDecoder,
         likelihood: nn.Module,
     ):
