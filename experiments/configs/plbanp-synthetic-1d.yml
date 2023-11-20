@@ -2,11 +2,11 @@ generators:
   train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: noisy_periodic_mixture
+    kernel_type: random
     min_log10_lengthscale: -0.301
     max_log10_lengthscale: 0.301
     noise_std: 0.2
-    min_num_ctx: 32
+    min_num_ctx: 8
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
@@ -17,12 +17,12 @@ generators:
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
-    kernel_type: noisy_periodic_mixture
+    kernel_type: random
     min_log10_lengthscale: -0.301
     max_log10_lengthscale: 0.301
     noise_std: 0.2
-    min_num_ctx: 32
-    max_num_ctx: 64
+    min_num_ctx: 8
+    max_num_ctx: 32
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
@@ -37,11 +37,11 @@ model:
   likelihood: ${likelihood}
 
 plbanp_encoder:
-  _target_: icicl.models.plbanp.PLBANPEncoder
-  parallel_nested_perceiver_encoder: ${parallel_nested_perceiver_encoder}
+  _target_: icicl.models.plbanp.NestedPLBANPEncoder
+  perceiver_encoder: ${perceiver_encoder}
   xy_encoder: ${xy_encoder}
 
-parallel_nested_perceiver_encoder:
+perceiver_encoder:
   _target_: icicl.networks.transformer.ParallelNestedPerceiverEncoder
   num_latents: 16
   mhsa_layer: ${mhsa_layer}
@@ -53,29 +53,29 @@ parallel_nested_perceiver_encoder:
 mhsa_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
 
 mhca_ctoq_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
 
 mhca_qtot_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
-  num_heads: 4
-  head_dim: ${eval:'${params.embed_dim} // 4'}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
 
 xy_encoder:
@@ -86,7 +86,7 @@ xy_encoder:
   width: ${params.embed_dim}
 
 lbanp_decoder:
-  _target_: icicl.models.lbanp.LBANPDecoder
+  _target_: icicl.models.lbanp.NestedLBANPDecoder
   z_decoder: ${z_decoder}
 
 z_decoder:
@@ -108,9 +108,12 @@ params:
   epochs: 200
   dim: 1
   embed_dim: 64
+  num_heads: 4
+  head_dim: 16
 
 
 misc:
   project: plbanp_tests
-  name: noisy_periodic_mixture
+  name: eq_or_period
   resume_from_checkpoint: null
+  plot_ar_mode: False
