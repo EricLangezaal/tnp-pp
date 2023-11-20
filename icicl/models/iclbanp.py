@@ -5,18 +5,18 @@ from torch import nn
 from ..networks.transformer import ICNestedPerceiverEncoder
 from ..utils.helpers import preprocess_observations
 from .base import ICNeuralProcess
-from .lbanp import LBANPDecoder
+from .lbanp import NestedLBANPDecoder
 
 
-class ICLBANPEncoder(nn.Module):
+class NestedICLBANPEncoder(nn.Module):
     def __init__(
         self,
-        ic_nested_perceiver_encoder: ICNestedPerceiverEncoder,
+        perceiver_encoder: ICNestedPerceiverEncoder,
         xy_encoder: nn.Module,
     ):
         super().__init__()
 
-        self.ic_nested_perceiver_encoder = ic_nested_perceiver_encoder
+        self.perceiver_encoder = perceiver_encoder
         self.xy_encoder = xy_encoder
 
     @check_shapes(
@@ -47,15 +47,15 @@ class ICLBANPEncoder(nn.Module):
         zt = torch.cat((xt, yt), dim=-1)
         zt = self.xy_encoder(zt)
 
-        zt = self.ic_nested_perceiver_encoder(zc, zic, zt)
+        zt = self.perceiver_encoder(zc, zic, zt)
         return zt
 
 
 class ICLBANP(ICNeuralProcess):
     def __init__(
         self,
-        encoder: ICLBANPEncoder,
-        decoder: LBANPDecoder,
+        encoder: NestedICLBANPEncoder,
+        decoder: NestedLBANPDecoder,
         likelihood: nn.Module,
     ):
         super().__init__(encoder, decoder, likelihood)

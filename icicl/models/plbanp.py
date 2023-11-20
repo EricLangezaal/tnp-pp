@@ -2,17 +2,17 @@ from torch import nn
 
 from ..networks.transformer import ParallelNestedPerceiverEncoder
 from .base import NeuralProcess
-from .lbanp import LBANPDecoder, LBANPEncoder
+from .lbanp import NestedLBANPDecoder, NestedLBANPEncoder
 
 
-class PLBANPEncoder(LBANPEncoder):
+class NestedPLBANPEncoder(NestedLBANPEncoder):
     def __init__(
         self,
-        parallel_nested_perceiver_encoder: ParallelNestedPerceiverEncoder,
+        perceiver_encoder: ParallelNestedPerceiverEncoder,
         xy_encoder: nn.Module,
     ):
         super().__init__(
-            nested_perceiver_encoder=parallel_nested_perceiver_encoder,
+            perceiver_encoder=perceiver_encoder,
             xy_encoder=xy_encoder,
         )
 
@@ -20,8 +20,8 @@ class PLBANPEncoder(LBANPEncoder):
 class PLBANP(NeuralProcess):
     def __init__(
         self,
-        encoder: PLBANPEncoder,
-        decoder: LBANPDecoder,
+        encoder: NestedPLBANPEncoder,
+        decoder: NestedLBANPDecoder,
         likelihood: nn.Module,
     ):
         super().__init__(encoder, decoder, likelihood)
