@@ -4,7 +4,7 @@ from utils import initialize_experiment, np_loss_fn
 
 
 def main():
-    experiment, _ = initialize_experiment()
+    experiment, checkpointer = initialize_experiment()
 
     model = experiment.model
     gen_train = experiment.generators.train
@@ -12,7 +12,9 @@ def main():
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
 
-    lit_model = LitWrapper(model=model, optimiser=optimiser, loss_fn=np_loss_fn)
+    lit_model = LitWrapper(
+        model=model, optimiser=optimiser, loss_fn=np_loss_fn, checkpointer=checkpointer
+    )
     logger = pl.loggers.WandbLogger()
     trainer = pl.Trainer(
         logger=logger,

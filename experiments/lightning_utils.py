@@ -5,6 +5,7 @@ import torch
 from plot import plot
 from plot_image import plot_image
 from torch import nn
+from utils import ModelCheckpointer
 
 from icicl.data.data import Batch, ICBatch, SyntheticBatch
 from icicl.data.image import ImageGenerator
@@ -12,13 +13,18 @@ from icicl.data.image import ImageGenerator
 
 class LitWrapper(pl.LightningModule):
     def __init__(
-        self, model: nn.Module, optimiser: torch.optim.Optimizer, loss_fn: Callable
+        self,
+        model: nn.Module,
+        optimiser: torch.optim.Optimizer,
+        loss_fn: Callable,
+        checkpointer: ModelCheckpointer,
     ):
         super().__init__()
 
         self.model = model
         self.optimiser = optimiser
         self.loss_fn = loss_fn
+        self.checkpointer = checkpointer
         self.val_outputs: List[Any] = []
 
     def forward(self, *args, **kwargs):
@@ -80,6 +86,15 @@ class LitWrapper(pl.LightningModule):
         loglik = torch.stack(results["loglik"]).mean()
         self.log("val/loss", -loglik)
         self.log("val/loglik", loglik)
+
+        # For checkpointing.
+        val_result = {
+            "mean_loss": -loglik,
+            "std_loss": torch.stack(results["loglik"]).std(),
+        }
+        self.checkpointer.update_best_and_last_checkpoint(
+            model=self.model, val_result=val_result
+        )
 
         if "gt_loglik" in results:
             gt_loglik = torch.stack(results["gt_loglik"]).mean()
