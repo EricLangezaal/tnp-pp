@@ -6,7 +6,7 @@ import einops
 import torch
 import torchvision
 
-from .data import Batch
+from .data import Batch, ICBatch
 
 
 @dataclass
@@ -16,9 +16,8 @@ class ImageBatch(Batch):
 
 
 @dataclass
-class ICImageBatch(ImageBatch):
-    xic: torch.Tensor
-    yic: torch.Tensor
+class ICImageBatch(ImageBatch, ICBatch):
+    pass
 
 
 class SingleLabelBatchSampler:
