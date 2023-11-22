@@ -17,7 +17,9 @@ class ImageBatch(Batch):
 
 @dataclass
 class ICImageBatch(ImageBatch, ICBatch):
-    pass
+    mcdc: torch.Tensor
+    xic_orig: torch.Tensor
+    yic_orig: torch.Tensor
 
 
 class SingleLabelBatchSampler:
@@ -373,4 +375,7 @@ class ICImageGenerator(ImageGenerator):
             mc=mc,
             xic=xic,
             yic=yic,
+            mcdc=mcdc,
+            xic_orig=x[:, 1:, ...],
+            yic_orig=y[:, 1:, ...],
         )
