@@ -55,10 +55,10 @@ class ModelCheckpointer:
         self, model: nn.Module, path: Optional[str] = None
     ) -> None:
         if path is None:
-            path = torch.load(os.path.join(self.checkpoint_dir, "best.ckpt"))
+            path = os.path.join(self.checkpoint_dir, "best.ckpt")
 
         if os.path.exists(path):
-            model.load_state_dict(torch.load(path))
+            model.load_state_dict(torch.load(path, map_location="cpu"))
         else:
             raise FileNotFoundError(f"Checkpoint file {path} not found.")
 
@@ -66,10 +66,10 @@ class ModelCheckpointer:
         self, model: nn.Module, path: Optional[str] = None
     ) -> None:
         if path is None:
-            path = torch.load(os.path.join(self.checkpoint_dir, "last.ckpt"))
+            path = os.path.join(self.checkpoint_dir, "last.ckpt")
 
         if os.path.exists(path):
-            model.load_state_dict(torch.load(path))
+            model.load_state_dict(torch.load(path, map_location="cpu"))
         else:
             raise FileNotFoundError(f"Checkpoint file {path} not found.")
 
