@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 import gpytorch
 import torch
 
-from .data import SyntheticGenerator
+from .data import ICSyntheticGenerator, SyntheticGenerator
 from .gp import GPGroundTruthPredictor
 
 
@@ -23,12 +23,18 @@ class LinearGenerator(SyntheticGenerator):
         xic: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, GPGroundTruthPredictor, Optional[torch.Tensor]]:
         w = self.sample_weight()
+        gt_pred = LinearGroundTruthPredictor(prior_std=1.0, noise_std=self.noise_std)
 
         # Generate observations.
         f = x @ w[..., None]
         y = f + self.noise_std * torch.randn_like(f)
 
-        gt_pred = LinearGroundTruthPredictor(prior_std=1.0, noise_std=self.noise_std)
+        if xic is not None:
+            # Generate observations for in-context input locations.
+            fic = xic @ w[:, None, :, None]
+            yic = fic + self.noise_std * torch.randn_like(fic)
+
+            return y, gt_pred, yic
 
         return y, gt_pred, None
 
@@ -37,6 +43,10 @@ class LinearGenerator(SyntheticGenerator):
         w = torch.randn((self.batch_size, self.dim))
 
         return w
+
+
+class ICLinearGenerator(LinearGenerator, ICSyntheticGenerator):
+    pass
 
 
 class LinearGroundTruthPredictor(GPGroundTruthPredictor):
