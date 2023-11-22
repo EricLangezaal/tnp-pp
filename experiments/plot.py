@@ -170,7 +170,11 @@ def plot(
             plt.yticks(fontsize=18)
 
             plt.legend(loc="upper right", fontsize=14)
-            wandb.log({f"fig/epoch-{epoch:04d}/{i:03d}": wandb.Image(fig)})
+            if wandb.run is not None:
+                wandb.log({f"fig/epoch-{epoch:04d}/{i:03d}": wandb.Image(fig)})
+            else:
+                plt.show()
+
             plt.close()
 
     else:

@@ -61,7 +61,7 @@ def plot_image(
             ~mc[:1, :],
             y[:1, :, 0].numpy(),
         )
-        w = y_plot.shape[-1] // 2
+        w = int(y_plot.shape[-1] ** 0.5)
         y_plot = einops.rearrange(y_plot, "1 (n m) -> n m", n=w, m=w)
         mean = einops.rearrange(mean[..., 0], "1 (n m) -> n m", n=w, m=w)
         std = einops.rearrange(std[..., 0], "1 (n m) -> n m", n=w, m=w)
@@ -81,5 +81,9 @@ def plot_image(
             fontsize=24,
         )
 
-        wandb.log({f"fig/epoch-{epoch:04d}/{i:03d}": wandb.Image(fig)})
+        if wandb.run is not None:
+            wandb.log({f"fig/epoch-{epoch:04d}/{i:03d}": wandb.Image(fig)})
+        else:
+            plt.show()
+
         plt.close()
