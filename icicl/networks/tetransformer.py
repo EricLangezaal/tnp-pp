@@ -181,6 +181,9 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
     ) -> torch.Tensor:
         xq = einops.repeat(self.latent_tokens, "l e -> m l e", m=xc.shape[0])
         tq = einops.repeat(self.latent_inputs, "l d -> m l d", m=xc.shape[0])
+
+        # Add mean of context input-locations to make translation equivariant.
+        tq = tq + tc.mean(1, keepdim=True)
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
             self.mhsa_layers, self.mhca_ctoq_layers, self.mhca_qtot_layers
         ):
