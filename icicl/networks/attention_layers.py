@@ -1,24 +1,26 @@
 from abc import ABC
-from typing import Optional
+from functools import partial
+from typing import Optional, Union
 
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
 from .attention import (
+    BaseMultiHeadAttention,
     MultiHeadAttention,
     MultiHeadCrossAttention,
     MultiHeadSelfAttention,
 )
 
 
-class MultiHeadAttentionLayer(nn.Module, ABC):
+class BaseMultiHeadAttentionLayer(nn.Module, ABC):
     def __init__(
         self,
         embed_dim: int,
         num_heads: int,
         head_dim: int,
-        attention: MultiHeadAttention,
+        attention: Union[BaseMultiHeadAttention, partial[BaseMultiHeadAttention]],
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
         activation: nn.Module = nn.ReLU(),
@@ -28,7 +30,9 @@ class MultiHeadAttentionLayer(nn.Module, ABC):
         feedforward_dim = embed_dim if feedforward_dim is None else feedforward_dim
 
         self.embed_dim = embed_dim
-        self.attn = attention(embed_dim, num_heads, head_dim, p_dropout)
+        self.attn = attention(
+            num_heads=num_heads, head_dim=head_dim, p_dropout=p_dropout
+        )
 
         # Feedforward model.
         self.ff_block = nn.Sequential(
@@ -46,9 +50,64 @@ class MultiHeadAttentionLayer(nn.Module, ABC):
         self.attn_dropout = nn.Dropout(p_dropout)
 
 
-class MultiHeadSelfAttentionLayer(MultiHeadAttentionLayer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, attention=MultiHeadSelfAttention, **kwargs)
+class MultiHeadAttentionLayer(BaseMultiHeadAttentionLayer):
+    def __init__(
+        self,
+        *,
+        qk_dim: int,
+        v_dim: int,
+        **kwargs,
+    ):
+        attention = partial(MultiHeadAttention, qk_dim=qk_dim, v_dim=v_dim)
+        super().__init__(embed_dim=v_dim, attention=attention, **kwargs)
+
+    @check_shapes(
+        "xq: [m, nq, dqk]",
+        "xk: [m, nkv, dqk]",
+        "xv: [m, nkv, dv]",
+        "mask: [m, nq, nkv]",
+        "return: [m, nq, dv]",
+    )
+    def attn_block(
+        self,
+        xq: torch.Tensor,
+        xk: torch.Tensor,
+        xv: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        x = self.attn(xq, xk, xv, mask=mask)
+        return self.attn_dropout(x)
+
+    @check_shapes(
+        "xq: [m, nq, dx]",
+        "xk: [m, nkv, dx]",
+        "xv: [m, nkv, dv]",
+        "mask: [m, nq, nkv]",
+        "return: [m, nq, dv]",
+    )
+    def forward(
+        self,
+        xq: torch.Tensor,
+        xk: torch.Tensor,
+        xv: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        if self.norm_first:
+            xq = xq + self.attn_block(
+                self.norm1(xq), self.norm1(xk), self.norm1(xv), mask
+            )
+            xq = xq + self.ff_block(self.norm2(xq))
+        else:
+            xq = xq + self.norm1(xq + self.attn_block(xq, xk, xv, mask))
+            xq = self.norm2(xq + self.ff_block(xq))
+
+        return xq
+
+
+class MultiHeadSelfAttentionLayer(BaseMultiHeadAttentionLayer):
+    def __init__(self, *, embed_dim: int, **kwargs):
+        attention = partial(MultiHeadSelfAttention, embed_dim=embed_dim)
+        super().__init__(embed_dim=embed_dim, attention=attention, **kwargs)
 
     @check_shapes("x: [m, n, d]", "mask: [m, n, n]", "return: [m, n, d]")
     def attn_block(
@@ -73,9 +132,10 @@ class MultiHeadSelfAttentionLayer(MultiHeadAttentionLayer):
         return x
 
 
-class MultiHeadCrossAttentionLayer(MultiHeadAttentionLayer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, attention=MultiHeadCrossAttention, **kwargs)
+class MultiHeadCrossAttentionLayer(BaseMultiHeadAttentionLayer):
+    def __init__(self, *, embed_dim: int, **kwargs):
+        attention = partial(MultiHeadCrossAttention, embed_dim=embed_dim)
+        super().__init__(embed_dim=embed_dim, attention=attention, **kwargs)
 
     @check_shapes(
         "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, n, n]", "return: [m, n, d]"
