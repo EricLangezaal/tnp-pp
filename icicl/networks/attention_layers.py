@@ -92,14 +92,8 @@ class MultiHeadAttentionLayer(BaseMultiHeadAttentionLayer):
         xv: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        if self.norm_first:
-            xq = xq + self.attn_block(
-                self.norm1(xq), self.norm1(xk), self.norm1(xv), mask
-            )
-            xq = xq + self.ff_block(self.norm2(xq))
-        else:
-            xq = xq + self.norm1(xq + self.attn_block(xq, xk, xv, mask))
-            xq = self.norm2(xq + self.ff_block(xq))
+        # An MHA block is just the MHA operation.
+        xq = self.attn_block(xq, xk, xv, mask)
 
         return xq
 
