@@ -14,6 +14,8 @@ class TNPDEncoder(nn.Module):
         self,
         transformer_encoder: TransformerEncoder,
         xy_encoder: nn.Module,
+        contexts_self_attend: bool = True,
+        contexts_cross_attend: bool = True,
         targets_self_attend: bool = True,
         ar_mode: bool = False,
     ):
@@ -21,6 +23,8 @@ class TNPDEncoder(nn.Module):
 
         self.transformer_encoder = transformer_encoder
         self.xy_encoder = xy_encoder
+        self.contexts_self_attend = contexts_self_attend
+        self.contexts_cross_attend = contexts_cross_attend
         self.targets_self_attend = targets_self_attend
         self.ar_mode = ar_mode
 
@@ -39,7 +43,12 @@ class TNPDEncoder(nn.Module):
 
         # Construct mask.
         mask = gen_tnpd_mask(
-            xc, xt, targets_self_attend=self.targets_self_attend, ar_mode=self.ar_mode
+            xc,
+            xt,
+            contexts_self_attend=self.contexts_self_attend,
+            contexts_cross_attend=self.contexts_cross_attend,
+            targets_self_attend=self.targets_self_attend,
+            ar_mode=self.ar_mode,
         )
 
         z = self.transformer_encoder(z, mask)
@@ -103,6 +112,8 @@ class TNPD(NeuralProcess):
 def gen_tnpd_mask(
     xc: torch.Tensor,
     xt: torch.Tensor,
+    contexts_self_attend: bool = True,
+    contexts_cross_attend: bool = True,
     targets_self_attend: bool = False,
     ar_mode: bool = False,
 ) -> torch.Tensor:
@@ -113,11 +124,16 @@ def gen_tnpd_mask(
 
     mask = torch.ones(m, n, n).to(xc) > 0.5
 
-    if ar_mode:
-        tril_idx = torch.tril_indices(nc, nc)
-        mask[:, tril_idx[0], tril_idx[1]] = False
-    else:
-        mask[:, :nc, :nc] = False
+    if contexts_cross_attend:
+        if ar_mode:
+            tril_idx = torch.tril_indices(nc, nc)
+            mask[:, tril_idx[0], tril_idx[1]] = False
+        else:
+            mask[:, :nc, :nc] = False
+
+    if not contexts_self_attend:
+        for i in range(xc.shape[-2]):
+            mask[:, i, i] = True
 
     for i in range(xt.shape[-2]):
         mask[:, nc + i, :nc] = False
