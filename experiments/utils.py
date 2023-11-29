@@ -218,6 +218,33 @@ def val_epoch(
     return result, batches
 
 
+def extract_config(
+    config_file: str, config_changes: List[str]
+) -> Tuple[DictConfig, Dict]:
+    """Extract the config from the config file and the config changes.
+
+    Arguments:
+        config_file: path to the config file.
+        config_changes: list of config changes.
+
+    Returns:
+        config: config object.
+        config_dict: config dictionary.
+    """
+    OmegaConf.register_new_resolver("eval", eval)
+    config = OmegaConf.load(config_file)
+    config_changes = OmegaConf.from_cli(config_changes)
+    config = OmegaConf.merge(config, config_changes)
+    config_dict = OmegaConf.to_container(config, resolve=True)
+
+    # Remove nested value key if necessary.
+    for k, v in config.items():
+        if isinstance(v, DictConfig) and "value" in v:
+            config[k] = v["value"]
+
+    return config, config_dict
+
+
 def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     # Make argument parser with config argument.
     parser = argparse.ArgumentParser()
@@ -225,12 +252,7 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     args, config_changes = parser.parse_known_args()
 
     # Initialise experiment, make path.
-    OmegaConf.register_new_resolver("eval", eval)
-    config = OmegaConf.load(args.config)
-    config_changes = OmegaConf.from_cli(config_changes)
-    config = OmegaConf.merge(config, config_changes)
-    config_dict = OmegaConf.to_container(config, resolve=True)
-
+    config, config_dict = extract_config(args.config, config_changes)
     experiment = instantiate(config)
 
     # Initialise wandb.
