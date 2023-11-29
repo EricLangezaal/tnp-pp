@@ -17,9 +17,9 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 def plot_image(
     model: nn.Module,
     batches: List[ImageBatch],
-    epoch: int = 0,
     num_fig: int = 5,
     figsize: Tuple[float, float] = (24.0, 8.0),
+    name: str = "plot_image",
 ):
     for i in range(num_fig):
         batch = batches[i]
@@ -82,7 +82,7 @@ def plot_image(
         )
 
         if wandb.run is not None:
-            wandb.log({f"fig/epoch-{epoch:04d}/{i:03d}": wandb.Image(fig)})
+            wandb.log({f"fig/{name}/{i:03d}": wandb.Image(fig)})
         else:
             plt.show()
 

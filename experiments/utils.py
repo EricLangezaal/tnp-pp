@@ -167,7 +167,6 @@ def train_epoch(
 def val_epoch(
     model: nn.Module,
     generator: DataGenerator,
-    epoch: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], List[Batch]]:
     result = defaultdict(list)
     batches = []
@@ -207,9 +206,6 @@ def val_epoch(
         result["pred_std"].append(pred_dist.scale)
 
     loglik = torch.stack(result["loglik"])
-    loss = -loglik.mean()
-    wandb.log({"val/loss": loss, "epoch": epoch})
-
     result["mean_loglik"] = loglik.mean()
     result["std_loglik"] = loglik.std()
     result["mean_loss"] = -loglik.mean()
@@ -236,11 +232,6 @@ def extract_config(
     config_changes = OmegaConf.from_cli(config_changes)
     config = OmegaConf.merge(config, config_changes)
     config_dict = OmegaConf.to_container(config, resolve=True)
-
-    # Remove nested value key if necessary.
-    for k, v in config.items():
-        if isinstance(v, DictConfig) and "value" in v:
-            config[k] = v["value"]
 
     return config, config_dict
 
@@ -269,6 +260,43 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
         )
 
     return experiment, checkpointer
+
+
+def initialize_evaluation() -> DictConfig:
+    # Make argument parser with config argument.
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run_path", type=str)
+    parser.add_argument("--ckpt", type=str, choices=["best", "last"], default="last")
+    args, config_changes = parser.parse_known_args()
+
+    api = wandb.Api()
+    run = api.run(args.run_path)
+    config = run.config
+
+    # Initialise experiment, make path.
+    config_changes = OmegaConf.from_cli(config_changes)
+    config = OmegaConf.merge(config, config_changes)
+    config_dict = OmegaConf.to_container(config, resolve=True)
+    experiment = instantiate(config)
+
+    # Downloads to "./checkpoints/last.ckpt"
+    ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
+    ckpt_file.download(replace=True)
+
+    experiment.model.load_state_dict(
+        torch.load(f"checkpoints/{args.ckpt}.ckpt", map_location="cpu")
+    )
+
+    # Initialise wandb.
+    wandb.init(
+        resume="must",
+        project=experiment.misc.project,
+        name=experiment.misc.name,
+        id=run.id,
+        config=config_dict,
+    )
+
+    return experiment
 
 
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:

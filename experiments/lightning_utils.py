@@ -71,7 +71,7 @@ class LitWrapper(pl.LightningModule):
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
-            gt_loglik = gt_loglik.mean() / batch.yc.shape[1]
+            gt_loglik = gt_loglik.mean() / batch.yt.shape[1]
             result["gt_loglik"] = gt_loglik
 
         self.val_outputs.append(result)
@@ -84,7 +84,6 @@ class LitWrapper(pl.LightningModule):
         self.val_outputs = []
 
         loglik = torch.stack(results["loglik"]).mean()
-        self.log("val/loss", -loglik)
         self.log("val/loglik", loglik)
 
         # For checkpointing.
@@ -104,15 +103,15 @@ class LitWrapper(pl.LightningModule):
             plot_image(
                 model=self.model,
                 batches=results["batch"],
-                epoch=self.current_epoch,
                 num_fig=min(5, len(results["batch"])),
+                name=f"epoch-{self.current_epoch:04d}",
             )
         else:
             plot(
                 model=self.model,
                 batches=results["batch"],
-                epoch=self.current_epoch,
                 num_fig=min(5, len(results["batch"])),
+                name=f"epoch-{self.current_epoch:04d}",
             )
 
     def configure_optimizers(self):

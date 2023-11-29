@@ -1,12 +1,12 @@
 from plot import plot
 from plot_image import plot_image
-from utils import evaluation_summary, initialize_experiment, val_epoch
+from utils import evaluation_summary, initialize_evaluation, val_epoch
 
 from icicl.data.image import ImageGenerator
 
 
 def main():
-    experiment, _ = initialize_experiment()
+    experiment = initialize_evaluation()
 
     model = experiment.model
     gen_val = experiment.generators.val
@@ -19,12 +19,14 @@ def main():
             model=model,
             batches=batches,
             num_fig=min(experiment.misc.num_plots, len(batches)),
+            name="test",
         )
     else:
         plot(
             model=model,
             batches=batches,
             num_fig=min(experiment.misc.num_plots, len(batches)),
+            name="test",
         )
 
 

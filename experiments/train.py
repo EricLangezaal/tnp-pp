@@ -31,23 +31,29 @@ def main():
         )
         evaluation_summary("train", train_result)
 
-        val_result, batches = val_epoch(model=model, generator=gen_val, epoch=epoch)
+        val_result, batches = val_epoch(model=model, generator=gen_val)
 
         evaluation_summary("val", val_result)
         checkpointer.update_best_and_last_checkpoint(model=model, val_result=val_result)
 
         if isinstance(gen_train, ImageGenerator):
             plot_image(
-                model=model, batches=batches, epoch=epoch, num_fig=min(5, len(batches))
+                model=model,
+                batches=batches,
+                num_fig=min(
+                    5,
+                    len(batches),
+                    name=f"epoch-{epoch:04d}",
+                ),
             )
         else:
             plot(
                 model=model,
                 batches=batches,
-                epoch=epoch,
                 num_fig=min(5, len(batches)),
                 plot_ar_mode=experiment.misc.plot_ar_mode,
                 num_ar_samples=20,
+                name=f"epoch-{epoch:04d}",
             )
 
 
