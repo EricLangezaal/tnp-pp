@@ -12,7 +12,7 @@ def main():
     gen_val = experiment.generators.val
 
     val_result, batches = val_epoch(model=model, generator=gen_val)
-    evaluation_summary("val", val_result)
+    evaluation_summary("test", val_result)
 
     if isinstance(gen_val, ImageGenerator):
         plot_image(
