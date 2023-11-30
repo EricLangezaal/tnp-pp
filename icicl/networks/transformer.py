@@ -36,10 +36,12 @@ class TNPDTransformerEncoder(nn.Module):
         self,
         mhca_layer: MultiHeadCrossAttentionLayer,
         num_layers: int,
+        final_layer_cross_attention: bool = False,
     ):
         super().__init__()
 
         self.mhca_layers = _get_clones(mhca_layer, num_layers)
+        self.final_layer_cross_attention = final_layer_cross_attention
 
     @check_shapes(
         "xc: [m, nc, d]", "xt: [m, nt, d]", "mask: [m, nt, nc]", "return: [m, nt, d]"
@@ -48,8 +50,13 @@ class TNPDTransformerEncoder(nn.Module):
         self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         for mhca_layer in self.mhca_layers:
-            xt = mhca_layer(xt, xc, mask)
+            if not self.final_layer_cross_attention:
+                xt = mhca_layer(xt, xc, mask)
+
             xc = mhca_layer(xc, xc)
+
+        if self.final_layer_cross_attention:
+            xt = self.mhca_layers[-1](xt, xc, mask)
 
         return xt
 
