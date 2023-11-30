@@ -1,0 +1,97 @@
+generators:
+  train:
+    _target_: icicl.data.gp.RandomScaleGPGenerator
+    dim: ${params.dim}
+    kernel_type: eq
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 16384
+    batch_size: 16
+  val:
+    _target_: icicl.data.gp.RandomScaleGPGenerator
+    dim: ${params.dim}
+    kernel_type: eq
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 4096
+    batch_size: 16
+
+model:
+  _target_: icicl.models.tnp.TNPD
+  encoder: ${tnpd_encoder}
+  decoder: ${tnpd_decoder}
+  likelihood: ${likelihood}
+
+tnpd_encoder:
+  _target_: icicl.models.tnp.EfficientTNPDEncoder
+  transformer_encoder: ${transformer_encoder}
+  xy_encoder: ${xy_encoder}
+
+transformer_encoder:
+  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  num_layers: 5
+  final_layer_cross_attention: True
+
+mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+xy_encoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${eval:'2 + ${params.dim}'}
+  out_dim: ${params.embed_dim}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+tnpd_decoder:
+  _target_: icicl.models.tnp.TNPDDecoder
+  z_decoder: ${z_decoder}
+
+z_decoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.embed_dim}
+  out_dim: 2
+  num_layers: 2
+  width: ${params.embed_dim}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.Adam
+  _partial_: True
+  lr: 5e-4
+
+params:
+  epochs: 200
+  dim: 1
+  embed_dim: 32
+  num_heads: 4
+  head_dim: 8
+  norm_first: True
+
+
+misc:
+  project: efficient-tnp-not-nested
+  name: synthetic-1d-L${params.num_layers}-H${params.num_heads}-D${params.embed_dim}
+  resume_from_checkpoint: null
+  plot_ar_mode: False
