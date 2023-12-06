@@ -21,10 +21,10 @@ def main():
 
     # Store test set performance.
     test_result, batches = val_epoch(model=model, generator=gen_val)
-    wandb.run.summary["test/mean_loglik"] = test_result["mean_loglik"]
+    wandb.run.summary["test/loglik"] = test_result["mean_loglik"]
     wandb.run.summary["test/std_loglik"] = test_result["std_loglik"]
     if "mean_gt_loglik" in test_result:
-        wandb.run.summary["test/mean_gt_loglik"] = test_result["mean_gt_loglik"]
+        wandb.run.summary["test/gt_loglik"] = test_result["mean_gt_loglik"]
         wandb.run.summary["test/std_gt_loglik"] = test_result["std_gt_loglik"]
 
     if isinstance(gen_val, ImageGenerator):
