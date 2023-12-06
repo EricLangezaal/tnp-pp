@@ -211,6 +211,11 @@ def val_epoch(
     result["mean_loss"] = -loglik.mean()
     result["std_loss"] = -loglik.std()
 
+    if "gt_loglik" in result:
+        gt_loglik = torch.stack(result["gt_loglik"])
+        result["mean_gt_loglik"] = gt_loglik.mean()
+        result["std_gt_loglik"] = gt_loglik.std()
+
     return result, batches
 
 
@@ -303,10 +308,10 @@ def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
     if "mean_loglik" in result:
         wandb.log({f"{name}/loglik": result["mean_loglik"]})
 
-    if "gt_loglik" in result:
+    if "mean_gt_loglik" in result:
         wandb.log(
             {
-                f"{name}/gt_loglik": torch.stack(result["gt_loglik"]).mean(),
+                f"{name}/gt_loglik": result["mean_gt_loglik"],
             }
         )
 

@@ -1,8 +1,12 @@
+import torch
 from plot import plot
 from plot_image import plot_image
-from utils import evaluation_summary, initialize_evaluation, val_epoch
+from utils import initialize_evaluation, val_epoch
 
+import wandb
 from icicl.data.image import ImageGenerator
+
+torch.manual_seed(0)
 
 
 def main():
@@ -11,8 +15,17 @@ def main():
     model = experiment.model
     gen_val = experiment.generators.val
 
-    val_result, batches = val_epoch(model=model, generator=gen_val)
-    evaluation_summary("test", val_result)
+    # Store number of parameters.
+    num_params = sum(p.numel() for p in model.parameters())
+    wandb.run.summary["num_params"] = num_params
+
+    # Store test set performance.
+    test_result, batches = val_epoch(model=model, generator=gen_val)
+    wandb.run.summary["test/mean_loglik"] = test_result["mean_loglik"]
+    wandb.run.summary["test/std_loglik"] = test_result["std_loglik"]
+    if "mean_gt_loglik" in test_result:
+        wandb.run.summary["test/mean_gt_loglik"] = test_result["mean_gt_loglik"]
+        wandb.run.summary["test/std_gt_loglik"] = test_result["std_gt_loglik"]
 
     if isinstance(gen_val, ImageGenerator):
         plot_image(
