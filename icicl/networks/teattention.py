@@ -18,15 +18,15 @@ class MultiHeadTEAttention(nn.Module, ABC):
         num_heads: int,
         head_dim: int,
         p_dropout: float = 0.0,
-        token_attention: bool = True,
-        kernel_accepts_tokens: bool = False,
+        post_kernel: bool = False,
         group_action: Callable = translation,
         phi_t: Optional[nn.Module] = None,
+        qk_dim: Optional[int] = None,
     ):
         super().__init__()
 
         self.embed_dim = embed_dim
-        self.num_heads = num_heads
+        self.head_dim = head_dim
         self.scale = head_dim**-0.5
 
         inner_dim = head_dim * num_heads
@@ -40,14 +40,15 @@ class MultiHeadTEAttention(nn.Module, ABC):
             else nn.Identity()
         )
 
-        # Whether or not to include attention between tokens.
-        self.token_attention = token_attention
-        if token_attention:
-            self.to_k = nn.Linear(embed_dim, inner_dim, bias=False)
-            self.to_q = nn.Linear(embed_dim, inner_dim, bias=False)
+        if qk_dim is not None and post_kernel:
+            # Update inner dim to accommodate qk_dim.
+            inner_dim = head_dim * qk_dim
 
-        # Whether or not to feed tokens into kernel alongside.
-        self.kernel_accepts_tokens = kernel_accepts_tokens
+        self.to_k = nn.Linear(embed_dim, inner_dim, bias=False)
+        self.to_q = nn.Linear(embed_dim, inner_dim, bias=False)
+
+        # Whether or not to pass through kernel after combination with inner products of tokens.
+        self.post_kernel = post_kernel
 
         # Group action on inputs prior to kernel.
         self.group_action = group_action
@@ -91,40 +92,33 @@ class MultiHeadTEAttention(nn.Module, ABC):
         # (m, nq, nkv, dx).
         diff = self.group_action(tq, tk)
 
-        if self.kernel_accepts_tokens:
-            # Append (xq, xk) to inputs into kernel.
-            xq_ = einops.repeat(xq, "m nq d -> m nq nk d", nk=xk.shape[1])
-            xk_ = einops.repeat(xq, "m nk d -> m nq nk d", nq=xq.shape[1])
-            diff = torch.cat((diff, xq_, xk_), dim=-1)
+        # Compute token attention.
+        q = self.to_q(xq)
+        k = self.to_k(xk)
 
-        # (m, {1, h}, nq, nkv).
-        dots = self.kernel(diff, mask)
+        # Each of shape (m, {num_heads, qk_dim}, n, head_dim).
+        q, k = map(
+            lambda t: einops.rearrange(t, "b n (h d) -> b h n d", d=self.head_dim),
+            (q, k),
+        )
 
-        if self.token_attention:
-            # Compute token attention.
-            q = self.to_q(xq)
-            k = self.to_k(xk)
+        # (m, h, nq, nk).
+        token_dots = (q @ k.transpose(-1, -2)) * self.scale
 
-            # Each of shape (m, num_heads, n, head_dim).
-            q, k = map(
-                lambda t: einops.rearrange(t, "b n (h d) -> b h n d", h=self.num_heads),
-                (q, k),
-            )
-
-            # (m, h, nq, nk).
-            token_dots = (q @ k.transpose(-1, -2)) * self.scale
-
-            if mask is not None:
-                mask = einops.repeat(mask, "m n p -> m h n p", h=self.num_heads)
-                token_dots = torch.masked_fill(dots, mask, -float("inf"))
-
+        if not self.post_kernel:
+            # (m, {1, h}, nq, nkv).
+            dots = self.kernel(diff, mask)
             dots = dots + token_dots
+        else:
+            token_dots = einops.rearrange(token_dots, "m h nq nk -> m nq nk h")
+            kernel_input = torch.cat((diff, token_dots), dim=-1)
+            dots = self.kernel(kernel_input, mask)
 
         attn = dots.softmax(dim=-1)
 
         # Multiply by values.
         v = self.to_v(xv)
-        v = einops.rearrange(v, "b n (h d) -> b h n d", h=self.num_heads)
+        v = einops.rearrange(v, "b n (h d) -> b h n d", d=self.head_dim)
         out = attn @ v
         out = einops.rearrange(out, "b h n d -> b n (h d)")
         out = self.to_out(out)

@@ -24,27 +24,27 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
         kernel: Kernel,
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
-        token_attention: bool = True,
-        kernel_accepts_tokens: bool = False,
+        post_kernel: bool = False,
         group_action: Callable = translation,
         phi_t: Optional[nn.Module] = None,
         activation: nn.Module = nn.ReLU(),
         norm_first: bool = False,
+        qk_dim: Optional[int] = None,
     ):
         super().__init__()
         feedforward_dim = embed_dim if feedforward_dim is None else feedforward_dim
 
         self.embed_dim = embed_dim
         self.attn = attention(
-            kernel,
-            embed_dim,
-            num_heads,
-            head_dim,
-            p_dropout,
-            token_attention,
-            kernel_accepts_tokens,
-            group_action,
-            phi_t,
+            kernel=kernel,
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            p_dropout=p_dropout,
+            post_kernel=post_kernel,
+            group_action=group_action,
+            phi_t=phi_t,
+            qk_dim=qk_dim,
         )
 
         # Feedforward model.
