@@ -4,9 +4,9 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 32
+    min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
@@ -19,9 +19,9 @@ generators:
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
-    max_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 32
+    min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
@@ -44,7 +44,7 @@ tetnpd_encoder:
 transformer_encoder:
   _target_: icicl.networks.tetransformer.TETNPDTransformerEncoder
   mhca_layer: ${mhca_layer}
-  num_layers: 3
+  num_layers: ${params.num_layers}
 
 mhca_layer:
   _target_: icicl.networks.teattention_layers.MultiHeadCrossTEAttentionLayer
@@ -54,13 +54,14 @@ mhca_layer:
   feedforward_dim: ${params.embed_dim}
   kernel: ${mhca_kernel}
   token_attention: True
+  norm_first: ${params.norm_first}
 
 mhca_kernel:
   _target_: icicl.networks.kernels.MLPKernel
   in_dim: ${params.dim}
   out_dim: ${params.num_heads}
   num_layers: 2
-  width: 16
+  width: ${params.embed_dim}
 
 y_encoder:
   _target_: icicl.networks.mlp.MLP
@@ -78,7 +79,7 @@ z_decoder:
   in_dim: ${params.embed_dim}
   out_dim: 2
   num_layers: 2
-  width: 32
+  width: ${params.embed_dim}
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -94,9 +95,11 @@ params:
   embed_dim: 32
   num_heads: 4
   head_dim: 8
+  norm_first: True
+  num_layers: 5
 
 
 misc:
   project: efficient-tetnp
-  name: synthetic-1d
+  name: synthetic-1d-L${params.num_layers}-H${params.num_heads}-D${params.embed_dim}
   resume_from_checkpoint: null
