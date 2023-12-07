@@ -57,18 +57,19 @@ mhsa_layer:
   kernel_accepts_tokens: False
   phi_t: ${phi_t}
 
-# kernel:
-#   _target_: icicl.networks.kernels.RBFKernel
-#   dim: ${params.dim}
-#   init_lengthscale: 0.1
-
 mhsa_kernel:
-  _target_: icicl.networks.kernels.MLPKernel
-  # in_dim: ${eval:'${params.dim} + ${params.embed_dim} * 2'}
+  _target_: icicl.networks.kernels.RBFKernel
   in_dim: ${params.dim}
   out_dim: ${params.num_heads}
-  num_layers: 2
-  width: 16
+  init_lengthscale: 0.1
+
+# mhsa_kernel:
+#   _target_: icicl.networks.kernels.MLPKernel
+#   # in_dim: ${eval:'${params.dim} + ${params.embed_dim} * 2'}
+#   in_dim: ${params.dim}
+#   out_dim: ${params.num_heads}
+#   num_layers: 2
+#   width: 16
 
 phi_t:
   _target_: icicl.networks.mlp.MLP
