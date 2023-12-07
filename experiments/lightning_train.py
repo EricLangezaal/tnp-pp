@@ -24,6 +24,8 @@ def main():
         log_every_n_steps=1,
         devices=1,
     )
+
+    pl.seed_everything(0)
     trainer.fit(model=lit_model, train_dataloaders=gen_train, val_dataloaders=gen_val)
 
 

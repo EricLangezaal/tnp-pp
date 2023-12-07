@@ -1,3 +1,4 @@
+import lightning.pytorch as pl
 from plot import plot
 from plot_image import plot_image
 from utils import (
@@ -19,6 +20,8 @@ def main():
     gen_val = experiment.generators.val
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
+
+    pl.seed_everything(0)
 
     step = 0
     for epoch in range(epochs):

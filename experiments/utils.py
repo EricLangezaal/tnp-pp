@@ -155,10 +155,11 @@ def train_epoch(
 
         step += 1
 
+    loglik = -torch.stack(losses)
     train_result = {
-        "loglik": -torch.stack(losses),
-        "mean_loglik": -torch.stack(losses).mean(),
-        "std_loglik": torch.stack(losses).std(),
+        "loglik": loglik,
+        "mean_loglik": loglik.mean(),
+        "std_loglik": loglik.std() / (len(losses) ** 0.5),
     }
 
     return step, train_result
@@ -207,14 +208,14 @@ def val_epoch(
 
     loglik = torch.stack(result["loglik"])
     result["mean_loglik"] = loglik.mean()
-    result["std_loglik"] = loglik.std()
+    result["std_loglik"] = loglik.std() / (len(loglik) ** 0.5)
     result["mean_loss"] = -loglik.mean()
-    result["std_loss"] = -loglik.std()
+    result["std_loss"] = -loglik.std() / (len(loglik) ** 0.5)
 
     if "gt_loglik" in result:
         gt_loglik = torch.stack(result["gt_loglik"])
         result["mean_gt_loglik"] = gt_loglik.mean()
-        result["std_gt_loglik"] = gt_loglik.std()
+        result["std_gt_loglik"] = gt_loglik.std() / (len(gt_loglik) ** 0.5)
 
     return result, batches
 

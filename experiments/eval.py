@@ -1,12 +1,10 @@
-import torch
+import lightning.pytorch as pl
 from plot import plot
 from plot_image import plot_image
 from utils import initialize_evaluation, val_epoch
 
 import wandb
 from icicl.data.image import ImageGenerator
-
-torch.manual_seed(0)
 
 
 def main():
@@ -20,6 +18,7 @@ def main():
     wandb.run.summary["num_params"] = num_params
 
     # Store test set performance.
+    pl.seed_everything(0)
     test_result, batches = val_epoch(model=model, generator=gen_val)
     wandb.run.summary["test/loglik"] = test_result["mean_loglik"]
     wandb.run.summary["test/std_loglik"] = test_result["std_loglik"]
