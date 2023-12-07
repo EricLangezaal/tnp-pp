@@ -7,6 +7,8 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
+from .kernels import Kernel
+
 
 class BaseMultiHeadAttention(nn.Module, ABC):
     def __init__(
@@ -16,6 +18,7 @@ class BaseMultiHeadAttention(nn.Module, ABC):
         num_heads: int,
         head_dim: int,
         p_dropout: float = 0.0,
+        kernel: Optional[Kernel] = None,
     ):
         super().__init__()
 
@@ -35,6 +38,9 @@ class BaseMultiHeadAttention(nn.Module, ABC):
             if project_out
             else nn.Identity()
         )
+
+        # Optional kernel nonlinearity to apply to inner products.
+        self.kernel = kernel
 
     @check_shapes(
         "xq: [m, nq, dqk]",
@@ -61,6 +67,11 @@ class BaseMultiHeadAttention(nn.Module, ABC):
         )
 
         dots = (q @ k.transpose(-1, -2)) * self.scale
+
+        if self.kernel is not None:
+            dots = einops.rearrange(dots, "m h nq nk -> m nq nk h")
+            dots = self.kernel(dots)
+            dots = einops.rearrange(dots, "m nq nk h -> m h nq nk")
 
         if mask is not None:
             mask = einops.repeat(mask, "m n p -> m h n p", h=self.num_heads)
