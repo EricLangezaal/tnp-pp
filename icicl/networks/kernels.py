@@ -1,7 +1,5 @@
 from abc import ABC
-from typing import Optional
 
-import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -24,13 +22,14 @@ class RBFKernel(Kernel):
 
     @property
     def lengthscale(self):
-        return 1e-5 + nn.functional.softplus(self.lengthscale_param)
+        return 1e-5 + nn.functional.softplus(  # pylint: disable=not-callable
+            self.lengthscale_param
+        )
 
-    @check_shapes(
-        "diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, h, n1, n2]"
-    )
+    @check_shapes("diff: [m, n1, n2, dx]", "return: [m, n1, n2, dout]")
     def forward(
-        self, diff: torch.Tensor, mask: Optional[torch.Tensor] = None
+        self,
+        diff: torch.Tensor,
     ) -> torch.Tensor:
         lengthscale = self.lengthscale[None, None, None, ...]
         diff = diff[..., None]
@@ -38,12 +37,6 @@ class RBFKernel(Kernel):
         # (m, n1, n2, h).
         dist = (diff / lengthscale).sum(-2, keepdim=False)
         dots = -0.5 * dist**2.0
-
-        if mask is not None:
-            mask = einops.repeat(mask, "m n1 n2 -> m n1 n2 h", h=dots.shape[-1])
-            dots = torch.masked_fill(dots, mask, -float("inf"))
-
-        dots = einops.rearrange(dots, "m n1 n2 h -> m h n1 n2")
 
         return dots
 
@@ -54,19 +47,9 @@ class MLPKernel(Kernel):
 
         self.mlp = MLP(**kwargs)
 
-    @check_shapes(
-        "diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, h, n1, n2]"
-    )
-    def forward(
-        self, diff: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    @check_shapes("diff: [m, n1, n2, dx]", "return: [m, n1, n2, dout]")
+    def forward(self, diff: torch.Tensor) -> torch.Tensor:
         dots = self.mlp(diff)
-
-        if mask is not None:
-            mask = einops.repeat(mask, "m n1 n2 -> m n1 n2 h", h=dots.shape[-1])
-            dots = torch.masked_fill(dots, mask, -float("inf"))
-
-        dots = einops.rearrange(dots, "m n1 n2 h -> m h n1 n2")
 
         return dots
 
@@ -84,12 +67,12 @@ class MixtureKernel(Kernel):
     def weights(self):
         return nn.functional.softmax(self.weights_param, dim=-1)
 
-    @check_shapes("diff: [m, n1, n2, dx]", "mask: [m, n1, n2]", "return: [m, n1, n2]")
+    @check_shapes("diff: [m, n1, n2, dx]", "return: [m, n1, n2, dout]")
     def foward(
-        self, diff: torch.Tensor, mask: Optional[torch.Tensor] = None
+        self,
+        diff: torch.Tensor,
     ) -> torch.Tensor:
         dots = sum(
-            weight * kernel(diff, mask)
-            for weight, kernel in zip(self.weights, self.kernels)
+            weight * kernel(diff) for weight, kernel in zip(self.weights, self.kernels)
         )
         return dots
