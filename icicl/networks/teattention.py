@@ -107,12 +107,18 @@ class MultiHeadTEAttention(nn.Module, ABC):
 
         if not self.post_kernel:
             # (m, {1, h}, nq, nkv).
-            dots = self.kernel(diff, mask)
+            dots = self.kernel(diff)
+            dots = einops.rearrange(dots, "m nq nk h -> m h nq nk")
             dots = dots + token_dots
         else:
             token_dots = einops.rearrange(token_dots, "m h nq nk -> m nq nk h")
             kernel_input = torch.cat((diff, token_dots), dim=-1)
-            dots = self.kernel(kernel_input, mask)
+            dots = self.kernel(kernel_input)
+            dots = einops.rearrange(dots, "m nq nk h -> m h nq nk")
+
+        if mask is not None:
+            mask = einops.repeat(mask, "m n p -> m h n p", h=self.num_heads)
+            dots = torch.masked_fill(dots, mask, -float("inf"))
 
         attn = dots.softmax(dim=-1)
 
