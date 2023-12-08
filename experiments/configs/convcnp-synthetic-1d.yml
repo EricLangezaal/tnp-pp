@@ -3,30 +3,30 @@ generators:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
-    min_log10_lengthscale: -0.301
-    max_log10_lengthscale: 0.301
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 32
+    min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-5.0, 5.0]]
-    samples_per_epoch: 16_000
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 16384
     batch_size: 16
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
-    min_log10_lengthscale: -0.301
-    max_log10_lengthscale: 0.301
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
     noise_std: 0.2
-    min_num_ctx: 32
+    min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-5.0, 5.0]]
+    target_range: [[-3.0, 3.0]]
     samples_per_epoch: 4096
     batch_size: 16
 
@@ -53,9 +53,9 @@ setconv_encoder:
 cnn:
   _target_: icicl.networks.cnn.UNet
   dim: ${params.dim}
-  num_channels: [64, 64, 64, 64, 64]
-  num_blocks: 9
-  kernel_size: 19
+  num_channels: ${params.num_channels}
+  num_blocks: ${params.num_blocks}
+  kernel_size: ${params.kernel_size}
 
 # cnn:
 #   _target_: icicl.networks.cnn.CNN
@@ -68,9 +68,9 @@ cnn:
 encoder_resizer:
   _target_: icicl.networks.mlp.MLP
   in_dim: 2
-  out_dim: 64
+  out_dim: ${params.num_channels}
   num_layers: 2
-  width: 64
+  width: ${params.num_channels}
 
 convcnp_decoder:
   _target_: icicl.models.convcnp.ConvCNPDecoder
@@ -85,10 +85,10 @@ setconv_decoder:
 
 decoder_resizer:
   _target_: icicl.networks.mlp.MLP
-  in_dim: 64
+  in_dim: ${params.num_channels}
   out_dim: 2
   num_layers: 2
-  width: 64
+  width: ${params.num_channels}
 
 likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
@@ -96,14 +96,17 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 3e-4
+  lr: 5e-4
 
 params:
   epochs: 200
   dim: 1
   points_per_unit: 64
+  num_channels: 16
+  num_blocks: 5
+  kernel_size: 5
 
 misc:
   project: convcnp
-  name: synthetic-1d
+  name: synthetic-1d-L${params.num_blocks}-C${params.num_channels}-K${params.kernel_size}-P${params.points_per_unit}
   resume_from_checkpoint: null
