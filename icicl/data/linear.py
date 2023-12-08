@@ -7,8 +7,8 @@ from typing import Optional, Tuple
 import gpytorch
 import torch
 
-from .data import ICSyntheticGenerator, SyntheticGenerator
 from .gp import GPGroundTruthPredictor
+from .synthetic import ICSyntheticGenerator, SyntheticGenerator
 
 
 class LinearGenerator(SyntheticGenerator):

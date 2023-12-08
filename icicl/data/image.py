@@ -6,7 +6,7 @@ import einops
 import torch
 import torchvision
 
-from .data import Batch, ICBatch
+from .base import Batch, ICBatch
 
 
 @dataclass

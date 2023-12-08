@@ -7,7 +7,8 @@ from torch import nn
 from utils import ar_predict
 
 import wandb
-from icicl.data.data import Batch, ICBatch, SyntheticBatch
+from icicl.data.base import Batch, ICBatch
+from icicl.data.synthetic import SyntheticBatch
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"

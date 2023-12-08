@@ -6,7 +6,8 @@ import gpytorch
 import torch
 import torch.distributions as td
 
-from .data import GroundTruthPredictor, ICSyntheticGenerator, SyntheticGenerator
+from .base import GroundTruthPredictor
+from .synthetic import ICSyntheticGenerator, SyntheticGenerator
 
 KERNEL_TYPES = [
     "random",
@@ -236,8 +237,10 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         ktc = kxx[:, num_ctx:, :num_ctx]
         ktt = kxx[:, num_ctx:, num_ctx:]
 
-        mean = (ktc @ torch.linalg.solve(kcc, yc))[..., 0]
-        cov = ktt - ktc @ torch.linalg.solve(kcc, kct)
+        mean = (ktc @ torch.linalg.solve(kcc, yc))[  # pylint: disable=not-callable
+            ..., 0
+        ]
+        cov = ktt - ktc @ torch.linalg.solve(kcc, kct)  # pylint: disable=not-callable
         std = torch.diagonal(cov, dim1=-2, dim2=-1).sqrt()
 
         if yt is not None:

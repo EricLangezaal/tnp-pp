@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from .data import SyntheticGenerator
+from .synthetic import SyntheticGenerator
 
 
 class SawtoothGenerator(SyntheticGenerator):

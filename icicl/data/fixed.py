@@ -2,7 +2,7 @@ from typing import Optional
 
 import torch
 
-from .data import (
+from .synthetic import (
     ICSyntheticBatch,
     ICSyntheticGenerator,
     SyntheticBatch,

@@ -14,7 +14,8 @@ from torch import nn
 from tqdm.auto import tqdm
 
 import wandb
-from icicl.data.data import Batch, DataGenerator, ICBatch, SyntheticBatch
+from icicl.data.base import Batch, DataGenerator, ICBatch
+from icicl.data.synthetic import SyntheticBatch
 from icicl.utils.batch import compress_batch_dimensions
 
 

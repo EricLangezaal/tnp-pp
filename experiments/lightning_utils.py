@@ -7,8 +7,9 @@ from plot_image import plot_image
 from torch import nn
 from utils import ModelCheckpointer
 
-from icicl.data.data import Batch, ICBatch, SyntheticBatch
+from icicl.data.base import Batch, ICBatch
 from icicl.data.image import ImageGenerator
+from icicl.data.synthetic import SyntheticBatch
 
 
 class LitWrapper(pl.LightningModule):
