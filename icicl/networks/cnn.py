@@ -6,7 +6,6 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..utils.conv import make_depth_sep_conv
 from ..utils.initialisation import weights_init
 
 CONV = {
@@ -215,7 +214,7 @@ class UNet(CNN):
         self.pooling = POOL[dim](pooling_size)
         self.upsample_mode = UPSAMPLE_MODE[dim]
 
-    @check_shapes("x: [m, c, ...]", "return: [m, ...]")
+    @check_shapes("x: [m, ..., c]", "return: [m, ..., c]")
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Move channels to after batch dimension.
         x = torch.movedim(x, -1, 1)
@@ -236,19 +235,10 @@ class UNet(CNN):
         for i in range(num_down_blocks + 1, self.num_blocks):
             x = nn.functional.interpolate(
                 x,
+                size=residuals[num_down_blocks - i].shape[-self.dim :],
                 mode=self.upsample_mode,
-                scale_factor=self.pooling_size,
                 align_corners=True,
             )
-
-            # Apply padding if needed.
-            if x.shape[-1] < residuals[num_down_blocks - i].shape[-1]:
-                # Compute and apply padding.
-                pad = [
-                    0,
-                    residuals[num_down_blocks - i].shape[-1] - x.shape[-1],
-                ] * self.dim
-                x = nn.functional.pad(x, pad, "constant", 0)
 
             x = torch.cat((x, residuals[num_down_blocks - i]), dim=1)
             x = self.conv_blocks[i](x)

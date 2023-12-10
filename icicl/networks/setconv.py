@@ -197,14 +197,14 @@ def make_grid(
     dim = xmin.shape[-1]
 
     # Compute half the number of points in each dimension
-    N = torch.ceil(
+    num_points = torch.ceil(
         (0.5 * (xmax - xmin) + margin) * points_per_unit
     )  # shape (batch_size, dim)
 
     # Take the maximum over the batch, in order to use the same number of
     # points across all tasks in the batch, to enable tensor batching
-    N = torch.max(N, dim=0)[0]
-    N = 2 ** torch.ceil(torch.log(N) / math.log(2.0))  # shape (dim,)
+    num_points = torch.max(num_points, dim=0)[0]
+    num_points = 2 ** torch.ceil(torch.log(num_points) / math.log(2.0))  # shape (dim,)
 
     # Compute midpoints of each dimension, multiply integer grid by the grid
     # spacing and add midpoint to obtain dimension-wise grids
@@ -213,7 +213,10 @@ def make_grid(
     # Compute multi-dimensional grid
     grid = torch.stack(
         torch.meshgrid(
-            *[torch.range(-N[i], N[i], dtype=xmin.dtype) for i in range(dim)]
+            *[
+                torch.range(-num_points[i], num_points[i], dtype=xmin.dtype)
+                for i in range(dim)
+            ]
         ),
         axis=-1,
     ).to(
