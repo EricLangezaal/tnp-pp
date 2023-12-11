@@ -143,8 +143,8 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         lengthscale = 10.0**log10_lengthscale
 
         if self.kernel_type == "random":
-            # kernel_type = random.choice(KERNEL_TYPES[1:])
-            kernel_type = random.choice(["eq", "periodic"])
+            kernel_type = random.choice(KERNEL_TYPES[1:])
+            # kernel_type = random.choice(["eq", "periodic"])
         else:
             kernel_type = self.kernel_type
 
