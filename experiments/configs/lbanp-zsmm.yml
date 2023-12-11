@@ -1,0 +1,101 @@
+generators:
+  train:
+    _target_: icicl.data.mnist.ZeroShotMultiMNISTGenerator
+    min_prop_ctx: 0.1
+    max_prop_ctx: 0.5
+    data_dir: /Users/matt/projects/tnp-pp/data
+    train: True
+    download: True
+    samples_per_epoch: 16_000
+    batch_size: 16
+  val:
+    _target_: icicl.data.mnist.ZeroShotMultiMNISTGenerator
+    min_prop_ctx: 0.1
+    max_prop_ctx: 0.5
+    data_dir: /Users/matt/projects/tnp-pp/data
+    train: False
+    download: True
+    samples_per_epoch: 4096
+    batch_size: 16
+
+model:
+  _target_: icicl.models.lbanp.LBANP
+  encoder: ${lbanp_encoder}
+  decoder: ${lbanp_decoder}
+  likelihood: ${likelihood}
+
+lbanp_encoder:
+  _target_: icicl.models.lbanp.NestedLBANPEncoder
+  perceiver_encoder: ${nested_perceiver_encoder}
+  xy_encoder: ${xy_encoder}
+
+nested_perceiver_encoder:
+  _target_: icicl.networks.transformer.NestedPerceiverEncoder
+  num_latents: ${params.num_latents}
+  mhsa_layer: ${mhsa_layer}
+  mhca_ctoq_layer: ${mhca_ctoq_layer}
+  mhca_qtot_layer: ${mhca_qtot_layer}
+  num_layers: ${params.num_layers}
+
+mhsa_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_ctoq_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+
+mhca_qtot_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${eval:'${params.embed_dim} // 4'}
+  feedforward_dim: ${params.embed_dim}
+
+xy_encoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${eval:'${params.dim} + 2'}
+  out_dim: ${params.embed_dim}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+lbanp_decoder:
+  _target_: icicl.models.lbanp.NestedLBANPDecoder
+  z_decoder: ${z_decoder}
+
+z_decoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.embed_dim}
+  out_dim: 2
+  num_layers: 2
+  width: ${params.embed_dim}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+  min_noise: 0.1
+
+optimiser:
+  _target_: torch.optim.Adam
+  _partial_: True
+  lr: 5e-4
+
+params:
+  epochs: 200
+  dim: 2
+  embed_dim: 64
+  num_layers: 5
+  num_heads: 4
+  head_dim: 16
+  num_latents: 64
+
+
+misc:
+  project: lbanp
+  name: zsmm-L${params.num_layers}-H${params.num_heads}-D${params.embed_dim}-M${params.num_latents}
+  resume_from_checkpoint: null
