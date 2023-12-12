@@ -7,6 +7,7 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
+from .te_pseudo_initialisers import PseudoTokenInitialiser
 from .teattention_layers import (
     MultiHeadCrossTEAttentionLayer,
     MultiHeadSelfTEAttentionLayer,
@@ -147,6 +148,7 @@ class BaseNestedTEPerceiverEncoder(nn.Module, ABC):
         mhca_ctoq_layer: MultiHeadCrossTEAttentionLayer,
         mhca_qtot_layer: MultiHeadCrossTEAttentionLayer,
         num_layers: int,
+        pseudo_token_initialiser: PseudoTokenInitialiser,
     ):
         super().__init__()
 
@@ -160,6 +162,7 @@ class BaseNestedTEPerceiverEncoder(nn.Module, ABC):
         self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
         self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
         self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+        self.pseudo_token_initialiser = pseudo_token_initialiser
 
 
 class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
@@ -182,8 +185,10 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
         xq = einops.repeat(self.latent_tokens, "l e -> m l e", m=xc.shape[0])
         tq = einops.repeat(self.latent_inputs, "l d -> m l d", m=xc.shape[0])
 
+        # Now initialise pseudo-tokens.
+        xq, tq = self.pseudo_token_initialiser(xq, xc, tq, tc)
+
         # Add mean of context input-locations to make translation equivariant.
-        tq = tq + tc.mean(1, keepdim=True)
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
             self.mhsa_layers, self.mhca_ctoq_layers, self.mhca_qtot_layers
         ):
