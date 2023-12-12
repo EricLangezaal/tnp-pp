@@ -32,7 +32,9 @@ class SetConvEncoder(nn.Module):
 
     @property
     def lengthscale(self):
-        return 1e-5 + nn.functional.softplus(self.lengthscale_param)
+        return 1e-5 + nn.functional.softplus(  # pylint: disable=not-callable
+            self.lengthscale_param
+        )
 
     @check_shapes(
         "xc: [m, nc, dx]",
@@ -104,7 +106,9 @@ class SetConvDecoder(nn.Module):
 
     @property
     def lengthscale(self):
-        return 1e-5 + nn.functional.softplus(self.lengthscale_param)
+        return 1e-5 + nn.functional.softplus(  # pylint: disable=not-callable
+            self.lengthscale_param
+        )
 
     @check_shapes(
         "grids[0]: [m, ..., dx]",
