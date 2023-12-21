@@ -32,7 +32,7 @@ class PseudoTokenInitialiser(nn.Module):
         )
 
         # Pre-softmax weighting of location attention weights.
-        self.raw_head_weights = nn.Parameter(torch.randn((num_heads,)))
+        self.raw_head_weights = nn.Parameter(torch.ones((num_heads,)))
 
     @property
     def head_weights(self):
@@ -81,4 +81,5 @@ class PseudoTokenInitialiser(nn.Module):
         tq_update = tq_update @ self.head_weights
         tq_out = tq + tq_update
 
-        return out, tq_out
+        # return out, tq_out
+        return xq, tq_out
