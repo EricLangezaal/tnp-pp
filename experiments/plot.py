@@ -9,6 +9,7 @@ from utils import ar_predict
 import wandb
 from icicl.data.base import Batch, ICBatch
 from icicl.data.synthetic import SyntheticBatch
+from icicl.models.telbanp import TELBANP
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -160,6 +161,19 @@ def plot(
 
                 ar_nll = -ar_sample_logprobs.mean()
                 title_str += f" AR NLL: {ar_nll:.3f}"
+
+            if isinstance(model, TELBANP):
+                xq = model.encoder.nested_perceiver_encoder.tq_cache
+
+                if xq is not None:
+                    plt.scatter(
+                        xq[0, ...],
+                        torch.ones_like(xq[0, ...])
+                        * (y_lim[0] + 0.05 * (y_lim[-1] - y_lim[0])),
+                        color="tab:red",
+                        label="Pseudo-locations",
+                        s=20,
+                    )
 
             plt.title(title_str, fontsize=24)
 

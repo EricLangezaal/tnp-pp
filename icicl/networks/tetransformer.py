@@ -166,6 +166,8 @@ class BaseNestedTEPerceiverEncoder(nn.Module, ABC):
 
 
 class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
+    tq_cache: Optional[torch.Tensor] = None
+
     @check_shapes(
         "xc: [m, nc, dx]",
         "xt: [m, nt, dx]",
@@ -187,6 +189,9 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
 
         # Now initialise pseudo-tokens.
         xq, tq = self.pseudo_token_initialiser(xq, xc, tq, tc)
+
+        # Cache for plotting.
+        self.tq_cache = tq.detach()
 
         # Add mean of context input-locations to make translation equivariant.
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
