@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -20,7 +20,9 @@ def plot(
     batches: List[Batch],
     num_fig: int = 5,
     figsize: Tuple[float, float] = (8.0, 6.0),
-    x_range: Tuple[float, float] = (-5.0, 5.0),
+    x_range: Union[
+        Tuple[float, float], Tuple[Tuple[float, float], Tuple[float, float]]
+    ] = (-5.0, 5.0),
     y_lim: Tuple[float, float] = (-3.0, 3.0),
     points_per_dim: int = 256,
     plot_ar_mode: bool = False,
@@ -192,5 +194,80 @@ def plot(
 
             plt.close()
 
+    elif dim in (2, 3):
+        # Plots first two dimensions in the case of 3.
+        figsize = (24.0, 8.0)
+        for i in range(num_fig):
+            batch = batches[i]
+            x = batch.x[:1]
+            y = batch.y[:1]
+            xc = batch.xc[:1]
+            yc = batch.yc[:1]
+            xt = batch.xt[:1]
+            yt = batch.yt[:1]
+
+            with torch.no_grad():
+                if isinstance(batch, ICBatch):
+                    y_plot_pred_dist = model(
+                        xc=xc,
+                        yc=yc,
+                        xic=batch.xic,
+                        yic=batch.yic,
+                        xt=x,
+                    )
+                    yt_pred_dist = model(
+                        xc=xc, yc=yc, xic=batch.xic[:1], yic=batch.yic[:1], xt=xt
+                    )
+                else:
+                    assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
+                    y_plot_pred_dist = model(xc=xc, yc=yc, xt=x)
+                    yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+
+                model_nll = -yt_pred_dist.log_prob(yt).mean()
+                mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
+
+            # Get indices corresponding to single time point.
+            for t_min in x[0, :, 0].unique():
+                # Make figure for plotting
+                fig, axes = plt.subplots(
+                    figsize=figsize, ncols=3, nrows=1, sharex=True, sharey=True
+                )
+
+                t_min_idx_c = torch.where(xc[0, :, 0] == t_min)[0]
+                t_min_idx = torch.where(x[0, :, 0] == t_min)[0]
+
+                axes[0].scatter(
+                    xc[0, t_min_idx_c, 1],
+                    xc[0, t_min_idx_c, 2],
+                    c=yc[0, t_min_idx_c, 0],
+                    s=50,
+                )
+                axes[1].scatter(
+                    x[0, t_min_idx, 1],
+                    x[0, t_min_idx, 2],
+                    c=mean[0, t_min_idx, 0],
+                    s=50,
+                )
+                axes[2].scatter(
+                    x[0, t_min_idx, 1], x[0, t_min_idx, 2], c=y[0, t_min_idx, 0], s=50
+                )
+
+                axes[0].set_title("Context set", fontsize=18)
+                axes[1].set_title("Predictive mean", fontsize=18)
+                axes[2].set_title("True values", fontsize=18)
+
+                plt.suptitle(
+                    f"prop_ctx = {xc.shape[-2] / x.shape[-2]:.2f}    "
+                    #
+                    f"NLL = {model_nll:.3f}",
+                    fontsize=24,
+                )
+
+                if wandb.run is not None:
+                    wandb.log({f"fig/{name}/{i:03d}/t-{t_min}": wandb.Image(fig)})
+                else:
+                    plt.show()
+
+                plt.close()
     else:
         raise NotImplementedError
