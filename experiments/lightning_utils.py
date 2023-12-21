@@ -27,6 +27,7 @@ class LitWrapper(pl.LightningModule):
         self.loss_fn = loss_fn
         self.checkpointer = checkpointer
         self.val_outputs: List[Any] = []
+        self.train_losses: List[Any] = []
 
     def forward(self, *args, **kwargs):
         return self.model(*args, **kwargs)
@@ -50,6 +51,7 @@ class LitWrapper(pl.LightningModule):
             loss = self.loss_fn(self.model, batch.xc, batch.yc, batch.xt, batch.yt)
 
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.train_losses.append(loss.detach())
         return loss
 
     def validation_step(  # pylint: disable=arguments-differ
@@ -81,6 +83,22 @@ class LitWrapper(pl.LightningModule):
 
         self.val_outputs.append(result)
 
+    def on_train_epoch_end(self) -> None:
+        train_losses = torch.stack(self.train_losses)
+        self.train_losses = []
+
+        # For checkpointing.
+        train_result = {
+            "mean_loss": train_losses.mean(),
+            "std_loss": train_losses.std() / (len(train_losses) ** 0.5),
+        }
+        self.checkpointer.update_best_and_last_checkpoint(
+            model=self.model,
+            val_result=train_result,
+            prefix="train_",
+            update_last=False,
+        )
+
     def on_validation_epoch_end(self) -> None:
         results = {
             k: [result[k] for result in self.val_outputs]
@@ -90,25 +108,25 @@ class LitWrapper(pl.LightningModule):
 
         loglik = torch.stack(results["loglik"])
         mean_loglik = loglik.mean()
-        std_loglik = loglik.std()
+        std_loglik = loglik.std() / (len(loglik) ** 0.5)
         self.log("val/loglik", mean_loglik)
         self.log("val/std_loglik", std_loglik)
 
         # For checkpointing.
         val_result = {
             "mean_loss": -mean_loglik,
-            "std_loss": -std_loglik,
+            "std_loss": std_loglik,
         }
         self.checkpointer.update_best_and_last_checkpoint(
-            model=self.model, val_result=val_result
+            model=self.model, val_result=val_result, prefix="val_"
         )
 
         if "gt_loglik" in results:
             gt_loglik = torch.stack(results["gt_loglik"])
             mean_gt_loglik = gt_loglik.mean()
-            std_gt_loglik = gt_loglik.std()
+            std_gt_loglik = gt_loglik.std() / (len(gt_loglik) ** 0.5)
             self.log("val/gt_loglik", mean_gt_loglik)
-            self.log("val/std_loglik", std_gt_loglik)
+            self.log("val/std_gt_loglik", std_gt_loglik)
 
         if isinstance(self.trainer.val_dataloaders, ImageGenerator):
             plot_image(

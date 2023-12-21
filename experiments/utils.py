@@ -34,6 +34,8 @@ class ModelCheckpointer:
         self,
         model: nn.Module,
         val_result: Dict[str, torch.Tensor],
+        prefix: Optional[str] = None,
+        update_last: bool = True,
     ) -> None:
         """Update the best and last checkpoints of the model.
 
@@ -47,10 +49,14 @@ class ModelCheckpointer:
         if loss_ci < self.best_validation_loss:
             self.best_validation_loss = loss_ci
             torch.save(
-                model.state_dict(), os.path.join(self.checkpoint_dir, "best.ckpt")
+                model.state_dict(),
+                os.path.join(self.checkpoint_dir, f"{prefix}best.ckpt"),
             )
 
-        torch.save(model.state_dict(), os.path.join(self.checkpoint_dir, "last.ckpt"))
+        if update_last:
+            torch.save(
+                model.state_dict(), os.path.join(self.checkpoint_dir, "last.ckpt")
+            )
 
     def load_best_checkpoint(
         self, model: nn.Module, path: Optional[str] = None
@@ -211,7 +217,7 @@ def val_epoch(
     result["mean_loglik"] = loglik.mean()
     result["std_loglik"] = loglik.std() / (len(loglik) ** 0.5)
     result["mean_loss"] = -loglik.mean()
-    result["std_loss"] = -loglik.std() / (len(loglik) ** 0.5)
+    result["std_loss"] = loglik.std() / (len(loglik) ** 0.5)
 
     if "gt_loglik" in result:
         gt_loglik = torch.stack(result["gt_loglik"])
