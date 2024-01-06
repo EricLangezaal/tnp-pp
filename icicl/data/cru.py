@@ -23,7 +23,7 @@ class CRUDataGenerator(DataGenerator):
         lat_range: Tuple[float, float] = (-89.75, 89.75),
         lon_range: Tuple[float, float] = (-179.75, 179.75),
         max_num_total: Optional[int] = None,
-        min_num_points: int = 0,
+        min_num_total: int = 1,
     ):
         super().__init__(samples_per_epoch=samples_per_epoch, batch_size=batch_size)
 
@@ -33,7 +33,11 @@ class CRUDataGenerator(DataGenerator):
         self.batch_grid_size = batch_grid_size
         self.dim = np.prod(batch_grid_size)
         self.max_num_total = max_num_total
-        self.min_num_points = min_num_points
+        self.min_num_total = min_num_total
+
+        # Store ranges for plotting.
+        self.lat_range = lat_range
+        self.lon_range = lon_range
 
         # Load dataset.
         dataset = netCDF4.Dataset(fname, "r")  # pylint: disable=no-member
@@ -103,7 +107,7 @@ class CRUDataGenerator(DataGenerator):
             # Get number of non-missing points.
             num_points = self._get_num_points(lat_idx=lat_idx, lon_idx=lon_idx)
             num_points *= self.batch_grid_size[0]
-            if num_points > self.min_num_points:
+            if num_points > self.min_num_total:
                 valid_location = True
 
         time_idx: List[List] = []
@@ -130,10 +134,14 @@ class CRUDataGenerator(DataGenerator):
             x = torch.stack(
                 [
                     torch.as_tensor(
-                        self.data["time"][idx_grid[:, 0]].data, dtype=float
+                        self.data["time"][idx_grid[:, 0]].data, dtype=torch.float
                     ),
-                    torch.as_tensor(self.data["lat"][idx_grid[:, 1]].data, dtype=float),
-                    torch.as_tensor(self.data["lon"][idx_grid[:, 2]].data, dtype=float),
+                    torch.as_tensor(
+                        self.data["lat"][idx_grid[:, 1]].data, dtype=torch.float
+                    ),
+                    torch.as_tensor(
+                        self.data["lon"][idx_grid[:, 2]].data, dtype=torch.float
+                    ),
                 ],
                 dim=-1,
             )
@@ -146,23 +154,24 @@ class CRUDataGenerator(DataGenerator):
 
             y_mask = y_raw.mask
             y = (
-                torch.as_tensor(y_raw.data[~y_mask]).unsqueeze(-1) - self.y_mean
+                torch.as_tensor(y_raw.data[~y_mask], dtype=torch.float32).unsqueeze(-1)
+                - self.y_mean
             ) / self.y_std
             x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
 
             # Sample indices for context / target.
             shuffled_idx = np.arange(len(y))
             np.random.shuffle(shuffled_idx)
+            shuffled_idx = shuffled_idx[: self.max_num_total]
+            x = x[shuffled_idx]
+            y = y[shuffled_idx]
 
             num_ctx = math.ceil(pc * len(y))
-            num_total = (
-                -1 if self.max_num_total is None else min(self.max_num_total, len(y))
-            )
 
-            xc = x[shuffled_idx[:num_ctx]]
-            yc = y[shuffled_idx[:num_ctx]]
-            xt = x[shuffled_idx[num_ctx:num_total]]
-            yt = y[shuffled_idx[num_ctx:num_total]]
+            xc = x[:num_ctx]
+            yc = y[:num_ctx]
+            xt = x[num_ctx:]
+            yt = y[num_ctx:]
 
             xs.append(x)
             ys.append(y)
