@@ -15,7 +15,7 @@ def main():
     lit_model = LitWrapper(
         model=model, optimiser=optimiser, loss_fn=np_loss_fn, checkpointer=checkpointer
     )
-    logger = pl.loggers.WandbLogger()
+    logger = pl.loggers.WandbLogger() if experiment.misc.logging else False
     trainer = pl.Trainer(
         logger=logger,
         max_epochs=epochs,

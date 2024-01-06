@@ -20,14 +20,19 @@ from icicl.utils.batch import compress_batch_dimensions
 
 
 class ModelCheckpointer:
-    def __init__(self, checkpoint_dir: Optional[str] = None):
-        if checkpoint_dir is None:
+    def __init__(self, checkpoint_dir: Optional[str] = None, logging: bool = True):
+        self.logging = logging
+
+        self.checkpoint_dir: Optional[str] = None
+
+        if checkpoint_dir is None and logging:
             checkpoint_dir = f"{wandb.run.dir}/checkpoints"
 
-        if not os.path.exists(checkpoint_dir):
-            os.mkdir(checkpoint_dir)
+            if not os.path.exists(checkpoint_dir):
+                os.mkdir(checkpoint_dir)
 
-        self.checkpoint_dir = checkpoint_dir
+            self.checkpoint_dir = checkpoint_dir
+
         self.best_validation_loss = float("inf")
 
     def update_best_and_last_checkpoint(
@@ -48,12 +53,15 @@ class ModelCheckpointer:
 
         if loss_ci < self.best_validation_loss:
             self.best_validation_loss = loss_ci
-            torch.save(
-                model.state_dict(),
-                os.path.join(self.checkpoint_dir, f"{prefix}best.ckpt"),
-            )
+            if self.logging:
+                assert self.checkpoint_dir is not None
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(self.checkpoint_dir, f"{prefix}best.ckpt"),
+                )
 
-        if update_last:
+        if update_last and self.logging:
+            assert self.checkpoint_dir is not None
             torch.save(
                 model.state_dict(), os.path.join(self.checkpoint_dir, "last.ckpt")
             )
@@ -61,8 +69,11 @@ class ModelCheckpointer:
     def load_best_checkpoint(
         self, model: nn.Module, path: Optional[str] = None
     ) -> None:
-        if path is None:
+        if path is None and self.logging:
+            assert self.checkpoint_dir is not None
             path = os.path.join(self.checkpoint_dir, "best.ckpt")
+        elif path is None:
+            raise ValueError("Not logging to any checkpoints.")
 
         if os.path.exists(path):
             model.load_state_dict(torch.load(path, map_location="cpu"))
@@ -72,8 +83,11 @@ class ModelCheckpointer:
     def load_last_checkpoint(
         self, model: nn.Module, path: Optional[str] = None
     ) -> None:
-        if path is None:
+        if path is None and self.logging:
+            assert self.checkpoint_dir is not None
             path = os.path.join(self.checkpoint_dir, "last.ckpt")
+        elif path is None:
+            raise ValueError("Not logging to any checkpoints.")
 
         if os.path.exists(path):
             model.load_state_dict(torch.load(path, map_location="cpu"))
@@ -157,8 +171,10 @@ def train_epoch(
         optimiser.step()
 
         losses.append(loss.detach())
-        wandb.log({"train/loss": loss, "step": step})
         epoch.set_postfix({"train/loss": loss.item()})
+
+        if wandb.run is not None:
+            wandb.log({"train/loss": loss, "step": step})
 
         step += 1
 
@@ -259,14 +275,15 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     config, config_dict = extract_config(args.config, config_changes)
     experiment = instantiate(config)
 
-    # Initialise wandb.
-    wandb.init(
-        project=experiment.misc.project,
-        name=experiment.misc.name,
-        config=config_dict,
-    )
+    # Initialise wandb. Set logging: True if wandb logging needed.
+    if experiment.misc.logging:
+        wandb.init(
+            project=experiment.misc.project,
+            name=experiment.misc.name,
+            config=config_dict,
+        )
 
-    checkpointer = ModelCheckpointer()
+    checkpointer = ModelCheckpointer(logging=experiment.misc.logging)
     if experiment.misc.resume_from_checkpoint is not None:
         checkpointer.load_best_checkpoint(
             experiment.model, experiment.misc.resume_from_checkpoint
@@ -313,6 +330,9 @@ def initialize_evaluation() -> DictConfig:
 
 
 def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
+    if wandb.run is None:
+        return
+
     if "mean_loglik" in result:
         wandb.log({f"{name}/loglik": result["mean_loglik"]})
 
