@@ -146,7 +146,7 @@ class LitWrapper(pl.LightningModule):
                 y_mean=self.trainer.val_dataloaders.y_mean,
                 y_std=self.trainer.val_dataloaders.y_std,
                 num_fig=min(5, len(results["batch"])),
-                figsize=(24.0, 4.0),
+                figsize=(24.0, 5.0),
                 lat_range=self.trainer.val_dataloaders.lat_range,
                 lon_range=self.trainer.val_dataloaders.lon_range,
                 time_idx=[0, -1],
