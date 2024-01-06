@@ -23,6 +23,7 @@ class CRUDataGenerator(DataGenerator):
         lat_range: Tuple[float, float] = (-89.75, 89.75),
         lon_range: Tuple[float, float] = (-179.75, 179.75),
         max_num_total: Optional[int] = None,
+        min_num_points: int = 0,
     ):
         super().__init__(samples_per_epoch=samples_per_epoch, batch_size=batch_size)
 
@@ -32,9 +33,10 @@ class CRUDataGenerator(DataGenerator):
         self.batch_grid_size = batch_grid_size
         self.dim = np.prod(batch_grid_size)
         self.max_num_total = max_num_total
+        self.min_num_points = min_num_points
 
         # Load dataset.
-        dataset = netCDF4.Dataset(fname, "r")
+        dataset = netCDF4.Dataset(fname, "r")  # pylint: disable=no-member
 
         # Apply specified lat/lon ranges.
         lon_idx = (dataset["lon"][:] <= lon_range[1]) & (
@@ -88,12 +90,21 @@ class CRUDataGenerator(DataGenerator):
         Returns:
             Tuple[List, List, List]: Indicies.
         """
+        # Keep sampling locations until one with enough non-missing values.
         # Must keep location the same across batch as missing values vary.
-        i = random.randint(0, len(self.data["lon"]) - 1 - self.batch_grid_size[2])
-        lon_idx = list(range(i, i + self.batch_grid_size[1]))
+        valid_location = False
+        while not valid_location:
+            i = random.randint(0, len(self.data["lon"]) - 1 - self.batch_grid_size[2])
+            lon_idx = list(range(i, i + self.batch_grid_size[1]))
 
-        i = random.randint(0, len(self.data["lat"]) - 1 - self.batch_grid_size[1])
-        lat_idx = list(range(i, i + self.batch_grid_size[2]))
+            i = random.randint(0, len(self.data["lat"]) - 1 - self.batch_grid_size[1])
+            lat_idx = list(range(i, i + self.batch_grid_size[2]))
+
+            # Get number of non-missing points.
+            num_points = self._get_num_points(lat_idx=lat_idx, lon_idx=lon_idx)
+            num_points *= self.batch_grid_size[0]
+            if num_points > self.min_num_points:
+                valid_location = True
 
         time_idx: List[List] = []
         for _ in range(batch_size):
@@ -114,15 +125,7 @@ class CRUDataGenerator(DataGenerator):
 
         for idx in idxs:
             # Crackers, but fast.
-            idx_grid = torch.stack(
-                torch.meshgrid(
-                    torch.as_tensor(idx[0]),
-                    torch.as_tensor(idx[1]),
-                    torch.as_tensor(idx[2]),
-                ),
-                dim=-1,
-            )
-            idx_grid = einops.rearrange(idx_grid, "n1 n2 n3 d -> (n1 n2 n3) d")
+            idx_grid = self._create_idx_grid(idx)
 
             x = torch.stack(
                 [
@@ -176,3 +179,40 @@ class CRUDataGenerator(DataGenerator):
         yt = torch.stack(yts)
 
         return Batch(x=x, y=y, xc=xc, yc=yc, xt=xt, yt=yt)
+
+    def _create_idx_grid(self, idx: Tuple[List, List, List]) -> torch.Tensor:
+        """Constructs a grid of tensors from given list of indices.
+
+        Args:
+            idx (Tuple[List, List, List]): List of indicies.
+
+        Returns:
+            torch.Tensor: Grid of tensors.
+        """
+        idx_grid = torch.stack(
+            torch.meshgrid(
+                torch.as_tensor(idx[0]),
+                torch.as_tensor(idx[1]),
+                torch.as_tensor(idx[2]),
+            ),
+            dim=-1,
+        )
+        idx_grid = einops.rearrange(idx_grid, "n1 n2 n3 d -> (n1 n2 n3) d")
+
+        return idx_grid
+
+    def _get_num_points(
+        self,
+        lat_idx: List[int],
+        lon_idx: List[int],
+        time_idx: Optional[List[int]] = None,
+    ) -> int:
+        time_idx = [0] if time_idx is None else time_idx
+        idx_grid = self._create_idx_grid((time_idx, lat_idx, lon_idx))
+
+        y_mask = self.data["Tair"][
+            idx_grid[:, 0].tolist(),
+            idx_grid[:, 1].tolist(),
+            idx_grid[:, 2].tolist(),
+        ].mask
+        return sum(~y_mask)
