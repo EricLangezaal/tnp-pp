@@ -57,7 +57,7 @@ def main():
                 y_mean=gen_val.y_mean,
                 y_std=gen_val.y_std,
                 num_fig=min(5, len(batches)),
-                figsize=(24.0, 4.0),
+                figsize=(24.0, 5.0),
                 lat_range=gen_val.lat_range,
                 lon_range=gen_val.lon_range,
                 time_idx=(0, -1),
