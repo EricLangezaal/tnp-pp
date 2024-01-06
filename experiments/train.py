@@ -1,5 +1,6 @@
 import lightning.pytorch as pl
 from plot import plot
+from plot_cru import plot_cru
 from plot_image import plot_image
 from utils import (
     evaluation_summary,
@@ -9,6 +10,7 @@ from utils import (
     val_epoch,
 )
 
+from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 
 
@@ -43,11 +45,23 @@ def main():
             plot_image(
                 model=model,
                 batches=batches,
-                num_fig=min(
-                    5,
-                    len(batches),
-                    name=f"epoch-{epoch:04d}",
-                ),
+                num_fig=min(5, len(batches)),
+                name=f"epoch-{epoch:04d}",
+            )
+        elif isinstance(gen_train, CRUDataGenerator):
+            plot_cru(
+                model=model,
+                batches=batches,
+                x_mean=gen_val.x_mean,
+                x_std=gen_val.x_std,
+                y_mean=gen_val.y_mean,
+                y_std=gen_val.y_std,
+                num_fig=min(5, len(batches)),
+                figsize=(24.0, 4.0),
+                lat_range=gen_val.lat_range,
+                lon_range=gen_val.lon_range,
+                time_idx=(0, -1),
+                name=f"epoch-{epoch:04d}",
             )
         else:
             plot(

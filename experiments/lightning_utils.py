@@ -3,11 +3,13 @@ from typing import Any, Callable, List
 import lightning.pytorch as pl
 import torch
 from plot import plot
+from plot_cru import plot_cru
 from plot_image import plot_image
 from torch import nn
 from utils import ModelCheckpointer
 
 from icicl.data.base import Batch, ICBatch
+from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.synthetic import SyntheticBatch
 
@@ -133,6 +135,21 @@ class LitWrapper(pl.LightningModule):
                 model=self.model,
                 batches=results["batch"],
                 num_fig=min(5, len(results["batch"])),
+                name=f"epoch-{self.current_epoch:04d}",
+            )
+        elif isinstance(self.trainer.val_dataloaders, CRUDataGenerator):
+            plot_cru(
+                model=self.model,
+                batches=results["batch"],
+                x_mean=self.trainer.val_dataloaders.x_mean,
+                x_std=self.trainer.val_dataloaders.x_std,
+                y_mean=self.trainer.val_dataloaders.y_mean,
+                y_std=self.trainer.val_dataloaders.y_std,
+                num_fig=min(5, len(results["batch"])),
+                figsize=(24.0, 4.0),
+                lat_range=self.trainer.val_dataloaders.lat_range,
+                lon_range=self.trainer.val_dataloaders.lon_range,
+                time_idx=[0, -1],
                 name=f"epoch-{self.current_epoch:04d}",
             )
         else:
