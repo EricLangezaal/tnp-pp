@@ -1,11 +1,13 @@
 import math
+import os
 import random
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 import einops
-import netCDF4
 import numpy as np
 import torch
+import xarray as xr
 
 from .base import Batch, DataGenerator
 
@@ -16,7 +18,8 @@ class CRUDataGenerator(DataGenerator):
         *,
         samples_per_epoch: int,
         batch_size: int,
-        fname: str,
+        data_dir: str,
+        fnames: List[str],
         min_prop_ctx: float,
         max_prop_ctx: float,
         batch_grid_size: Tuple[int, int, int],
@@ -24,6 +27,11 @@ class CRUDataGenerator(DataGenerator):
         lon_range: Tuple[float, float] = (-179.75, 179.75),
         max_num_total: Optional[int] = None,
         min_num_total: int = 1,
+        x_mean: Optional[Tuple[float, float, float]] = None,
+        x_std: Optional[Tuple[float, float, float]] = None,
+        y_mean: Optional[float] = None,
+        y_std: Optional[float] = None,
+        ref_date: str = "2000-01-01",
     ):
         super().__init__(samples_per_epoch=samples_per_epoch, batch_size=batch_size)
 
@@ -39,8 +47,20 @@ class CRUDataGenerator(DataGenerator):
         self.lat_range = lat_range
         self.lon_range = lon_range
 
-        # Load dataset.
-        dataset = netCDF4.Dataset(fname, "r")  # pylint: disable=no-member
+        # Load datasets.
+        datasets = [
+            xr.open_dataset(os.path.join(data_dir, fname))
+            for fname in fnames  # pylint: disable=no-member
+        ]
+
+        # Merge datasets.
+        dataset = xr.concat(datasets, "time")
+
+        # Change time to hours since reference time.
+        ref_datetime = datetime.strptime(ref_date, "%Y-%m-%d")
+        ref_np_datetime = np.datetime64(ref_datetime)
+        hours = (dataset["time"][:].data - ref_np_datetime) / np.timedelta64(1, "h")
+        dataset = dataset.assign_coords(time=hours)
 
         # Apply specified lat/lon ranges.
         lon_idx = (dataset["lon"][:] <= lon_range[1]) & (
@@ -57,22 +77,32 @@ class CRUDataGenerator(DataGenerator):
             "lon": dataset["lon"][lon_idx],
         }
 
-        self.x_mean = torch.as_tensor(
-            [self.data[k].data.mean() for k in ["time", "lat", "lon"]],
-            dtype=torch.float,
-        )
-        self.x_std = torch.as_tensor(
-            [self.data[k].data.std() for k in ["time", "lat", "lon"]],
-            dtype=torch.float,
-        )
-        self.y_mean = torch.as_tensor(
-            self.data["Tair"].data[~self.data["Tair"].mask].mean(),
-            dtype=torch.float,
-        )
-        self.y_std = torch.as_tensor(
-            self.data["Tair"].data[~self.data["Tair"].mask].std(),
-            dtype=torch.float,
-        )
+        # Assign means and stds.
+        if x_mean is None or x_std is None:
+            self.x_mean = torch.as_tensor(
+                [self.data[k][:].mean().item() for k in ["time", "lat", "lon"]],
+                dtype=torch.float,
+            )
+            self.x_std = torch.as_tensor(
+                [self.data[k][:].std().item() for k in ["time", "lat", "lon"]],
+                dtype=torch.float,
+            )
+        else:
+            assert x_mean is not None and x_std is not None, "Must specifiy both."
+            self.x_mean = torch.as_tensor(x_mean, dtype=torch.float)
+            self.x_std = torch.as_tensor(x_std, dtype=torch.float)
+
+        if y_mean is None or y_std is None:
+            self.y_mean = torch.as_tensor(
+                self.data["Tair"].mean().item(), dtype=torch.float
+            )
+            self.y_std = torch.as_tensor(
+                self.data["Tair"].std().item(), dtype=torch.float
+            )
+        else:
+            assert y_mean is not None and y_std is not None, "Must specify both."
+            self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
+            self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
     def generate_batch(self) -> Batch:
         # (batch_size, n, 3).
@@ -146,13 +176,9 @@ class CRUDataGenerator(DataGenerator):
                 dim=-1,
             )
 
-            y_raw = self.data["Tair"][
-                idx_grid[:, 0].tolist(),
-                idx_grid[:, 1].tolist(),
-                idx_grid[:, 2].tolist(),
-            ]
+            y_raw = self.data["Tair"][idx[0], idx[1], idx[2]]
+            y_mask = np.isnan(y_raw.data)
 
-            y_mask = y_raw.mask
             y = (
                 torch.as_tensor(y_raw.data[~y_mask], dtype=torch.float32).unsqueeze(-1)
                 - self.y_mean
@@ -217,11 +243,7 @@ class CRUDataGenerator(DataGenerator):
         time_idx: Optional[List[int]] = None,
     ) -> int:
         time_idx = [0] if time_idx is None else time_idx
-        idx_grid = self._create_idx_grid((time_idx, lat_idx, lon_idx))
 
-        y_mask = self.data["Tair"][
-            idx_grid[:, 0].tolist(),
-            idx_grid[:, 1].tolist(),
-            idx_grid[:, 2].tolist(),
-        ].mask
-        return sum(~y_mask)
+        y = self.data["Tair"][time_idx, lat_idx, lon_idx]
+        y_mask = np.isnan(y.data)
+        return (~y_mask).sum()
