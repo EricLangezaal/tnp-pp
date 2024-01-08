@@ -23,7 +23,7 @@ def main():
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
 
-    pl.seed_everything(0)
+    pl.seed_everything(experiment.misc.seed)
 
     step = 0
     for epoch in range(epochs):

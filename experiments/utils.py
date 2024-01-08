@@ -243,6 +243,18 @@ def val_epoch(
     return result, batches
 
 
+def create_default_config() -> DictConfig:
+    default_config = {
+        "misc": {
+            "resume_from_checkpoint": None,
+            "plot_ar_mode": False,
+            "logging": True,
+            "seed": 0,
+        }
+    }
+    return OmegaConf.create(default_config)
+
+
 def extract_config(
     config_file: str, config_changes: List[str]
 ) -> Tuple[DictConfig, Dict]:
@@ -256,8 +268,10 @@ def extract_config(
         config: config object.
         config_dict: config dictionary.
     """
+    default_config = create_default_config()
     OmegaConf.register_new_resolver("eval", eval)
     config = OmegaConf.load(config_file)
+    config = OmegaConf.merge(default_config, config)
     config_changes = OmegaConf.from_cli(config_changes)
     config = OmegaConf.merge(config, config_changes)
     config_dict = OmegaConf.to_container(config, resolve=True)
