@@ -31,11 +31,10 @@ class CNPEncoder(nn.Module):
 class CNPDecoder(nn.Module):
     """Represents the decoder for a CNP."""
 
-    def __init__(self, mlp: nn.Module, agg=lambda z, x: torch.cat((z, x), dim=-1)):
+    def __init__(self, z_decoder: nn.Module):
         super().__init__()
 
-        self.mlp = mlp
-        self.agg = agg
+        self.z_decoder = z_decoder
 
     @check_shapes(
         "zc: [m, nt, dz]",
@@ -43,7 +42,7 @@ class CNPDecoder(nn.Module):
         "return: [m, nt, .]",
     )
     def forward(self, zc: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
-        return self.mlp(self.agg(zc, xt))
+        return self.z_decoder(torch.cat((zc, xt), dim=-1))
 
 
 class CNP(NeuralProcess):
