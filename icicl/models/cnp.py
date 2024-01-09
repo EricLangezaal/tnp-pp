@@ -1,3 +1,4 @@
+import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -24,7 +25,7 @@ class CNPEncoder(nn.Module):
     ) -> torch.Tensor:
         zc = self.deepset(xc, yc)
         # Use same context representation for every target point.
-        zc = zc.unsqueeze(-2).repeat(1, xt.shape[-2], 1)
+        zc = einops.repeat(zc, "m d -> m n d", n=xt.shape[-2])
         return zc
 
 
