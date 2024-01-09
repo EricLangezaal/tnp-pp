@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import einops
+import lightning.pytorch as pl
 import torch
 from check_shapes import check_shapes
 from hydra.utils import instantiate
@@ -289,6 +290,9 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     config, config_dict = extract_config(args.config, config_changes)
     experiment = instantiate(config)
 
+    # Set random seed.
+    pl.seed_everything(experiment.misc.seed)
+
     # Initialise wandb. Set logging: True if wandb logging needed.
     if experiment.misc.logging:
         wandb.init(
@@ -322,6 +326,8 @@ def initialize_evaluation() -> DictConfig:
     config = OmegaConf.merge(config, config_changes)
     config_dict = OmegaConf.to_container(config, resolve=True)
     experiment = instantiate(config)
+
+    pl.seed_everything(experiment.misc.seed)
 
     # Downloads to "./checkpoints/last.ckpt"
     ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]

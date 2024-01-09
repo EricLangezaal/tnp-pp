@@ -1,4 +1,3 @@
-import lightning.pytorch as pl
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
@@ -22,8 +21,6 @@ def main():
     gen_val = experiment.generators.val
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
-
-    pl.seed_everything(experiment.misc.seed)
 
     step = 0
     for epoch in range(epochs):

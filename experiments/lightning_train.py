@@ -25,7 +25,6 @@ def main():
         devices=1,
     )
 
-    pl.seed_everything(experiment.misc.seed)
     trainer.fit(model=lit_model, train_dataloaders=gen_train, val_dataloaders=gen_val)
 
 

@@ -1,4 +1,3 @@
-import lightning.pytorch as pl
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
@@ -19,8 +18,6 @@ def main():
     num_params = sum(p.numel() for p in model.parameters())
     wandb.run.summary["num_params"] = num_params
 
-    # Store test set performance.
-    pl.seed_everything(0)
     test_result, batches = val_epoch(model=model, generator=gen_val)
     wandb.run.summary["test/loglik"] = test_result["mean_loglik"]
     wandb.run.summary["test/std_loglik"] = test_result["std_loglik"]
