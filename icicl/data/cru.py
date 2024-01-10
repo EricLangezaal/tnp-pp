@@ -80,30 +80,17 @@ class CRUDataGenerator(DataGenerator):
 
         # Assign means and stds.
         if x_mean is None or x_std is None:
-            self.x_mean = torch.as_tensor(
-                [self.data[k][:].mean().item() for k in ["time", "lat", "lon"]],
-                dtype=torch.float,
-            )
-            self.x_std = torch.as_tensor(
-                [self.data[k][:].std().item() for k in ["time", "lat", "lon"]],
-                dtype=torch.float,
-            )
-        else:
-            assert x_mean is not None and x_std is not None, "Must specifiy both."
-            self.x_mean = torch.as_tensor(x_mean, dtype=torch.float)
-            self.x_std = torch.as_tensor(x_std, dtype=torch.float)
+            x_mean = [self.data[k][:].mean().item() for k in ["time", "lat", "lon"]]
+            x_std = [self.data[k][:].std().item() for k in ["time", "lat", "lon"]]
 
         if y_mean is None or y_std is None:
-            self.y_mean = torch.as_tensor(
-                self.data["Tair"].mean().item(), dtype=torch.float
-            )
-            self.y_std = torch.as_tensor(
-                self.data["Tair"].std().item(), dtype=torch.float
-            )
-        else:
-            assert y_mean is not None and y_std is not None, "Must specify both."
-            self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
-            self.y_std = torch.as_tensor(y_std, dtype=torch.float)
+            y_mean = self.data["Tair"].mean().item()
+            y_std = self.data["Tair"].std().item()
+
+        self.x_mean = torch.as_tensor(x_mean, dtype=torch.float)
+        self.x_std = torch.as_tensor(x_std, dtype=torch.float)
+        self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
+        self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
     def generate_batch(self) -> Batch:
         # (batch_size, n, 3).
