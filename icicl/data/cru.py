@@ -32,6 +32,7 @@ class CRUDataGenerator(DataGenerator):
         y_mean: Optional[float] = None,
         y_std: Optional[float] = None,
         ref_date: str = "2000-01-01",
+        t_spacing: int = 1,
     ):
         super().__init__(samples_per_epoch=samples_per_epoch, batch_size=batch_size)
 
@@ -72,7 +73,7 @@ class CRUDataGenerator(DataGenerator):
 
         self.data = {
             "Tair": dataset["Tair"][:, lat_idx, lon_idx],
-            "time": dataset["time"][:],
+            "time": dataset["time"][:][::t_spacing],
             "lat": dataset["lat"][lat_idx],
             "lon": dataset["lon"][lon_idx],
         }
