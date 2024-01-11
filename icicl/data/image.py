@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 import einops
 import torch
@@ -85,6 +85,8 @@ class ImageGenerator:
         max_prop_ctx: float,
         samples_per_epoch: Optional[int] = None,
         same_label_per_batch: bool = False,
+        x_mean: Optional[Tuple[float, float]] = None,
+        x_std: Optional[Tuple[float, float]] = None,
     ):
         self.batch_size = batch_size
         self.min_prop_ctx = min_prop_ctx
@@ -117,6 +119,24 @@ class ImageGenerator:
                     sampler, batch_size=batch_size, drop_last=True
                 )
             )
+
+        # Set input mean and std.
+        if x_mean is None or x_std is None:
+            x = torch.stack(
+                torch.meshgrid(
+                    *[
+                        torch.range(0, dim - 1)
+                        for dim in self.dataset[0][0][0, ...].shape
+                    ]
+                ),
+                dim=-1,
+            )
+            x = einops.rearrange(x, "n1 n2 d -> (n1 n2) d")
+            self.x_mean = x.mean(dim=0)
+            self.x_std = x.std(dim=0)
+        else:
+            self.x_mean = torch.as_tensor(x_mean)
+            self.x_std = torch.as_tensor(x_std)
 
         # Set the batch counter.
         self.batches = 0
@@ -221,10 +241,9 @@ class ImageGenerator:
         # Rearrange.
         y = einops.rearrange(y, "m n1 n2 -> m (n1 n2) 1")
         x = einops.rearrange(x, "n1 n2 d -> (n1 n2) d")
-        x = torch.reshape(x, shape=(-1, x.shape[-1]))
 
         # Normalise inputs.
-        x = (x - x.mean(dim=-2)) / x.std(dim=-2)
+        x = (x - self.x_mean) / self.x_std
         x = einops.repeat(x, "n p -> m n p", m=len(batch_idx))
 
         xc = torch.stack([x_[mask] for x_, mask in zip(x, mc)])
@@ -336,7 +355,7 @@ class ICImageGenerator(ImageGenerator):
         x = einops.rearrange(x, "n1 n2 d -> (n1 n2) d")
 
         # Normalise inputs.
-        x = (x - x.mean(dim=-2)) / x.std(dim=-2)
+        x = (x - self.x_mean) / self.x_std
         x = einops.repeat(
             x,
             "n p -> m np1 n p",
