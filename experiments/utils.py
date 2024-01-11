@@ -18,6 +18,7 @@ import wandb
 from icicl.data.base import Batch, DataGenerator, ICBatch
 from icicl.data.synthetic import SyntheticBatch
 from icicl.utils.batch import compress_batch_dimensions
+from icicl.utils.initialisation import weights_init
 
 
 class ModelCheckpointer:
@@ -289,11 +290,14 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     # Initialise experiment, make path.
     config, config_dict = extract_config(args.config, config_changes)
 
+    # Instantiate.
+    experiment = instantiate(config)
+
     # Set random seed.
     pl.seed_everything(config.misc.seed)
 
-    # Instantiate.
-    experiment = instantiate(config)
+    # Initialise model weights. Needed so random seed works.
+    weights_init(experiment.model)
 
     # Initialise wandb. Set logging: True if wandb logging needed.
     if experiment.misc.logging:
@@ -328,11 +332,11 @@ def initialize_evaluation() -> DictConfig:
     config = OmegaConf.merge(config, config_changes)
     config_dict = OmegaConf.to_container(config, resolve=True)
 
-    # Set random seed.
-    pl.seed_everything(config.misc.seed)
-
     # Instantiate.
     experiment = instantiate(config)
+
+    # Set random seed.
+    pl.seed_everything(config.misc.seed)
 
     # Downloads to "./checkpoints/last.ckpt"
     ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
