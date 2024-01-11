@@ -288,10 +288,12 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
     # Initialise experiment, make path.
     config, config_dict = extract_config(args.config, config_changes)
-    experiment = instantiate(config)
 
     # Set random seed.
-    pl.seed_everything(experiment.misc.seed)
+    pl.seed_everything(config.misc.seed)
+
+    # Instantiate.
+    experiment = instantiate(config)
 
     # Initialise wandb. Set logging: True if wandb logging needed.
     if experiment.misc.logging:
@@ -325,9 +327,12 @@ def initialize_evaluation() -> DictConfig:
     config_changes = OmegaConf.from_cli(config_changes)
     config = OmegaConf.merge(config, config_changes)
     config_dict = OmegaConf.to_container(config, resolve=True)
-    experiment = instantiate(config)
 
-    pl.seed_everything(experiment.misc.seed)
+    # Set random seed.
+    pl.seed_everything(config.misc.seed)
+
+    # Instantiate.
+    experiment = instantiate(config)
 
     # Downloads to "./checkpoints/last.ckpt"
     ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
