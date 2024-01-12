@@ -249,6 +249,7 @@ def create_default_config() -> DictConfig:
     default_config = {
         "misc": {
             "resume_from_checkpoint": None,
+            "override_config": False,
             "plot_ar_mode": False,
             "logging": True,
             "seed": 0,
@@ -290,14 +291,32 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     # Initialise experiment, make path.
     config, config_dict = extract_config(args.config, config_changes)
 
-    # Instantiate.
+    # Get run and potentially override config before instantiation.
+    if config.misc.resume_from_checkpoint is not None:
+        # Downloads to "./checkpoints/last.ckpt".
+        api = wandb.Api()
+        run = api.run(config.misc.resume_from_checkpoint)
+
+        # Overide config if specified.
+        if config.misc.override_config:
+            config = OmegaConf.create(run.config)
+            config_dict = run.config
+
+    # Instantiate experiment and load checkpoint.
     experiment = instantiate(config)
+    pl.seed_everything(experiment.misc.seed)
 
-    # Set random seed.
-    pl.seed_everything(config.misc.seed)
+    if experiment.misc.resume_from_checkpoint:
+        # Downloads to "./checkpoints/last.ckpt".
+        ckpt_file = run.files("checkpoints/last.ckpt")[0]
+        ckpt_file.download(replace=True)
+        experiment.model.load_state_dict(
+            torch.load("checkpoints/last.ckpt", map_location="cpu")
+        )
 
-    # Initialise model weights. Needed so random seed works.
-    weights_init(experiment.model)
+    else:
+        # Initialise model weights.
+        weights_init(experiment.model)
 
     # Initialise wandb. Set logging: True if wandb logging needed.
     if experiment.misc.logging:
@@ -308,10 +327,6 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
         )
 
     checkpointer = ModelCheckpointer(logging=experiment.misc.logging)
-    if experiment.misc.resume_from_checkpoint is not None:
-        checkpointer.load_best_checkpoint(
-            experiment.model, experiment.misc.resume_from_checkpoint
-        )
 
     return experiment, checkpointer
 
