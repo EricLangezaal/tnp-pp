@@ -21,6 +21,7 @@ class LitWrapper(pl.LightningModule):
         optimiser: torch.optim.Optimizer,
         loss_fn: Callable,
         checkpointer: ModelCheckpointer,
+        plot_interval: int = 1,
     ):
         super().__init__()
 
@@ -28,6 +29,7 @@ class LitWrapper(pl.LightningModule):
         self.optimiser = optimiser
         self.loss_fn = loss_fn
         self.checkpointer = checkpointer
+        self.plot_interval = plot_interval
         self.val_outputs: List[Any] = []
         self.train_losses: List[Any] = []
 
@@ -130,35 +132,36 @@ class LitWrapper(pl.LightningModule):
             self.log("val/gt_loglik", mean_gt_loglik)
             self.log("val/std_gt_loglik", std_gt_loglik)
 
-        if isinstance(self.trainer.val_dataloaders, ImageGenerator):
-            plot_image(
-                model=self.model,
-                batches=results["batch"],
-                num_fig=min(5, len(results["batch"])),
-                name=f"epoch-{self.current_epoch:04d}",
-            )
-        elif isinstance(self.trainer.val_dataloaders, CRUDataGenerator):
-            plot_cru(
-                model=self.model,
-                batches=results["batch"],
-                x_mean=self.trainer.val_dataloaders.x_mean,
-                x_std=self.trainer.val_dataloaders.x_std,
-                y_mean=self.trainer.val_dataloaders.y_mean,
-                y_std=self.trainer.val_dataloaders.y_std,
-                num_fig=min(5, len(results["batch"])),
-                figsize=(24.0, 5.0),
-                lat_range=self.trainer.val_dataloaders.lat_range,
-                lon_range=self.trainer.val_dataloaders.lon_range,
-                time_idx=[0, -1],
-                name=f"epoch-{self.current_epoch:04d}",
-            )
-        else:
-            plot(
-                model=self.model,
-                batches=results["batch"],
-                num_fig=min(5, len(results["batch"])),
-                name=f"epoch-{self.current_epoch:04d}",
-            )
+        if self.current_epoch % self.plot_interval == 0:
+            if isinstance(self.trainer.val_dataloaders, ImageGenerator):
+                plot_image(
+                    model=self.model,
+                    batches=results["batch"],
+                    num_fig=min(5, len(results["batch"])),
+                    name=f"epoch-{self.current_epoch:04d}",
+                )
+            elif isinstance(self.trainer.val_dataloaders, CRUDataGenerator):
+                plot_cru(
+                    model=self.model,
+                    batches=results["batch"],
+                    x_mean=self.trainer.val_dataloaders.x_mean,
+                    x_std=self.trainer.val_dataloaders.x_std,
+                    y_mean=self.trainer.val_dataloaders.y_mean,
+                    y_std=self.trainer.val_dataloaders.y_std,
+                    num_fig=min(5, len(results["batch"])),
+                    figsize=(24.0, 5.0),
+                    lat_range=self.trainer.val_dataloaders.lat_range,
+                    lon_range=self.trainer.val_dataloaders.lon_range,
+                    time_idx=[0, -1],
+                    name=f"epoch-{self.current_epoch:04d}",
+                )
+            else:
+                plot(
+                    model=self.model,
+                    batches=results["batch"],
+                    num_fig=min(5, len(results["batch"])),
+                    name=f"epoch-{self.current_epoch:04d}",
+                )
 
     def configure_optimizers(self):
         return self.optimiser

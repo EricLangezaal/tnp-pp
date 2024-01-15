@@ -253,6 +253,7 @@ def create_default_config() -> DictConfig:
             "plot_ar_mode": False,
             "logging": True,
             "seed": 0,
+            "plot_interval": 1,
         }
     }
     return OmegaConf.create(default_config)
