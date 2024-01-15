@@ -8,7 +8,7 @@ import torch
 from torch import nn
 
 import wandb
-from icicl.data.image import ICImageBatch, ImageBatch
+from icicl.data.image import GriddedImageBatch, ICImageBatch, ImageBatch
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -24,13 +24,13 @@ def plot_image(
     for i in range(num_fig):
         batch = batches[i]
 
-        x = batch.x
-        y = batch.y
-        xc = batch.xc
-        yc = batch.yc
-        xt = batch.xt
-        yt = batch.yt
-        mc = batch.mc
+        x = batch.x[:1]
+        y = batch.y[:1]
+        xc = batch.xc[:1]
+        yc = batch.yc[:1]
+        xt = batch.xt[:1]
+        yt = batch.yt[:1]
+        mc = batch.mc[:1]
 
         with torch.no_grad():
             if isinstance(batch, ICImageBatch):
@@ -42,8 +42,14 @@ def plot_image(
                     xt=x,
                 )
                 yt_pred_dist = model(xc=xc, yc=yc, xic=batch.xic, yic=batch.yic, xt=xt)
+            elif isinstance(batch, GriddedImageBatch):
+                y_plot_pred_dist = model(
+                    mc=batch.mc_grid,
+                    y=batch.y_grid,
+                    mt=torch.full(batch.mt_grid.shape, True),
+                )
+                yt_pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
             else:
-                assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
                 y_plot_pred_dist = model(xc=xc, yc=yc, xt=x)
                 yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
