@@ -10,9 +10,9 @@ class SetConvEncoder(nn.Module):
     def __init__(
         self,
         dim: int,
-        points_per_unit: int,
         init_lengthscale: float,
         margin: float,
+        points_per_unit: int,
         xmin: Optional[List[float]] = None,
         xmax: Optional[List[float]] = None,
         train_lengthscale: bool = True,
@@ -41,11 +41,11 @@ class SetConvEncoder(nn.Module):
         "yc: [m, nc, dy]",
         "xt: [m, nt, dx]",
         "return[0]: [m, ..., dx]",
-        "return[1]: [m, ...]",
+        "return[1]: [m, ... dz]",
     )
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         yc = torch.cat((yc, torch.ones(*yc.shape[:-1], 1).to(yc)), dim=-1)
 
         # Build dimension wise grids.
@@ -90,8 +90,8 @@ class SetConvDecoder(nn.Module):
     def __init__(
         self,
         dim: int,
-        init_lengthscale: float,
-        scaling_factor: float,
+        init_lengthscale: float = 0.1,
+        scaling_factor: float = 1.0,
         train_lengthscale: bool = True,
         dtype: torch.dtype = torch.float32,
     ):
