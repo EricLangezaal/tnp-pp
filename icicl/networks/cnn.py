@@ -205,9 +205,11 @@ class UNet(CNN):
         num_blocks: Optional[int] = None,
         max_num_channels: int = 256,
         pooling_size: int = 2,
+        factor_chan: int = 2,
         **kwargs,
     ):
         self.max_num_channels = max_num_channels
+        self.factor_chan = factor_chan
         super().__init__(dim, num_channels, num_blocks, **kwargs)
 
         self.pooling_size = pooling_size
@@ -250,7 +252,7 @@ class UNet(CNN):
         self, num_channels: Union[List[int], int], num_blocks: int
     ) -> List[Tuple[int, int]]:
         # Doubles at every down layer, as in vanila UNet.
-        factor_chan = 2
+        factor_chan = self.factor_chan
 
         assert num_blocks % 2 == 1, f"n_blocks={num_blocks} not odd."
 
