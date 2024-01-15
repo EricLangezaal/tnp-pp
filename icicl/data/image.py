@@ -22,6 +22,13 @@ class ICImageBatch(ImageBatch, ICBatch):
     yic_orig: torch.Tensor
 
 
+@dataclass
+class GriddedImageBatch(ImageBatch):
+    y_grid: torch.Tensor
+    mc_grid: torch.Tensor
+    mt_grid: torch.Tensor
+
+
 class SingleLabelBatchSampler:
     def __init__(
         self, labels: torch.Tensor, batch_size: int, num_batches: Optional[int] = None
@@ -87,6 +94,7 @@ class ImageGenerator:
         same_label_per_batch: bool = False,
         x_mean: Optional[Tuple[float, float]] = None,
         x_std: Optional[Tuple[float, float]] = None,
+        return_as_gridded: bool = False,
     ):
         self.batch_size = batch_size
         self.min_prop_ctx = min_prop_ctx
@@ -100,6 +108,7 @@ class ImageGenerator:
         self.samples_per_epoch = min(samples_per_epoch, len(self.dataset))
         self.num_batches = samples_per_epoch // batch_size
         self.same_label_per_batch = same_label_per_batch
+        self.return_as_gridded = return_as_gridded
 
         # Create batch sampler.
         if self.same_label_per_batch:
@@ -227,19 +236,19 @@ class ImageGenerator:
 
         # Sample batch of data.
         batch_idx = next(self.batch_sampler)
-        y = torch.cat([self.dataset[idx][0] for idx in batch_idx], dim=0)
+        y_grid = torch.cat([self.dataset[idx][0] for idx in batch_idx], dim=0)
         label = torch.stack(
             [torch.as_tensor(self.dataset[idx][1]) for idx in batch_idx]
         )
 
         # Input grid.
         x = torch.stack(
-            torch.meshgrid(*[torch.range(0, dim - 1) for dim in y[0, ...].shape]),
+            torch.meshgrid(*[torch.range(0, dim - 1) for dim in y_grid[0, ...].shape]),
             dim=-1,
         )
 
         # Rearrange.
-        y = einops.rearrange(y, "m n1 n2 -> m (n1 n2) 1")
+        y = einops.rearrange(y_grid, "m n1 n2 -> m (n1 n2) 1")
         x = einops.rearrange(x, "n1 n2 d -> (n1 n2) d")
 
         # Normalise inputs.
@@ -250,6 +259,29 @@ class ImageGenerator:
         yc = torch.stack([y_[mask] for y_, mask in zip(y, mc)])
         xt = torch.stack([x_[~mask] for x_, mask in zip(x, mc)])
         yt = torch.stack([y_[~mask] for y_, mask in zip(y, mc)])
+
+        if self.return_as_gridded:
+            # Restructure mask.
+            mc_grid = einops.rearrange(
+                mc,
+                "m (n1 n2) -> m n1 n2",
+                n1=y_grid[0, ...].shape[0],
+                n2=y_grid[0, ...].shape[1],
+            )
+            mt_grid = ~mc_grid
+            return GriddedImageBatch(
+                x=x,
+                y=y,
+                xc=xc,
+                yc=yc,
+                xt=xt,
+                yt=yt,
+                label=label,
+                mc=mc,
+                y_grid=y_grid,
+                mc_grid=mc_grid,
+                mt_grid=mt_grid,
+            )
 
         return ImageBatch(x=x, y=y, xc=xc, yc=yc, xt=xt, yt=yt, label=label, mc=mc)
 

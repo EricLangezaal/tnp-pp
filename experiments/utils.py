@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import einops
 import lightning.pytorch as pl
 import torch
-from check_shapes import check_shapes
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
@@ -16,7 +15,10 @@ from tqdm.auto import tqdm
 
 import wandb
 from icicl.data.base import Batch, DataGenerator, ICBatch
+from icicl.data.image import GriddedImageBatch
 from icicl.data.synthetic import SyntheticBatch
+from icicl.models.base import ICNeuralProcess, NeuralProcess
+from icicl.models.convcnp import GriddedConvCNP
 from icicl.utils.batch import compress_batch_dimensions
 from icicl.utils.initialisation import weights_init
 
@@ -97,46 +99,33 @@ class ModelCheckpointer:
             raise FileNotFoundError(f"Checkpoint file {path} not found.")
 
 
-@check_shapes(
-    "xc: [m, nc, dx]",
-    "yc: [m, nc, dy]",
-    "xt: [m, nt, dx]",
-    "yt: [m, nt, dy]",
-    "xic: [m, nic, ncic, dx]",
-    "yic: [m, nic, ncic, dy]",
-    "return: []",
-)
 def np_loss_fn(
     model: nn.Module,
-    xc: torch.Tensor,
-    yc: torch.Tensor,
-    xt: torch.Tensor,
-    yt: torch.Tensor,
-    xic: Optional[torch.Tensor] = None,
-    yic: Optional[torch.Tensor] = None,
+    batch: Batch,
 ) -> torch.Tensor:
     """Perform a single training step, returning the loss, i.e.
     the negative log likelihood.
 
     Arguments:
         model: model to train.
-        xc: Tensor representing context inputs.
-        yc: Tensor representing context outputs.
-        xt: Tensor representing target inputs.
-        yt: Tensor representing target outputs.
-        xic: Optional[Tensor] representing in-context inputs.
-        yic: Optional[Tensor] representing in-context outputs.
-        optimizer: optimizer to use in the training step.
+        batch: batch of data.
 
     Returns:
         loss: average negative log likelihood.
     """
-    if xic is not None and yic is not None:
-        pred_dist = model(xc, yc, xic, yic, xt)
+    if isinstance(batch, ICBatch):
+        assert isinstance(model, ICNeuralProcess)
+        pred_dist = model(
+            xc=batch.xc, yc=batch.yc, xic=batch.xic, yic=batch.yic, xt=batch.xt
+        )
+    elif isinstance(batch, GriddedImageBatch):
+        assert isinstance(model, GriddedConvCNP)
+        pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
     else:
-        pred_dist = model(xc, yc, xt)
+        assert isinstance(model, NeuralProcess)
+        pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
 
-    loglik = pred_dist.log_prob(yt)
+    loglik = pred_dist.log_prob(batch.yt)
 
     return -loglik.mean()
 
@@ -152,23 +141,7 @@ def train_epoch(
     losses = []
     for batch in epoch:
         optimiser.zero_grad()
-
-        if isinstance(batch, ICBatch):
-            loss = loss_fn(
-                model=model,
-                xc=batch.xc,
-                yc=batch.yc,
-                xt=batch.xt,
-                yt=batch.yt,
-                xic=batch.xic,
-                yic=batch.yic,
-            )
-        else:
-            assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
-            loss = loss_fn(
-                model=model, xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
-            )
-
+        loss = loss_fn(model=model, batch=batch)
         loss.backward()
         optimiser.step()
 
@@ -201,6 +174,7 @@ def val_epoch(
         batches.append(batch)
         with torch.no_grad():
             if isinstance(batch, ICBatch):
+                assert isinstance(model, ICNeuralProcess)
                 pred_dist = model(
                     xc=batch.xc,
                     yc=batch.yc,
@@ -208,8 +182,11 @@ def val_epoch(
                     yic=batch.yic,
                     xt=batch.xt,
                 )
+            elif isinstance(batch, GriddedImageBatch):
+                assert isinstance(model, GriddedConvCNP)
+                pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
             else:
-                assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
+                assert isinstance(model, NeuralProcess)
                 pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
 
         loglik = pred_dist.log_prob(batch.yt).mean()

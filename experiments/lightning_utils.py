@@ -10,7 +10,7 @@ from utils import ModelCheckpointer
 
 from icicl.data.base import Batch, ICBatch
 from icicl.data.cru import CRUDataGenerator
-from icicl.data.image import ImageGenerator
+from icicl.data.image import GriddedImageBatch, ImageGenerator
 from icicl.data.synthetic import SyntheticBatch
 
 
@@ -40,20 +40,7 @@ class LitWrapper(pl.LightningModule):
         self, batch: Batch, batch_idx: int
     ) -> torch.Tensor:
         _ = batch_idx
-
-        if isinstance(batch, ICBatch):
-            loss = self.loss_fn(
-                self.model,
-                batch.xc,
-                batch.yc,
-                batch.xt,
-                batch.yt,
-                batch.xic,
-                batch.yic,
-            )
-        else:
-            loss = self.loss_fn(self.model, batch.xc, batch.yc, batch.xt, batch.yt)
-
+        loss = self.loss_fn(self.model, batch)
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         self.train_losses.append(loss.detach())
         return loss
@@ -63,7 +50,6 @@ class LitWrapper(pl.LightningModule):
     ) -> None:
         _ = batch_idx
         result = {"batch": batch}
-
         if isinstance(batch, ICBatch):
             pred_dist = self.model(
                 xc=batch.xc,
@@ -72,6 +58,8 @@ class LitWrapper(pl.LightningModule):
                 yic=batch.yic,
                 xt=batch.xt,
             )
+        elif isinstance(batch, GriddedImageBatch):
+            pred_dist = self.model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
         else:
             pred_dist = self.model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
 
