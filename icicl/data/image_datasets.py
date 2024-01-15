@@ -5,27 +5,28 @@ import torch
 import torchvision
 
 
-class ZeroShotTranslationImageDataset(torch.utils.data.Dataset):
+class TranslationImageDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         dataset: torch.utils.data.Dataset,
         max_translation: Tuple[int, int],
-        train_image_size: Optional[Tuple[int, int]] = None,
-        test_image_size: Optional[Tuple[int, int]] = None,
+        stationary_image_size: Optional[Tuple[int, int]] = None,
+        translated_image_size: Optional[Tuple[int, int]] = None,
         train: bool = True,
+        zero_shot: bool = True,
         seed: int = 0,
     ):
         self.seed = seed
         self.image_size = dataset.data.shape[1:]
         self.max_translation = max_translation
 
-        self.train_image_size = (
-            self.image_size if train_image_size is None else train_image_size
+        self.stationary_image_size = (
+            self.image_size if stationary_image_size is None else stationary_image_size
         )
-        self.test_image_size = (
+        self.translated_image_size = (
             [dim + 2 * shift for dim, shift in zip(self.image_size, max_translation)]
-            if test_image_size is None
-            else test_image_size
+            if translated_image_size is None
+            else translated_image_size
         )
 
         # Make transforms.
@@ -33,30 +34,32 @@ class ZeroShotTranslationImageDataset(torch.utils.data.Dataset):
             [torchvision.transforms.ToPILImage(), torchvision.transforms.ToTensor()]
         )
 
-        if train:
-            self.data = self.make_train_images(dataset.data)
+        if train and zero_shot:
+            self.data = self.make_stationary_images(dataset.data)
         else:
-            self.data = self.make_test_images(dataset.data)
+            self.data = self.make_translated_images(dataset.data)
 
         # Rescale between to [0, 1].
         self.data = self.data.float() / self.data.float().max()
 
-    def make_train_images(self, train_dataset: torch.Tensor) -> torch.Tensor:
-        background = np.zeros((train_dataset.shape[0], *self.train_image_size)).astype(
+    def make_stationary_images(self, dataset: torch.Tensor) -> torch.Tensor:
+        background = np.zeros((dataset.shape[0], *self.stationary_image_size)).astype(
             np.uint8
         )
 
-        borders = (np.array(self.train_image_size) - np.array(self.image_size)) // 2
+        borders = (
+            np.array(self.stationary_image_size) - np.array(self.image_size)
+        ) // 2
         background[
             :,
             borders[0] : (background.shape[1] - borders[0]),
             borders[1] : (background.shape[2] - borders[1]),
-        ] = train_dataset
+        ] = dataset
         return torch.from_numpy(background)
 
-    def make_test_images(self, test_dataset: torch.Tensor) -> torch.Tensor:
+    def make_translated_images(self, dataset: torch.Tensor) -> torch.Tensor:
         background = torch.from_numpy(
-            (np.zeros((test_dataset.shape[0], *self.test_image_size)).astype(np.uint8))
+            (np.zeros((dataset.shape[0], *self.translated_image_size)).astype(np.uint8))
         )
 
         st = np.random.get_state()
@@ -64,19 +67,21 @@ class ZeroShotTranslationImageDataset(torch.utils.data.Dataset):
         vertical_shifts = np.random.randint(
             low=-self.max_translation[0],
             high=self.max_translation[0],
-            size=test_dataset.shape[0],
+            size=dataset.shape[0],
         )
         horizontal_shifts = np.random.randint(
             low=-self.max_translation[1],
             high=self.max_translation[1],
-            size=test_dataset.shape[0],
+            size=dataset.shape[0],
         )
         np.random.set_state(st)
 
-        borders = (np.array(self.test_image_size) - np.array(self.image_size)) // 2
+        borders = (
+            np.array(self.translated_image_size) - np.array(self.image_size)
+        ) // 2
 
         for i, (vshift, hshift) in enumerate(zip(vertical_shifts, horizontal_shifts)):
-            img = test_dataset[i, ...]
+            img = dataset[i, ...]
 
             # Trim original image to fit within background.
             if vshift < -borders[0]:

@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 import torchvision
 
 from .image import ICImageGenerator, ImageGenerator
-from .image_datasets import ZeroShotMultiImageDataset, ZeroShotTranslationImageDataset
+from .image_datasets import TranslationImageDataset, ZeroShotMultiImageDataset
 
 
 class MNIST(ABC):
@@ -64,27 +64,29 @@ class ZeroShotMultiMNISTGenerator(ImageGenerator):
         super().__init__(dataset=self.dataset, dim=self.dim, **kwargs)
 
 
-class ZeroShotTranslatedMNISTGenerator(ImageGenerator):
+class TranslatedMNISTGenerator(ImageGenerator):
     def __init__(
         self,
         data_dir: str,
         train: bool = True,
         download: bool = True,
         max_translation: Tuple[int, int] = (14, 14),
-        train_image_size: Optional[Tuple[int, int]] = None,
-        test_image_size: Optional[Tuple[int, int]] = None,
+        stationary_image_size: Optional[Tuple[int, int]] = None,
+        translated_image_size: Optional[Tuple[int, int]] = None,
+        zero_shot: bool = True,
         seed: int = 0,
         **kwargs,
     ):
         mnist_dataset = torchvision.datasets.MNIST(
             root=data_dir, train=train, download=download
         )
-        self.dataset = ZeroShotTranslationImageDataset(
+        self.dataset = TranslationImageDataset(
             dataset=mnist_dataset,
             max_translation=max_translation,
-            train_image_size=train_image_size,
-            test_image_size=test_image_size,
+            stationary_image_size=stationary_image_size,
+            translated_image_size=translated_image_size,
             train=train,
+            zero_shot=zero_shot,
             seed=seed,
         )
         self.dim = self.dataset.data.shape[1] * self.dataset.data.shape[2]
