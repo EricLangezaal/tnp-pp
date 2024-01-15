@@ -25,7 +25,7 @@ class CRUDataGenerator(DataGenerator):
         batch_grid_size: Tuple[int, int, int],
         lat_range: Tuple[float, float] = (-89.75, 89.75),
         lon_range: Tuple[float, float] = (-179.75, 179.75),
-        max_num_total: Optional[int] = None,
+        max_nt: Optional[int] = None,
         min_num_total: int = 1,
         x_mean: Optional[Tuple[float, float, float]] = None,
         x_std: Optional[Tuple[float, float, float]] = None,
@@ -41,7 +41,7 @@ class CRUDataGenerator(DataGenerator):
         # How large each sampled grid should be (in indicies).
         self.batch_grid_size = batch_grid_size
         self.dim = np.prod(batch_grid_size)
-        self.max_num_total = max_num_total
+        self.max_nt = max_nt
         self.min_num_total = min_num_total
 
         # Store ranges for plotting.
@@ -176,16 +176,12 @@ class CRUDataGenerator(DataGenerator):
             # Sample indices for context / target.
             shuffled_idx = np.arange(len(y))
             np.random.shuffle(shuffled_idx)
-            shuffled_idx = shuffled_idx[: self.max_num_total]
-            x = x[shuffled_idx]
-            y = y[shuffled_idx]
-
             num_ctx = math.ceil(pc * len(y))
 
-            xc = x[:num_ctx]
-            yc = y[:num_ctx]
-            xt = x[num_ctx:]
-            yt = y[num_ctx:]
+            xc = x[shuffled_idx[:num_ctx]]
+            yc = y[shuffled_idx[:num_ctx]]
+            xt = x[shuffled_idx[num_ctx:][: self.max_nt]]
+            yt = y[shuffled_idx[num_ctx:][: self.max_nt]]
 
             xs.append(x)
             ys.append(y)

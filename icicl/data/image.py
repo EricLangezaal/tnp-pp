@@ -90,6 +90,7 @@ class ImageGenerator:
         batch_size: int,
         min_prop_ctx: float,
         max_prop_ctx: float,
+        nt: Optional[int] = None,
         samples_per_epoch: Optional[int] = None,
         same_label_per_batch: bool = False,
         x_mean: Optional[Tuple[float, float]] = None,
@@ -99,6 +100,7 @@ class ImageGenerator:
         self.batch_size = batch_size
         self.min_prop_ctx = min_prop_ctx
         self.max_prop_ctx = max_prop_ctx
+        self.nt = nt
         self.dim = dim
         self.dataset = dataset
 
@@ -259,6 +261,14 @@ class ImageGenerator:
         yc = torch.stack([y_[mask] for y_, mask in zip(y, mc)])
         xt = torch.stack([x_[~mask] for x_, mask in zip(x, mc)])
         yt = torch.stack([y_[~mask] for y_, mask in zip(y, mc)])
+
+        if self.nt is not None:
+            # Only use nt randomly sampled target points.
+            rand = torch.rand(size=(xt.shape[0], xt.shape[1]))
+            randperm = rand.argsort(dim=-1)
+            mt = randperm < self.nt
+            xt = torch.stack([xt_[mt_] for xt_, mt_ in zip(xt, mt)])
+            yt = torch.stack([yt_[mt_] for yt_, mt_ in zip(yt, mt)])
 
         if self.return_as_gridded:
             # Restructure mask.
