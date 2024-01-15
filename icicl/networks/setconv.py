@@ -41,7 +41,7 @@ class SetConvEncoder(nn.Module):
         "yc: [m, nc, dy]",
         "xt: [m, nt, dx]",
         "return[0]: [m, ..., dx]",
-        "return[1]: [m, ... dz]",
+        "return[1]: [m, ..., dz]",
     )
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
