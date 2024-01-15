@@ -59,11 +59,21 @@ mhsa_layer:
   kernel: ${mhsa_kernel}
   feedforward_dim: ${params.embed_dim}
   norm_first: ${params.norm_first}
+  post_kernel: True
+  phi_t: ${mhsa_phi_t}
+  qk_dim: ${params.qk_dim}
 
 mhsa_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  in_dim: ${params.dim}
+  in_dim: ${eval:'${params.qk_dim} + ${params.dim}'}
   out_dim: ${params.num_heads}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+mhsa_phi_t:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.num_heads}
+  out_dim: 1
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -75,11 +85,21 @@ mhca_ctoq_layer:
   kernel: ${mhca_ctoq_kernel}
   feedforward_dim: ${params.embed_dim}
   norm_first: ${params.norm_first}
+  post_kernel: True
+  phi_t: ${mhca_ctoq_phi_t}
+  qk_dim: ${params.qk_dim}
 
 mhca_ctoq_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  in_dim: ${params.dim}
+  in_dim: ${eval:'${params.qk_dim} + ${params.dim}'}
   out_dim: ${params.num_heads}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+mhca_ctoq_phi_t:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.num_heads}
+  out_dim: 1
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -91,11 +111,21 @@ mhca_qtot_layer:
   kernel: ${mhca_qtot_kernel}
   feedforward_dim: ${params.embed_dim}
   norm_first: ${params.norm_first}
+  post_kernel: True
+  phi_t: ${mhca_qtot_phi_t}
+  qk_dim: ${params.qk_dim}
 
 mhca_qtot_kernel:
   _target_: icicl.networks.kernels.MLPKernel
-  in_dim: ${params.dim}
+  in_dim: ${eval:'${params.qk_dim} + ${params.dim}'}
   out_dim: ${params.num_heads}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+mhca_qtot_phi_t:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.num_heads}
+  out_dim: 1
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -140,6 +170,7 @@ params:
   num_latents: 32
   num_layers: 5
   norm_first: True
+  qk_dim: ${params.num_heads}
 
 
 
@@ -148,3 +179,5 @@ misc:
   name: synthetic-1d-L${params.num_layers}-H${params.num_heads}-D${params.embed_dim}-M${params.num_latents}
   resume_from_checkpoint: null
   eval: False
+  logging: True
+  seed: 0
