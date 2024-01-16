@@ -28,13 +28,13 @@ class RCNPEncoder(nn.Module):
         if agg == "sum":
             self.agg = (
                 lambda x: torch.sum(x, dim=-2)
-                if self.diagonal_encoder
+                if self.diagonal_encoding
                 else lambda x: torch.sum(x, dim=(-2, -3))
             )
         elif agg == "mean":
             self.agg = (
                 lambda x: torch.mean(x, dim=-2)
-                if self.diagonal_encoder
+                if self.diagonal_encoding
                 else lambda x: torch.mean(x, dim=(-2, -3))
             )
         else:
