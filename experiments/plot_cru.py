@@ -81,20 +81,63 @@ def plot_cru(
             for ax in axes:
                 ax.add_feature(cfeature.COASTLINE)
                 ax.add_feature(cfeature.BORDERS)
-                ax.gridlines()
+                # ax.gridlines()
                 ax.set_xlim([lon_range[0], lon_range[1]])
                 ax.set_ylim([lat_range[0], lat_range[1]])
+                ax.set_axisbelow(True)
 
             vmin = min(pred_mean_.min(), y_.max())
             vmax = max(pred_mean_.max(), y_.max())
+
+            # # Calculate marker size.
+            # num_x_points = (lon_range[1] - lon_range[0]) // 0.5
+            # num_y_points = (lat_range[1] - lat_range[0]) // 0.5
+
+            # # Distance is 1 / num_x_points units.
+            # bbox = (
+            #     axes[0].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+            # )
+            # width = bbox.width * fig.dpi
+            # height = bbox.height * fig.dpi
+
+            # mw = width / num_x_points
+            # mh = height / num_y_points
+            # ms = (mh * mw) ** 0.5
+
+            ms = 15
             axes[0].scatter(
-                xc_[:, 2], xc_[:, 1], c=yc_, alpha=0.75, s=15, vmin=vmin, vmax=vmax
+                xc_[:, 2],
+                xc_[:, 1],
+                c=yc_,
+                alpha=1.0,
+                marker="s",
+                # s=25,
+                s=ms,
+                vmin=vmin,
+                vmax=vmax,
+                lw=0,
             )
             axes[1].scatter(
-                x_[:, 2], x_[:, 1], c=pred_mean_, alpha=0.75, s=15, vmin=vmin, vmax=vmax
+                x_[:, 2],
+                x_[:, 1],
+                c=pred_mean_,
+                alpha=1.0,
+                marker="s",
+                s=ms,
+                vmin=vmin,
+                vmax=vmax,
+                lw=0,
             )
             sc = axes[2].scatter(
-                x_[:, 2], x_[:, 1], c=y_, alpha=0.75, s=15, vmin=vmin, vmax=vmax
+                x_[:, 2],
+                x_[:, 1],
+                c=y_,
+                alpha=1.0,
+                marker="s",
+                s=ms,
+                vmin=vmin,
+                vmax=vmax,
+                lw=0,
             )
 
             axes[0].set_title("Context set", fontsize=18)
