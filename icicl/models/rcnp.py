@@ -17,12 +17,28 @@ class RCNPEncoder(nn.Module):
         relational_encoder: MLP,
         group_action: Callable = translation,
         diagonal_encoding: bool = False,
+        agg: str = "sum",
     ):
         super().__init__()
 
         self.relational_encoder = relational_encoder
         self.group_action = group_action
         self.diagonal_encoding = diagonal_encoding
+
+        if agg == "sum":
+            self.agg = (
+                lambda x: torch.sum(x, dim=-2)
+                if self.diagonal_encoder
+                else lambda x: torch.sum(x, dim=(-2, -3))
+            )
+        elif agg == "mean":
+            self.agg = (
+                lambda x: torch.mean(x, dim=-2)
+                if self.diagonal_encoder
+                else lambda x: torch.mean(x, dim=(-2, -3))
+            )
+        else:
+            raise ValueError("agg must be one of 'sum', 'mean'.")
 
     @check_shapes(
         "xc: [m, nc, dx]",
@@ -56,7 +72,7 @@ class RCNPEncoder(nn.Module):
             ztc = self.relational_encoder(ztc)
 
             # Sum over context points and return.
-            return ztc.sum(2)
+            return self.agg(ztc)
 
         # This seems quite insane.
         yc = einops.repeat(yc, "m nc1 d -> m nc1 nc2 d", nc2=xc.shape[1])
@@ -71,7 +87,7 @@ class RCNPEncoder(nn.Module):
         ztc = self.relational_encoder(ztc)
 
         # Sum over context points and return.
-        return ztc.sum((2, 3))
+        return self.agg(ztc)
 
 
 class RCNP(NeuralProcess):
