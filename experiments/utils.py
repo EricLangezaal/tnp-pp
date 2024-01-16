@@ -281,6 +281,7 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
             config_dict = run.config
 
     # Instantiate experiment and load checkpoint.
+    pl.seed_everything(config.misc.seed)
     experiment = instantiate(config)
     pl.seed_everything(experiment.misc.seed)
 
