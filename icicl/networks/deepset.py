@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import torch
 from check_shapes import check_shapes
@@ -22,8 +22,8 @@ class DeepSet(nn.Module):
         z_encoder: nn.Module,
         x_encoder: nn.Module = nn.Identity(),
         y_encoder: nn.Module = nn.Identity(),
-        xy_comb=lambda x, y: torch.cat((x, y), dim=-1),
-        agg=lambda x: torch.sum(x, dim=-2),
+        xy_comb: Callable = lambda x, y: torch.cat((x, y), dim=-1),
+        agg: str = "sum",
     ):
         super().__init__()
 
@@ -31,7 +31,13 @@ class DeepSet(nn.Module):
         self.x_encoder = x_encoder
         self.y_encoder = y_encoder
         self.xy_comb = xy_comb
-        self.agg = agg
+
+        if agg == "sum":
+            self.agg = lambda x: torch.sum(x, dim=-2)
+        elif agg == "mean":
+            self.agg = lambda x: torch.mean(x, dim=-2)
+        else:
+            raise ValueError("agg must be one of 'sum', 'mean'")
 
     @check_shapes(
         "x: [m, n, dx]",
@@ -51,11 +57,17 @@ class DatasetDeepSet(nn.Module):
     def __init__(
         self,
         deepset: nn.Module,
-        agg=lambda x: torch.sum(x, dim=-2),
+        agg: str = "sum",
     ):
         super().__init__()
         self.deepset = deepset
-        self.agg = agg
+
+        if agg == "sum":
+            self.agg = lambda x: torch.sum(x, dim=-2)
+        elif agg == "mean":
+            self.agg = lambda x: torch.mean(x, dim=-2)
+        else:
+            raise ValueError("agg must be one of 'sum', 'mean'")
 
     @check_shapes(
         "d[all][0]: [., ., d]",
