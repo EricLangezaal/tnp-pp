@@ -1,3 +1,6 @@
+import lightning.pytorch as pl
+import torch
+from lightning_utils import LitWrapper
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
@@ -19,7 +22,28 @@ def main():
     num_params = sum(p.numel() for p in model.parameters())
     wandb.run.summary["num_params"] = num_params
 
-    test_result, batches = val_epoch(model=model, generator=gen_test)
+    if experiment.misc.lightning_eval:
+        lit_model = LitWrapper(model)
+        trainer = pl.Trainer(devices=1)
+        trainer.test(model=lit_model, dataloaders=gen_test)
+        test_result = {
+            k: [result[k] for result in lit_model.test_outputs]
+            for k in lit_model.test_outputs[0].keys()
+        }
+        loglik = torch.stack(test_result["loglik"])
+        test_result["mean_loglik"] = loglik.mean()
+        test_result["std_loglik"] = loglik.std() / (len(loglik) ** 0.5)
+
+        if "gt_loglik" in test_result:
+            gt_loglik = torch.stack(test_result["gt_loglik"])
+            test_result["mean_gt_loglik"] = gt_loglik.mean()
+            test_result["std_gt_loglik"] = gt_loglik.std() / (len(gt_loglik) ** 0.5)
+
+        batches = test_result["batch"]
+
+    else:
+        test_result, batches = val_epoch(model=model, generator=gen_test)
+
     wandb.run.summary[f"test/{eval_name}/loglik"] = test_result["mean_loglik"]
     wandb.run.summary[f"test/{eval_name}/std_loglik"] = test_result["std_loglik"]
     if "mean_gt_loglik" in test_result:
