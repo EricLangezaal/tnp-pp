@@ -285,17 +285,20 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     experiment = instantiate(config)
     pl.seed_everything(experiment.misc.seed)
 
-    if experiment.misc.resume_from_checkpoint:
-        # Downloads to "./checkpoints/last.ckpt".
-        ckpt_file = run.files("checkpoints/last.ckpt")[0]
-        ckpt_file.download(replace=True)
-        experiment.model.load_state_dict(
-            torch.load("checkpoints/last.ckpt", map_location="cpu")
-        )
+    if isinstance(experiment.model, nn.Module):
+        if experiment.misc.resume_from_checkpoint:
+            # Downloads to "./checkpoints/last.ckpt".
+            ckpt_file = run.files("checkpoints/last.ckpt")[0]
+            ckpt_file.download(replace=True)
+            experiment.model.load_state_dict(
+                torch.load("checkpoints/last.ckpt", map_location="cpu")
+            )
 
+        else:
+            # Initialise model weights.
+            weights_init(experiment.model)
     else:
-        # Initialise model weights.
-        weights_init(experiment.model)
+        print("Did not initialise as not nn.Module.")
 
     # Initialise wandb. Set logging: True if wandb logging needed.
     if experiment.misc.logging:
