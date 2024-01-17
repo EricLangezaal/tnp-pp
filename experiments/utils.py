@@ -314,17 +314,23 @@ def initialize_evaluation() -> DictConfig:
     # Make argument parser with config argument.
     parser = argparse.ArgumentParser()
     parser.add_argument("--run_path", type=str)
-    parser.add_argument("--ckpt", type=str, choices=["best", "last"], default="last")
+    parser.add_argument("--config", type=str)
+    parser.add_argument(
+        "--ckpt", type=str, choices=["val_best", "train_best", "last"], default="last"
+    )
     args, config_changes = parser.parse_known_args()
 
     api = wandb.Api()
     run = api.run(args.run_path)
-    config = run.config
 
-    # Initialise experiment, make path.
-    config_changes = OmegaConf.from_cli(config_changes)
-    config = OmegaConf.merge(config, config_changes)
-    config_dict = OmegaConf.to_container(config, resolve=True)
+    # Initialise evaluation, make path.
+    config, _ = extract_config(args.config, config_changes)
+
+    # Set model to run.config.model.
+    config.model = run.config["model"]
+
+    # Set random seed.
+    pl.seed_everything(config.misc.seed)
 
     # Instantiate.
     experiment = instantiate(config)
@@ -343,10 +349,9 @@ def initialize_evaluation() -> DictConfig:
     # Initialise wandb.
     wandb.init(
         resume="must",
-        project=experiment.misc.project,
-        name=experiment.misc.name,
+        project=run.project,
+        name=run.name,
         id=run.id,
-        config=config_dict,
     )
 
     return experiment
