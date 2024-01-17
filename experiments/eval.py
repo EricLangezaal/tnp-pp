@@ -67,7 +67,7 @@ def main():
             x_std=gen_test.x_std,
             y_mean=gen_test.y_mean,
             y_std=gen_test.y_std,
-            num_fig=min(experiment.misc.numy_plots, len(batches)),
+            num_fig=min(experiment.misc.num_plots, len(batches)),
             figsize=(24.0, 5.0),
             lat_range=gen_test.lat_range,
             lon_range=gen_test.lon_range,

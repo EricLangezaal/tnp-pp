@@ -231,6 +231,8 @@ def create_default_config() -> DictConfig:
             "logging": True,
             "seed": 0,
             "plot_interval": 1,
+            "lightning_eval": False,
+            "num_plots": 5,
         }
     }
     return OmegaConf.create(default_config)
