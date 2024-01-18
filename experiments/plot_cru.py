@@ -47,8 +47,8 @@ def plot_cru(
             pred_mean, pred_std = y_pred_dist.loc.cpu(), y_pred_dist.scale.cpu()
 
         # Rescale inputs and outputs.
-        xc = (xc.cpu() * x_std) + x_mean
-        x = (x.cpu() * x_std) + x_mean
+        xc = (xc[..., :3].cpu() * x_std) + x_mean
+        x = (x[..., :3].cpu() * x_std) + x_mean
         yc = (yc.cpu() * y_std) + y_mean
         y = (y.cpu() * y_std) + y_mean
         pred_mean = (pred_mean * y_std) + y_mean

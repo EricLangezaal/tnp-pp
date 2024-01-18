@@ -244,3 +244,143 @@ class CRUDataGenerator(DataGenerator):
         y = self.data["Tair"][time_idx, lat_idx, lon_idx]
         y_mask = np.isnan(y.data)
         return (~y_mask).sum()
+
+
+class CRUDataGeneratorWithElevation(CRUDataGenerator):
+    def __init__(
+        self,
+        *,
+        elev_fname: str,
+        data_dir: str,
+        elev_mean: Optional[float] = None,
+        elev_std: Optional[float] = None,
+        **kwargs,
+    ):
+        super().__init__(data_dir=data_dir, **kwargs)
+
+        # Load elevation datasets.
+        dataset = xr.open_dataset(os.path.join(data_dir, elev_fname))
+
+        # Apply specified lat/lon ranges.
+        lon_idx = (dataset["lon"][:] <= self.lon_range[1]) & (
+            dataset["lon"][:] >= self.lon_range[0]
+        )
+        lat_idx = (dataset["lat"][:] <= self.lat_range[1]) & (
+            dataset["lat"][:] >= self.lat_range[0]
+        )
+
+        # Check latitudes and longitudes line up.
+        assert (
+            self.data["lat"] == dataset["lat"][lat_idx]
+        ).all(), "Latitude doesn't match."
+        assert (
+            self.data["lon"] == dataset["lon"][lon_idx]
+        ).all(), "Longitude doesn't match."
+
+        self.data["elev"] = dataset["ASurf"][lat_idx, lon_idx]
+
+        # Update x_mean and x_std.
+        if elev_mean is None or elev_std is None:
+            elev_mean = self.data["elev"][:].mean().item()
+            elev_std = self.data["elev"][:].std().item()
+
+        self.elev_mean = torch.as_tensor(elev_mean, dtype=torch.float)
+        self.elev_std = torch.as_tensor(elev_std, dtype=torch.float)
+
+    def sample_batch(self, pc: float, idxs: List[Tuple[List, List, List]]) -> Batch:
+        # Will build tensors from these later.
+        xs: List[torch.Tensor] = []
+        ys: List[torch.Tensor] = []
+        xcs: List[torch.Tensor] = []
+        ycs: List[torch.Tensor] = []
+        xts: List[torch.Tensor] = []
+        yts: List[torch.Tensor] = []
+
+        for idx in idxs:
+            # Crackers, but fast.
+            idx_grid = self._create_idx_grid(idx)
+
+            x = torch.stack(
+                [
+                    torch.as_tensor(
+                        self.data["time"][idx_grid[:, 0]].data, dtype=torch.float
+                    ),
+                    torch.as_tensor(
+                        self.data["lat"][idx_grid[:, 1]].data, dtype=torch.float
+                    ),
+                    torch.as_tensor(
+                        self.data["lon"][idx_grid[:, 2]].data, dtype=torch.float
+                    ),
+                ],
+                dim=-1,
+            )
+
+            elev_raw = self.data["elev"][idx[1], idx[2]]
+            elev_mask = np.isnan(elev_raw.data)
+
+            # Repeat elevations for every time point.
+            elev_mask = einops.repeat(elev_mask, "n2 n3 -> n1 n2 n3", n1=len(idx[0]))
+            elev_data = einops.repeat(
+                elev_raw.data, "n2 n3 -> n1 n2 n3", n1=len(idx[0])
+            )
+
+            y_raw = self.data["Tair"][idx[0], idx[1], idx[2]]
+            y_mask = np.isnan(y_raw.data)
+
+            mask = elev_mask & y_mask
+
+            y = (
+                torch.as_tensor(y_raw.data[~mask], dtype=torch.float32).unsqueeze(-1)
+                - self.y_mean
+            ) / self.y_std
+            elev = (
+                torch.as_tensor(elev_data[~mask], dtype=torch.float32).unsqueeze(-1)
+                - self.elev_mean
+            ) / self.elev_std
+
+            x = (x[~mask.flatten()] - self.x_mean) / self.x_std
+
+            # Concat elevation to input.
+            x = torch.cat((x, elev), dim=-1)
+
+            # Sample indices for context / target.
+            shuffled_idx = np.arange(len(y))
+            np.random.shuffle(shuffled_idx)
+            num_ctx = math.ceil(pc * len(y))
+
+            xc = x[shuffled_idx[:num_ctx]]
+            yc = y[shuffled_idx[:num_ctx]]
+            xt = x[shuffled_idx[num_ctx:][: self.max_nt]]
+            yt = y[shuffled_idx[num_ctx:][: self.max_nt]]
+
+            xs.append(x)
+            ys.append(y)
+            xcs.append(xc)
+            ycs.append(yc)
+            xts.append(xt)
+            yts.append(yt)
+
+        x = torch.stack(xs)
+        y = torch.stack(ys)
+        xc = torch.stack(xcs)
+        yc = torch.stack(ycs)
+        xt = torch.stack(xts)
+        yt = torch.stack(yts)
+
+        return Batch(x=x, y=y, xc=xc, yc=yc, xt=xt, yt=yt)
+
+    def _get_num_points(
+        self,
+        lat_idx: List[int],
+        lon_idx: List[int],
+        time_idx: Optional[List[int]] = None,
+    ) -> int:
+        time_idx = [0] if time_idx is None else time_idx
+
+        y = self.data["Tair"][time_idx, lat_idx, lon_idx]
+        y_mask = np.isnan(y.data)
+
+        elev = self.data["elev"][lat_idx, lon_idx]
+        elev_mask = np.isnan(elev.data)
+
+        return (~y_mask & ~elev_mask).sum()
