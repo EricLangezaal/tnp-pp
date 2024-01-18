@@ -233,6 +233,7 @@ def create_default_config() -> DictConfig:
             "plot_interval": 1,
             "lightning_eval": False,
             "num_plots": 5,
+            "gradient_clip_val": None,
         }
     }
     return OmegaConf.create(default_config)

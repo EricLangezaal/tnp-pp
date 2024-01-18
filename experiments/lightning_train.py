@@ -13,7 +13,11 @@ def main():
     epochs = experiment.params.epochs
 
     lit_model = LitWrapper(
-        model=model, optimiser=optimiser, loss_fn=np_loss_fn, checkpointer=checkpointer
+        model=model,
+        optimiser=optimiser,
+        loss_fn=np_loss_fn,
+        checkpointer=checkpointer,
+        plot_interval=experiment.misc.plot_interval,
     )
     logger = pl.loggers.WandbLogger() if experiment.misc.logging else False
     trainer = pl.Trainer(
@@ -23,6 +27,7 @@ def main():
         limit_val_batches=gen_val.num_batches,
         log_every_n_steps=1,
         devices=1,
+        gradient_clip_val=experiment.misc.gradient_clip_val,
     )
 
     trainer.fit(model=lit_model, train_dataloaders=gen_train, val_dataloaders=gen_val)
