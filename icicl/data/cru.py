@@ -74,7 +74,8 @@ class CRUDataGenerator(DataGenerator):
 
         self.data = {
             "Tair": dataset["Tair"][:, lat_idx, lon_idx],
-            "time": dataset["time"][:],
+            # "time": dataset["time"][:],
+            "time": dataset["time"][::t_spacing],
             "lat": dataset["lat"][lat_idx],
             "lon": dataset["lon"][lon_idx],
         }
@@ -130,17 +131,20 @@ class CRUDataGenerator(DataGenerator):
                 valid_location = True
 
         time_idx: List[List] = []
+        # for _ in range(batch_size):
+        #     i = random.randint(
+        #         0, len(self.data["time"]) - 1 - self.t_spacing * self.batch_grid_size[0]
+        #     )
+        #     time_idx.append(
+        #         list(
+        #             range(
+        #                 i, i + self.t_spacing * self.batch_grid_size[0], self.t_spacing
+        #             )
+        #         )
+        #     )
         for _ in range(batch_size):
-            i = random.randint(
-                0, len(self.data["time"]) - 1 - self.t_spacing * self.batch_grid_size[0]
-            )
-            time_idx.append(
-                list(
-                    range(
-                        i, i + self.t_spacing * self.batch_grid_size[0], self.t_spacing
-                    )
-                )
-            )
+            i = random.randint(0, len(self.data["time"]) - 1 - self.batch_grid_size[0])
+            time_idx.append(list(range(i, i + self.batch_grid_size[0])))
 
         idx = [(time_idx[i], lat_idx, lon_idx) for i in range(len(time_idx))]
         return idx
