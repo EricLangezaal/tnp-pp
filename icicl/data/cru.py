@@ -82,8 +82,12 @@ class CRUDataGenerator(DataGenerator):
 
         # Assign means and stds.
         if x_mean is None or x_std is None:
-            x_mean = [self.data[k][:].mean().item() for k in ["time", "lat", "lon"]]
-            x_std = [self.data[k][:].std().item() for k in ["time", "lat", "lon"]]
+            x_mean: Tuple[float, float, float] = tuple(
+                [self.data[k][:].mean().item() for k in ["time", "lat", "lon"]]
+            )
+            x_std: Tuple[float, float, float] = tuple(
+                [self.data[k][:].std().item() for k in ["time", "lat", "lon"]]
+            )
 
         if y_mean is None or y_std is None:
             y_mean = self.data["Tair"].mean().item()
