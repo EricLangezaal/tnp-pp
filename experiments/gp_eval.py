@@ -19,6 +19,7 @@ def main():
     init_optimiser = experiment.optimiser
     gen_val = experiment.generators.val
     train_iters = experiment.params.train_iters
+    eval_name = experiment.misc.eval_name
 
     pl.seed_everything(0)
 
@@ -48,6 +49,7 @@ def main():
                 yc=yc,
                 dataset_idx=dataset_idx,
                 iters=train_iters,
+                log=(dataset_idx % experiment.misc.log_interval == 0),
             )
             results["elbos"].append(train_result["elbo"])
 
@@ -62,11 +64,18 @@ def main():
 
             results["loglik"].append(loglik.mean())
 
+            # Log moving average loglik.
+            mean_loglik = torch.stack(results["loglik"]).mean()
+            wandb.log({f"{eval_name}/loglik_ma": mean_loglik})
+
             dataset_idx += 1
 
     loglik = torch.stack(results["loglik"])
     mean_loglik = loglik.mean()
-    wandb.run.summary["val/loglik"] = mean_loglik
+    wandb.run.summary[f"eval/{eval_name}/mean_loglik"] = loglik.mean()
+    wandb.run.summary[f"eval/{eval_name}/std_loglik"] = loglik.std() / (
+        len(loglik) ** 0.5
+    )
 
 
 if __name__ == "__main__":

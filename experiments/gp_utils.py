@@ -13,6 +13,7 @@ def train_gp(
     yc: torch.Tensor,
     dataset_idx: int,
     iters: int = 100,
+    log: bool = False,
 ):
     train_iter = tqdm(range(iters), total=iters, desc="Training")
     for _ in train_iter:
@@ -23,8 +24,10 @@ def train_gp(
         loss.backward()
         optimiser.step()
 
-        wandb.log({f"train/dataset-{dataset_idx}/loss": loss})
         train_iter.set_postfix({"train/loss": loss.item()})
+
+        if log:
+            wandb.log({f"train/dataset-{dataset_idx}/loss": loss})
 
     elbo = -loss.detach()
     train_result = {
