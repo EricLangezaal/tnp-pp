@@ -53,7 +53,7 @@ class LitWrapper(pl.LightningModule):
         self, batch: Batch, batch_idx: int
     ) -> None:
         _ = batch_idx
-        result = {"batch": _batch_to_cpu(batch)}
+        result = {"batch": batch}
         if isinstance(batch, ICBatch):
             pred_dist = self.model(
                 xc=batch.xc,
