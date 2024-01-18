@@ -66,14 +66,14 @@ def plot_image(
         if y.shape[-1] == 1:
             mc_ = einops.repeat(mc[:1], "m n -> m n d", d=y.shape[-1])
             y_plot = np.ma.masked_where(
-                ~mc_,
-                y[:1, :].numpy(),
+                ~mc_.cpu().numpy(),
+                y[:1, :].cpu().numpy(),
             )
         else:
             # Masking does not work for RGB images.
             # Use mask to control alpha values instead.
             mc_ = einops.rearrange(mc[:1], "m n -> m n 1")
-            y_plot = torch.cat((y[:1], mc_), dim=-1).numpy()
+            y_plot = torch.cat((y[:1], mc_), dim=-1).cpu().numpy()
 
         w = int(y_plot.shape[-2] ** 0.5)
         y_plot = einops.rearrange(y_plot, "1 (n m) d -> n m d", n=w, m=w)
