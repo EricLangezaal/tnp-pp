@@ -64,17 +64,17 @@ def plot_image(
 
         # Reorganise into grid.
         y_plot = np.ma.masked_where(
-            ~mc[:1, :],
-            y[:1, :, 0].numpy(),
+            ~einops.repeat(mc[:1, :], "m n -> m n d", d=y.shape[-1]),
+            y[:1, :].numpy(),
         )
-        w = int(y_plot.shape[-1] ** 0.5)
-        y_plot = einops.rearrange(y_plot, "1 (n m) -> n m", n=w, m=w)
-        mean = einops.rearrange(mean[..., 0], "1 (n m) -> n m", n=w, m=w)
-        std = einops.rearrange(std[..., 0], "1 (n m) -> n m", n=w, m=w)
+        w = int(y_plot.shape[-2] ** 0.5)
+        y_plot = einops.rearrange(y_plot, "1 (n m) d -> n m d", n=w, m=w)
+        mean = einops.rearrange(mean, "1 (n m) d -> n m d", n=w, m=w)
+        std = einops.rearrange(std, "1 (n m) d -> n m d", n=w, m=w)
 
-        axes[0].imshow(y_plot)
-        axes[1].imshow(mean)
-        axes[2].imshow(std)
+        axes[0].imshow(y_plot, cmap="gray", vmax=1, vmin=0)
+        axes[1].imshow(mean, cmap="gray", vmax=1, vmin=0)
+        axes[2].imshow(std, cmap="gray", vmax=std.max(), vmin=std.min())
 
         axes[0].set_title("Context set", fontsize=18)
         axes[1].set_title("Mean prediction", fontsize=18)
