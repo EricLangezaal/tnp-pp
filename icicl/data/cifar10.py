@@ -6,39 +6,41 @@ from .image import ICImageGenerator, ImageGenerator
 from .image_datasets import TranslatedImageGenerator, ZeroShotMultiImageGenerator
 
 
-class MNIST(ABC):
+class CIFAR10(ABC):
     def __init__(self, data_dir: str, train: bool = True, download: bool = False):
         self.dim = 28 * 28
-        self.dataset = torchvision.datasets.MNIST(
+        self.dataset = torchvision.datasets.CIFAR10(
             root=data_dir,
             train=train,
             download=download,
             transform=torchvision.transforms.Compose(
                 [
                     torchvision.transforms.ToTensor(),
-                    torchvision.transforms.Normalize((0.1307,), (0.3081,)),
+                    torchvision.transforms.Normalize(
+                        (0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)
+                    ),
                 ]
             ),
         )
 
 
-class MNISTGenerator(MNIST, ImageGenerator):
+class CIFAR10Generator(CIFAR10, ImageGenerator):
     def __init__(
         self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
     ):
-        MNIST.__init__(self, data_dir, train, download)
+        CIFAR10.__init__(self, data_dir, train, download)
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
 
-class ICMNISTGenerator(MNIST, ICImageGenerator):
+class ICCIFAR10(CIFAR10, ICImageGenerator):
     def __init__(
         self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
     ):
-        MNIST.__init__(self, data_dir, train, download)
+        CIFAR10.__init__(self, data_dir, train, download)
         ICImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
 
-class ZeroShotMultiMNISTGenerator(ZeroShotMultiImageGenerator):
+class ZeroShotMultiCIFAR10Generator(ZeroShotMultiImageGenerator):
     def __init__(
         self,
         data_dir: str,
@@ -46,14 +48,13 @@ class ZeroShotMultiMNISTGenerator(ZeroShotMultiImageGenerator):
         download: bool = True,
         **kwargs,
     ):
-        mnist_dataset = torchvision.datasets.MNIST(
+        cifar10_dataset = torchvision.datasets.MNCIFAR10ST(
             root=data_dir, train=train, download=download
         )
-        mnist_dataset.data = mnist_dataset.data.unsqueeze(-1)
-        super().__init__(dataset=mnist_dataset, train=train, **kwargs)
+        super().__init__(dataset=cifar10_dataset, train=train, **kwargs)
 
 
-class TranslatedMNISTGenerator(TranslatedImageGenerator):
+class TranslatedCIFAR10Generator(TranslatedImageGenerator):
     def __init__(
         self,
         data_dir: str,
@@ -61,9 +62,7 @@ class TranslatedMNISTGenerator(TranslatedImageGenerator):
         download: bool = True,
         **kwargs,
     ):
-        mnist_dataset = torchvision.datasets.MNIST(
+        cifar10_dataset = torchvision.datasets.CIFAR10(
             root=data_dir, train=train, download=download
         )
-        # Add channel dimension to MNIST.
-        mnist_dataset.data = mnist_dataset.data.unsqueeze(-1)
-        super().__init__(dataset=mnist_dataset, train=train, **kwargs)
+        super().__init__(dataset=cifar10_dataset, train=train, **kwargs)

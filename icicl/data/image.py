@@ -97,6 +97,10 @@ class ImageGenerator:
         x_std: Optional[Tuple[float, float]] = None,
         return_as_gridded: bool = False,
     ):
+        assert (
+            len(dataset.data.shape) == 4
+        ), "dataset.data.shape must be (batch_size, height, width, num_channels)."
+
         self.batch_size = batch_size
         self.min_prop_ctx = min_prop_ctx
         self.max_prop_ctx = max_prop_ctx
@@ -238,19 +242,22 @@ class ImageGenerator:
 
         # Sample batch of data.
         batch_idx = next(self.batch_sampler)
-        y_grid = torch.cat([self.dataset[idx][0] for idx in batch_idx], dim=0)
+        # (batch_size, num_channels, height, width).
+        y_grid = torch.stack([self.dataset[idx][0] for idx in batch_idx], dim=0)
         label = torch.stack(
             [torch.as_tensor(self.dataset[idx][1]) for idx in batch_idx]
         )
 
         # Input grid.
         x = torch.stack(
-            torch.meshgrid(*[torch.range(0, dim - 1) for dim in y_grid[0, ...].shape]),
+            torch.meshgrid(
+                *[torch.range(0, dim - 1) for dim in y_grid[0, 0, ...].shape]
+            ),
             dim=-1,
         )
 
         # Rearrange.
-        y = einops.rearrange(y_grid, "m n1 n2 -> m (n1 n2) 1")
+        y = einops.rearrange(y_grid, "m d n1 n2 -> m (n1 n2) d")
         x = einops.rearrange(x, "n1 n2 d -> (n1 n2) d")
 
         # Normalise inputs.
@@ -262,6 +269,7 @@ class ImageGenerator:
         xt = torch.stack([x_[~mask] for x_, mask in zip(x, mc)])
         yt = torch.stack([y_[~mask] for y_, mask in zip(y, mc)])
 
+        mt_grid = None
         if self.nt is not None:
             # Only use nt randomly sampled target points.
             rand = torch.rand(size=(xt.shape[0], xt.shape[1]))
@@ -270,15 +278,32 @@ class ImageGenerator:
             xt = torch.stack([xt_[mt_] for xt_, mt_ in zip(xt, mt)])
             yt = torch.stack([yt_[mt_] for yt_, mt_ in zip(yt, mt)])
 
+            if self.return_as_gridded:
+                mt_grid = torch.full(mc.shape, False)
+                mt_idx_orig = [torch.nonzero(~mc_).squeeze(-1) for mc_ in mc]
+                mt_idx_orig_mask = [torch.nonzero(mt_).squeeze(-1) for mt_ in mt]
+                mt_idx = [mt_idx_orig[i][mt_idx_orig_mask[i]] for i in range(len(mc))]
+
+                for i, mt_idx_ in enumerate(mt_idx):
+                    mt_grid[i][mt_idx_] = True
+
         if self.return_as_gridded:
             # Restructure mask.
             mc_grid = einops.rearrange(
                 mc,
                 "m (n1 n2) -> m n1 n2",
-                n1=y_grid[0, ...].shape[0],
-                n2=y_grid[0, ...].shape[1],
+                n1=y_grid[0, ...].shape[-2],
+                n2=y_grid[0, ...].shape[-1],
             )
-            mt_grid = ~mc_grid
+            if mt_grid is None:
+                mt_grid = ~mc_grid
+            else:
+                mt_grid = einops.rearrange(
+                    mt_grid,
+                    "m (n1 n2) -> m n1 n2",
+                    n1=y_grid[0, ...].shape[0],
+                    n2=y_grid[0, ...].shape[1],
+                )
             return GriddedImageBatch(
                 x=x,
                 y=y,

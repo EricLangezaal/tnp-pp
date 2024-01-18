@@ -4,14 +4,16 @@ import numpy as np
 import torch
 import torchvision
 
+from .image import ImageGenerator
+
 
 class TranslationImageDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         dataset: torch.utils.data.Dataset,
         max_translation: Tuple[int, int],
-        stationary_image_size: Optional[Tuple[int, int]] = None,
-        translated_image_size: Optional[Tuple[int, int]] = None,
+        stationary_image_size: Optional[Tuple[int, int, int]] = None,
+        translated_image_size: Optional[Tuple[int, int, int]] = None,
         train: bool = True,
         zero_shot: bool = True,
         seed: int = 0,
@@ -25,6 +27,7 @@ class TranslationImageDataset(torch.utils.data.Dataset):
         )
         self.translated_image_size = (
             [dim + 2 * shift for dim, shift in zip(self.image_size, max_translation)]
+            + [self.image_size.shape[-1]]
             if translated_image_size is None
             else translated_image_size
         )
@@ -75,7 +78,6 @@ class TranslationImageDataset(torch.utils.data.Dataset):
             size=dataset.shape[0],
         )
         np.random.set_state(st)
-
         borders = (
             np.array(self.translated_image_size) - np.array(self.image_size)
         ) // 2
@@ -104,7 +106,7 @@ class TranslationImageDataset(torch.utils.data.Dataset):
             hslice = slice(
                 max(0, hshift + borders[1]), max(0, hshift + borders[1]) + img.shape[1]
             )
-            background[i, vslice, hslice] = img
+            background[i, vslice, hslice] = torch.as_tensor(img)
 
         return background
 
@@ -112,8 +114,34 @@ class TranslationImageDataset(torch.utils.data.Dataset):
         return self.data.size(0)
 
     def __getitem__(self, idx: int):
-        img = self.transforms(self.data[idx]).float()
+        # Move channel dim to first dimension.
+        img = self.transforms(self.data[idx].transpose(-3, -1)).float()
         return img, 0
+
+
+class TranslatedImageGenerator(ImageGenerator):
+    def __init__(
+        self,
+        dataset: torch.utils.data.Dataset,
+        train: bool = True,
+        max_translation: Tuple[int, int] = (14, 14),
+        stationary_image_size: Optional[Tuple[int, int, int]] = None,
+        translated_image_size: Optional[Tuple[int, int, int]] = None,
+        zero_shot: bool = True,
+        seed: int = 0,
+        **kwargs,
+    ):
+        self.dataset = TranslationImageDataset(
+            dataset=dataset,
+            max_translation=max_translation,
+            stationary_image_size=stationary_image_size,
+            translated_image_size=translated_image_size,
+            train=train,
+            zero_shot=zero_shot,
+            seed=seed,
+        )
+        self.dim = self.dataset.data.shape[1] * self.dataset.data.shape[2]
+        super().__init__(dataset=self.dataset, dim=self.dim, **kwargs)
 
 
 class ZeroShotMultiImageDataset(torch.utils.data.Dataset):
@@ -251,3 +279,24 @@ class ZeroShotMultiImageDataset(torch.utils.data.Dataset):
         # no label so return 0 (note that can't return None because)
         # dataloaders requires so
         return img, 0
+
+
+class ZeroShotMultiImageGenerator(ImageGenerator):
+    def __init__(
+        self,
+        dataset: torch.utils.data.Dataset,
+        train: bool = True,
+        num_test_images: int = 2,
+        train_image_size: Optional[Tuple[int, int]] = None,
+        seed: int = 0,
+        **kwargs,
+    ):
+        self.dataset = ZeroShotMultiImageDataset(
+            dataset=dataset,
+            train=train,
+            num_test_images=num_test_images,
+            train_image_size=train_image_size,
+            seed=seed,
+        )
+        self.dim = self.dataset.data.shape[1] * self.dataset.data.shape[2]
+        super().__init__(dataset=self.dataset, dim=self.dim, **kwargs)
