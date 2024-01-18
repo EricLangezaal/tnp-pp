@@ -12,6 +12,7 @@ class CNPEncoder(nn.Module):
         self,
         deepset: DeepSet,
     ):
+        super().__init__()
         self.deepset = deepset
 
     @check_shapes(

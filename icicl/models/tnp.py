@@ -131,7 +131,10 @@ def gen_tnpd_mask(
         else:
             mask[:, :nc, :nc] = False
 
-    if not contexts_self_attend:
+    if contexts_self_attend:
+        for i in range(xc.shape[-2]):
+            mask[:, i, i] = False
+    else:
         for i in range(xc.shape[-2]):
             mask[:, i, i] = True
 
