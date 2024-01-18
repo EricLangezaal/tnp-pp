@@ -301,9 +301,13 @@ class ImageGenerator:
                 mt_grid = einops.rearrange(
                     mt_grid,
                     "m (n1 n2) -> m n1 n2",
-                    n1=y_grid[0, ...].shape[0],
-                    n2=y_grid[0, ...].shape[1],
+                    n1=y_grid[0, ...].shape[-2],
+                    n2=y_grid[0, ...].shape[-1],
                 )
+
+            # Move channel to final dimension.
+            y_grid = einops.rearrange(y_grid, "m d n1 n2 -> m n1 n2 d")
+
             return GriddedImageBatch(
                 x=x,
                 y=y,

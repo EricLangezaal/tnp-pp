@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -43,8 +44,9 @@ class GriddedConvCNPEncoder(nn.Module):
         self.resizer = resizer
 
     def forward(self, mc: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        yc = y * mc
-        z_grid = torch.stack((yc, mc), dim=-1)
+        mc_ = einops.repeat(mc, "m n1 n2 -> m n1 n2 d", d=y.shape[-1])
+        yc = y * mc_
+        z_grid = torch.cat((yc, mc_), dim=-1)
         z_grid = self.resizer(z_grid)
         z_grid = self.conv_net(z_grid)
         return z_grid
