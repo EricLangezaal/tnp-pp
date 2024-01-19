@@ -115,7 +115,7 @@ class TranslationImageDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx: int):
         # Move channel dim to first dimension.
-        img = self.transforms(self.data[idx].transpose(-3, -1)).float()
+        img = self.transforms(self.data[idx].permute(2, 0, 1)).float()
         return img, 0
 
 
