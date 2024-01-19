@@ -1,8 +1,13 @@
+from typing import Union
+
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..networks.tetransformer import NestedTEPerceiverEncoder
+from ..networks.tetransformer import (
+    NestedTEISetTransformerEncoder,
+    NestedTEPerceiverEncoder,
+)
 from ..utils.helpers import preprocess_observations
 from .base import NeuralProcess
 from .lbanp import LBANPDecoder
@@ -11,7 +16,9 @@ from .lbanp import LBANPDecoder
 class TELBANPEncoder(nn.Module):
     def __init__(
         self,
-        nested_perceiver_encoder: NestedTEPerceiverEncoder,
+        nested_perceiver_encoder: Union[
+            NestedTEPerceiverEncoder, NestedTEISetTransformerEncoder
+        ],
         y_encoder: nn.Module,
     ):
         super().__init__()

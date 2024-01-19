@@ -204,5 +204,71 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
         return xt
 
 
+class NestedTEISetTransformerEncoder(nn.Module):
+    tq_cache: Optional[torch.Tensor] = None
+
+    def __init__(
+        self,
+        dim: int,
+        num_latents: int,
+        mhca_ctoq_layer: MultiHeadSelfTEAttentionLayer,
+        mhca_qtoc_layer: MultiHeadCrossTEAttentionLayer,
+        mhca_qtot_layer: MultiHeadCrossTEAttentionLayer,
+        num_layers: int,
+        pseudo_token_initialiser: PseudoTokenInitialiser,
+    ):
+        super().__init__()
+
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtoc_layer.embed_dim
+        ), "embed_dim mismatch."
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtot_layer.embed_dim
+        ), "embed_dim mismatch."
+
+        embed_dim = mhca_ctoq_layer.embed_dim
+        self.latent_tokens = nn.Parameter(torch.randn(num_latents, embed_dim))
+        self.latent_inputs = nn.Parameter(torch.randn(num_latents, dim))
+
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
+        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+        self.pseudo_token_initialiser = pseudo_token_initialiser
+
+    @check_shapes(
+        "xc: [m, nc, dx]",
+        "xt: [m, nt, dx]",
+        "tc: [m, nc, dt]",
+        "tt: [m, nt, dt]",
+        "mask: [m, nq, n]",
+        "return: [m, nq, dx]",
+    )
+    def forward(
+        self,
+        xc: torch.Tensor,
+        xt: torch.Tensor,
+        tc: torch.Tensor,
+        tt: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        xq = einops.repeat(self.latent_tokens, "l e -> m l e", m=xc.shape[0])
+        tq = einops.repeat(self.latent_inputs, "l d -> m l d", m=xc.shape[0])
+
+        # Now initialise pseudo-tokens.
+        xq, tq = self.pseudo_token_initialiser(xq, xc, tq, tc)
+
+        # Cache for plotting.
+        self.tq_cache = tq.detach()
+        for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
+            self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
+        ):
+            xq, tq = mhca_ctoq_layer(xq, xc, tq, tc, mask)
+            xc, tc = mhca_qtoc_layer(xc, xq, tc, tq)
+            xt, tt = mhca_qtot_layer(xt, xq, tt, tq)
+
+        return xt
+
+
 def _get_clones(module: nn.Module, n: int) -> nn.ModuleList:
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])
