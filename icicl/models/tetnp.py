@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Optional, Union
 
 import torch
 from check_shapes import check_shapes
@@ -15,11 +15,13 @@ class TETNPDEncoder(nn.Module):
         self,
         transformer_encoder: TETransformerEncoder,
         y_encoder: nn.Module,
+        initial_token_x_dependencies: Optional[List[int]] = None,
     ):
         super().__init__()
 
         self.transformer_encoder = transformer_encoder
         self.y_encoder = y_encoder
+        self.inital_token_x_dependencies = initial_token_x_dependencies
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, n, dz]"
@@ -31,7 +33,13 @@ class TETNPDEncoder(nn.Module):
 
         x = torch.cat((xc, xt), dim=-2)
         y = torch.cat((yc, yt), dim=-2)
-        z = self.y_encoder(y)
+
+        if self.initial_token_dependencies is not None:
+            z = self.y_encoder(
+                torch.cat((y, x[..., self.initial_token_dependencies]), dim=-1)
+            )
+        else:
+            z = self.y_encoder(y)
 
         # Construct mask.
         mask = gen_tnpd_mask(xc, xt, targets_self_attend=True)

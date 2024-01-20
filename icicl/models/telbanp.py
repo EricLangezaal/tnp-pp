@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Optional, Union
 
 import torch
 from check_shapes import check_shapes
@@ -20,11 +20,13 @@ class TELBANPEncoder(nn.Module):
             NestedTEPerceiverEncoder, NestedTEISetTransformerEncoder
         ],
         y_encoder: nn.Module,
+        initial_token_x_dependencies: Optional[List[int]] = None,
     ):
         super().__init__()
 
         self.nested_perceiver_encoder = nested_perceiver_encoder
         self.y_encoder = y_encoder
+        self.inital_token_x_dependencies = initial_token_x_dependencies
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, nq, dz]"
@@ -37,8 +39,16 @@ class TELBANPEncoder(nn.Module):
     ) -> torch.Tensor:
         yc, yt = preprocess_observations(xt, yc)
 
-        zc = self.y_encoder(yc)
-        zt = self.y_encoder(yt)
+        if self.initial_token_dependencies is not None:
+            zc = self.y_encoder(
+                torch.cat((yc, xc[..., self.initial_token_dependencies]), dim=-1)
+            )
+            zt = self.y_encoder(
+                torch.cat((yt, xt[..., self.initial_token_dependencies]), dim=-1)
+            )
+        else:
+            zc = self.y_encoder(yc)
+            zt = self.y_encoder(yt)
 
         zt = self.nested_perceiver_encoder(zc, zt, xc, xt)
         return zt
