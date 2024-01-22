@@ -41,8 +41,6 @@ def plot_kolmogorov(
         model_nll = -yt_pred_dist.log_prob(yt).mean()
         mean = y_pred_dist.loc
 
-    fig = plt.figure(figsize=figsize)
-
     other_dim = [i for i in range(x.shape[-1]) if i not in plot_dims][0]
 
     # Select data to plot.
@@ -58,8 +56,10 @@ def plot_kolmogorov(
     yc_ = yc[0, data_idx_c]
     mean_ = mean[0, data_idx]
 
-    vmin = min(y_.min(), mean_.min())
-    vmax = max(y_.max(), mean_.max())
+    # vmin = min(y_.min(), mean_.min())
+    # vmax = max(y_.max(), mean_.max())
+    vmin = y_.min()
+    vmax = y_.max()
 
     scatter_kwargs = {
         "s": 45,
