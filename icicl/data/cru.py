@@ -40,7 +40,6 @@ class CRUDataGenerator(DataGenerator):
 
         # How large each sampled grid should be (in indicies).
         self.batch_grid_size = batch_grid_size
-        self.dim = np.prod(batch_grid_size)
         self.max_nt = max_nt
         self.min_num_total = min_num_total
         self.t_spacing = t_spacing
