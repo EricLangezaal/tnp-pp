@@ -1,6 +1,7 @@
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
+from plot_kolmogorov import plot_kolmogorov
 from utils import (
     evaluation_summary,
     initialize_experiment,
@@ -11,6 +12,7 @@ from utils import (
 
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
+from icicl.data.kolmogorov import KolmogorovGenerator
 
 
 def main():
@@ -60,6 +62,18 @@ def main():
                     lon_range=gen_val.lon_range,
                     time_idx=(0, -1),
                     name=f"epoch-{epoch:04d}",
+                )
+            elif isinstance(gen_train, KolmogorovGenerator):
+                plot_kolmogorov(
+                    model=model,
+                    batches=batches,
+                    num_fig=min(5, len(batches)),
+                    figsize=(18.0, 5.0),
+                    plot_dims=(0, 1),
+                    other_dim_slice=0,
+                    savefig=False,
+                    logging=False,
+                    subplots=True,
                 )
             else:
                 plot(

@@ -6,12 +6,14 @@ import torch
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
+from plot_kolmogorov import plot_kolmogorov
 from torch import nn
 from utils import ModelCheckpointer, np_loss_fn
 
 from icicl.data.base import Batch, ICBatch
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import GriddedImageBatch, ImageGenerator
+from icicl.data.kolmogorov import KolmogorovGenerator
 from icicl.data.synthetic import SyntheticBatch
 
 
@@ -177,6 +179,17 @@ class LitWrapper(pl.LightningModule):
                     lat_range=self.trainer.val_dataloaders.lat_range,
                     lon_range=self.trainer.val_dataloaders.lon_range,
                     time_idx=[0, -1],
+                    name=f"epoch-{self.current_epoch:04d}",
+                )
+            elif isinstance(self.trainer.val_dataloaders, KolmogorovGenerator):
+                plot_kolmogorov(
+                    model=self.model,
+                    batches=results["batch"],
+                    num_fig=min(5, len(results["batch"])),
+                    figsize=(18.0, 5.0),
+                    plot_dims=(0, 2),
+                    other_dim_slice=0,
+                    subplots=True,
                     name=f"epoch-{self.current_epoch:04d}",
                 )
             else:
