@@ -1,3 +1,5 @@
+from typing import Optional
+
 import gpytorch
 import torch
 from tqdm.auto import tqdm
@@ -11,7 +13,7 @@ def train_gp(
     optimiser: torch.optim.Optimizer,
     xc: torch.Tensor,
     yc: torch.Tensor,
-    dataset_idx: int,
+    dataset_idx: Optional[int] = None,
     iters: int = 100,
     log: bool = False,
 ):
