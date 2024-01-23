@@ -226,6 +226,7 @@ def create_default_config() -> DictConfig:
     default_config = {
         "misc": {
             "resume_from_checkpoint": None,
+            "resume_from_path": None,
             "override_config": False,
             "plot_ar_mode": False,
             "logging": True,
@@ -295,6 +296,12 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
             ckpt_file.download(replace=True)
             experiment.model.load_state_dict(
                 torch.load("checkpoints/last.ckpt", map_location="cpu")
+            )
+
+        elif experiment.misc.resume_from_path is not None:
+            experiment.model.load_state_dict(
+                torch.load(experiment.misc.resume_from_path, map_location="cpu"),
+                strict=True,
             )
 
         else:

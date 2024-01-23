@@ -47,14 +47,14 @@ def plot_kolmogorov(
     other_dim_vals = x[0, :, other_dim].unique()
     other_dim_val = other_dim_vals[other_dim_slice]
 
-    data_idx = torch.where(x[0, ..., other_dim] == other_dim_val)[0]
-    data_idx_c = torch.where(xc[0, ..., other_dim] == other_dim_val)[0]
+    data_idx = torch.where(x[0, ..., other_dim] == other_dim_val)[0].cpu()
+    data_idx_c = torch.where(xc[0, ..., other_dim] == other_dim_val)[0].cpu()
 
-    x_ = x[0, data_idx]
-    y_ = y[0, data_idx]
-    xc_ = xc[0, data_idx_c]
-    yc_ = yc[0, data_idx_c]
-    mean_ = mean[0, data_idx]
+    x_ = x[0, data_idx].cpu()
+    y_ = y[0, data_idx].cpu()
+    xc_ = xc[0, data_idx_c].cpu()
+    yc_ = yc[0, data_idx_c].cpu()
+    mean_ = mean[0, data_idx].cpu()
 
     # vmin = min(y_.min(), mean_.min())
     # vmax = max(y_.max(), mean_.max())
