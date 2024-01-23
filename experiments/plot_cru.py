@@ -1,4 +1,5 @@
-from typing import List, Optional, Tuple
+import os
+from typing import Callable, List, Optional, Tuple, Union
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -15,7 +16,10 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
 def plot_cru(
-    model: nn.Module,
+    model: Union[
+        nn.Module,
+        Callable[..., torch.distributions.Distribution],
+    ],
     batches: List[Batch],
     x_mean: torch.Tensor,
     x_std: torch.Tensor,
@@ -23,10 +27,14 @@ def plot_cru(
     y_std: torch.Tensor,
     num_fig: int = 5,
     figsize: Tuple[float, float] = (8.0, 6.0),
-    lat_range: Tuple[float, float] = (35.25, 59.75),
-    lon_range: Tuple[float, float] = (10.25, 44.75),
+    lat_range: Optional[Tuple[float, float]] = None,
+    lon_range: Optional[Tuple[float, float]] = None,
     time_idx: Optional[List[int]] = None,
     name: str = "plot",
+    subplots: bool = True,
+    savefig: bool = False,
+    logging: bool = True,
+    colorbar: bool = False,
 ):
     time_idx = [0, -1] if time_idx is None else time_idx
 
@@ -39,12 +47,22 @@ def plot_cru(
         x = batch.x[:1]
         y = batch.y[:1]
 
-        with torch.no_grad():
+        if not isinstance(model, nn.Module):
             y_pred_dist = model(xc=xc, yc=yc, xt=x)
             yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
-            model_nll = -yt_pred_dist.log_prob(yt).mean().cpu()
-            pred_mean, pred_std = y_pred_dist.loc.cpu(), y_pred_dist.scale.cpu()
+            # Detach gradients.
+            y_pred_dist.loc = y_pred_dist.loc.detach().unsqueeze(0)
+            y_pred_dist.scale = y_pred_dist.scale.detach().unsqueeze(0)
+            yt_pred_dist.loc = yt_pred_dist.loc.detach().unsqueeze(0)
+            yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
+        else:
+            with torch.no_grad():
+                y_pred_dist = model(xc=xc, yc=yc, xt=x)
+                yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+
+        model_nll = -yt_pred_dist.log_prob(yt).mean().cpu()
+        pred_mean, pred_std = y_pred_dist.loc.cpu(), y_pred_dist.scale.cpu()
 
         # Rescale inputs and outputs.
         xc = (xc[..., :3].cpu() * x_std) + x_mean
@@ -67,98 +85,136 @@ def plot_cru(
             x_ = x[0, data_idx].cpu()
             y_ = y[0, data_idx, 0].cpu()
             pred_mean_ = pred_mean[0, data_idx, 0]
-            # pred_std_ = pred_std[data_idx]
+            vmin = min(y_.min(), y_.max())
+            vmax = max(y_.max(), y_.max())
+            pred_std_ = pred_std[0, data_idx, 0]
 
             # Note that x is (time, lat, lon).
-
-            fig, axes = plt.subplots(
-                figsize=figsize,
-                ncols=3,
-                nrows=1,
-                subplot_kw={"projection": ccrs.PlateCarree()},
+            ylim = (
+                (x_[:, 1].min().item() - 0.5, x_[:, 1].max().item() + 0.5)
+                if lat_range is None
+                else lat_range
             )
-
-            for ax in axes:
-                ax.add_feature(cfeature.COASTLINE)
-                ax.add_feature(cfeature.BORDERS)
-                # ax.gridlines()
-                ax.set_xlim([lon_range[0], lon_range[1]])
-                ax.set_ylim([lat_range[0], lat_range[1]])
-                ax.set_axisbelow(True)
-
-            vmin = min(pred_mean_.min(), y_.max())
-            vmax = max(pred_mean_.max(), y_.max())
-
-            # # Calculate marker size.
-            # num_x_points = (lon_range[1] - lon_range[0]) // 0.5
-            # num_y_points = (lat_range[1] - lat_range[0]) // 0.5
-
-            # # Distance is 1 / num_x_points units.
-            # bbox = (
-            #     axes[0].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-            # )
-            # width = bbox.width * fig.dpi
-            # height = bbox.height * fig.dpi
-
-            # mw = width / num_x_points
-            # mh = height / num_y_points
-            # ms = (mh * mw) ** 0.5
-
-            ms = 15
-            axes[0].scatter(
-                xc_[:, 2],
-                xc_[:, 1],
-                c=yc_,
-                alpha=1.0,
-                marker="s",
-                # s=25,
-                s=ms,
-                vmin=vmin,
-                vmax=vmax,
-                lw=0,
+            xlim = (
+                (x_[:, 2].min().item() - 0.5, x_[:, 2].max().item() + 0.5)
+                if lon_range is None
+                else lon_range
             )
-            axes[1].scatter(
-                x_[:, 2],
-                x_[:, 1],
-                c=pred_mean_,
-                alpha=1.0,
-                marker="s",
-                s=ms,
-                vmin=vmin,
-                vmax=vmax,
-                lw=0,
-            )
-            sc = axes[2].scatter(
-                x_[:, 2],
-                x_[:, 1],
-                c=y_,
-                alpha=1.0,
-                marker="s",
-                s=ms,
-                vmin=vmin,
-                vmax=vmax,
-                lw=0,
-            )
+            scatter_kwargs = {
+                "s": 15,
+                "marker": "s",
+                "alpha": 1.0,
+                "vmin": vmin,
+                "vmax": vmax,
+                "lw": 0,
+            }
 
-            axes[0].set_title("Context set", fontsize=18)
-            axes[1].set_title("Predictive mean", fontsize=18)
-            axes[2].set_title("True values", fontsize=18)
+            if subplots:
+                fig, axes = plt.subplots(
+                    figsize=figsize,
+                    ncols=3,
+                    nrows=1,
+                    subplot_kw={"projection": ccrs.PlateCarree()},
+                )
 
-            # Add colourbar.
-            cbar = fig.colorbar(sc, ax=axes, fraction=0.046, pad=0.04)
-            cbar.solids.set(alpha=1)
+                for ax in axes:
+                    ax.add_feature(cfeature.COASTLINE)
+                    ax.add_feature(cfeature.BORDERS)
+                    # ax.gridlines()
+                    ax.set_xlim(xlim)
+                    ax.set_ylim(ylim)
+                    ax.set_axisbelow(True)
 
-            plt.suptitle(
-                f"prop_ctx = {xc.shape[-2] / x.shape[-2]:.2f}    "
-                #
-                f"NLL = {model_nll:.3f}",
-                fontsize=18,
-            )
+                axes[0].scatter(
+                    xc_[:, 2],
+                    xc_[:, 1],
+                    c=yc_,
+                    **scatter_kwargs,
+                )
+                axes[1].scatter(
+                    x_[:, 2],
+                    x_[:, 1],
+                    c=pred_mean_,
+                    **scatter_kwargs,
+                )
+                sc = axes[2].scatter(x_[:, 2], x_[:, 1], c=y_, **scatter_kwargs)
 
-            if wandb.run is not None:
-                wandb.log({f"fig/{name}/{i:03d}/t-{t}": wandb.Image(fig)})
+                axes[0].set_title("Context set", fontsize=18)
+                axes[1].set_title("Predictive mean", fontsize=18)
+                axes[2].set_title("True values", fontsize=18)
+
+                # Add colourbar.
+                cbar = fig.colorbar(sc, ax=axes, fraction=0.046, pad=0.04)
+                cbar.solids.set(alpha=1)
+
+                plt.suptitle(
+                    f"prop_ctx = {xc.shape[-2] / x.shape[-2]:.2f}    "
+                    #
+                    f"NLL = {model_nll:.3f}",
+                    fontsize=18,
+                )
+
+                fname = f"fig/{name}/{i:03d}/t-{t}"
+                if wandb.run is not None and logging:
+                    wandb.log({fname: wandb.Image(fig)})
+                elif savefig:
+                    if not os.path.isdir(f"fig/{name}/{i:03d}"):
+                        os.makedirs(f"fig/{name}/{i:03d}")
+                    plt.savefig(fname)
+                else:
+                    plt.show()
+
+                # plt.tight_layout()
+                plt.close()
+
             else:
-                plt.show()
+                scatter_kwargs["s"] = 500
+                for fig_name, x_plot, y_plot in zip(
+                    ("context", "ground_truth", "pred_mean", "pred_std"),
+                    (xc_, x_, x_, x_),
+                    (yc_, y_, pred_mean_, pred_std_),
+                ):
+                    fig = plt.figure(figsize=figsize)
 
-            # plt.tight_layout()
-            plt.close()
+                    ax = plt.axes(projection=ccrs.PlateCarree())
+                    ax.add_feature(cfeature.COASTLINE)
+                    ax.add_feature(cfeature.BORDERS)
+                    ax.set_xlim(xlim)
+                    ax.set_ylim(ylim)
+                    ax.set_axisbelow(True)
+
+                    gl = ax.gridlines(draw_labels=True)
+                    gl.xlabel_style = {"size": 15}
+                    gl.ylabel_style = {"size": 15}
+                    # ax.tick_params(axis="both", which="major", labelsize=20)
+
+                    if fig_name == "pred_std":
+                        std_scatter_kwargs = scatter_kwargs
+                        std_scatter_kwargs["vmin"] = y_plot.min()
+                        std_scatter_kwargs["vmax"] = y_plot.max()
+                        sc = ax.scatter(
+                            x_plot[:, 2], x_plot[:, 1], c=y_plot, **std_scatter_kwargs
+                        )
+                    else:
+                        sc = ax.scatter(
+                            x_plot[:, 2], x_plot[:, 1], c=y_plot, **scatter_kwargs
+                        )
+
+                    # Add colourbar.
+                    if colorbar:
+                        cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.09)
+                        cbar.solids.set(alpha=1)
+
+                    plt.tight_layout()
+
+                    fname = f"fig/{name}/{i:03d}/t-{t}/{fig_name}"
+                    if wandb.run is not None and logging:
+                        wandb.log({fname: wandb.Image(fig)})
+                    elif savefig:
+                        if not os.path.isdir(f"fig/{name}/{i:03d}/t-{t}"):
+                            os.makedirs(f"fig/{name}/{i:03d}/t-{t}")
+                        plt.savefig(fname)
+                    else:
+                        plt.show()
+
+                    plt.close()

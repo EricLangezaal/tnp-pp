@@ -1,4 +1,5 @@
-from typing import List, Tuple, Union
+import os
+from typing import Callable, List, Tuple, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -16,7 +17,10 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
 def plot(
-    model: nn.Module,
+    model: Union[
+        nn.Module,
+        Callable[..., torch.distributions.Distribution],
+    ],
     batches: List[Batch],
     num_fig: int = 5,
     figsize: Tuple[float, float] = (8.0, 6.0),
@@ -27,7 +31,10 @@ def plot(
     points_per_dim: int = 256,
     plot_ar_mode: bool = False,
     num_ar_samples: int = 20,
+    plot_target: bool = True,
     name: str = "plot",
+    savefig: bool = False,
+    logging: bool = True,
 ):
     # Get dimension of input data
     dim = batches[0].xc.shape[-1]
@@ -43,6 +50,16 @@ def plot(
             xt = batch.xt[:1]
             yt = batch.yt[:1]
 
+            if not isinstance(model, nn.Module):
+                # model is a callable function.
+                y_pred_dist = model(xc=xc, yc=yc, xt=x_plot)
+                yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+
+                # Detach gradients.
+                y_pred_dist.loc = y_pred_dist.loc.detach().unsqueeze(0)
+                y_pred_dist.scale = y_pred_dist.scale.detach().unsqueeze(0)
+                yt_pred_dist.loc = yt_pred_dist.loc.detach().unsqueeze(0)
+                yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
             with torch.no_grad():
                 if isinstance(batch, ICBatch):
                     y_plot_pred_dist = model(
@@ -60,8 +77,8 @@ def plot(
                     y_plot_pred_dist = model(xc=xc, yc=yc, xt=x_plot)
                     yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
-                model_nll = -yt_pred_dist.log_prob(yt).mean()
-                mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
+            model_nll = -yt_pred_dist.log_prob(yt).mean()
+            mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
 
             # Make figure for plotting
             fig = plt.figure(figsize=figsize)
@@ -72,22 +89,24 @@ def plot(
                 yc[0, :, 0].numpy(),
                 c="k",
                 label="Context",
-                s=20,
+                s=30,
             )
 
-            plt.scatter(
-                xt[0, :, 0].numpy(),
-                yt[0, :, 0].numpy(),
-                c="r",
-                label="Target",
-                s=20,
-            )
+            if plot_target:
+                plt.scatter(
+                    xt[0, :, 0].numpy(),
+                    yt[0, :, 0].numpy(),
+                    c="r",
+                    label="Target",
+                    s=30,
+                )
 
             # Plot model predictions
             plt.plot(
                 x_plot[0, :, 0].cpu(),
                 mean[0, :, 0].cpu(),
                 c="tab:blue",
+                lw=3,
             )
 
             plt.fill_between(
@@ -122,6 +141,7 @@ def plot(
                     gt_mean[0, :].cpu(),
                     "--",
                     color="tab:purple",
+                    lw=3,
                 )
 
                 plt.plot(
@@ -129,6 +149,7 @@ def plot(
                     gt_mean[0, :].cpu() + 2 * gt_std[0, :].cpu(),
                     "--",
                     color="tab:purple",
+                    lw=3,
                 )
 
                 plt.plot(
@@ -137,6 +158,7 @@ def plot(
                     "--",
                     color="tab:purple",
                     label="Ground truth",
+                    lw=3,
                 )
 
                 title_str += f" GT NLL = {gt_nll:.3f}"
@@ -172,102 +194,40 @@ def plot(
                         xq[0, ...],
                         torch.ones_like(xq[0, ...])
                         * (y_lim[0] + 0.05 * (y_lim[-1] - y_lim[0])),
-                        color="tab:red",
+                        color="tab:green",
+                        marker="^",
                         label="Pseudo-locations",
                         s=20,
                     )
 
-            plt.title(title_str, fontsize=24)
+            # plt.title(title_str, fontsize=24)
+            plt.grid()
 
             # Set axis limits
             plt.xlim(x_range)
+            # plt.ylim(y_lim)
+            y_max = 0.25 + max(gt_mean[0, ...] + 2 * gt_std[0, ...])
+            y_min = -0.25 + min(gt_mean[0, ...] - 2 * gt_std[0, ...])
+            y_lim = (y_min, y_max)
             plt.ylim(y_lim)
 
-            plt.xticks(fontsize=18)
-            plt.yticks(fontsize=18)
+            plt.xticks(fontsize=24)
+            plt.yticks(fontsize=24)
 
-            plt.legend(loc="upper right", fontsize=14)
-            if wandb.run is not None:
-                wandb.log({f"fig/{name}/{i:03d}": wandb.Image(fig)})
+            plt.legend(loc="upper right", fontsize=20)
+            plt.tight_layout()
+            fname = f"fig/{name}/{i:03d}"
+            if wandb.run is not None and logging:
+                wandb.log({fname: wandb.Image(fig)})
+            elif savefig:
+                if not os.path.isdir(f"fig/{name}"):
+                    os.makedirs(f"fig/{name}")
+                plt.savefig(fname, bbox_inches="tight")
             else:
                 plt.show()
 
             plt.close()
 
-    elif dim in (2, 3):
-        # Plots first two dimensions in the case of 3.
-        figsize = (24.0, 8.0)
-        for i in range(num_fig):
-            batch = batches[i]
-            x = batch.x[:1]
-            y = batch.y[:1]
-            xc = batch.xc[:1]
-            yc = batch.yc[:1]
-            xt = batch.xt[:1]
-            yt = batch.yt[:1]
-
-            with torch.no_grad():
-                if isinstance(batch, ICBatch):
-                    y_plot_pred_dist = model(
-                        xc=xc,
-                        yc=yc,
-                        xic=batch.xic,
-                        yic=batch.yic,
-                        xt=x,
-                    )
-                    yt_pred_dist = model(
-                        xc=xc, yc=yc, xic=batch.xic[:1], yic=batch.yic[:1], xt=xt
-                    )
-                else:
-                    assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
-                    y_plot_pred_dist = model(xc=xc, yc=yc, xt=x)
-                    yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
-
-                model_nll = -yt_pred_dist.log_prob(yt).mean()
-                mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
-
-            # Get indices corresponding to single time point.
-            for t_min in x[0, :, 0].unique():
-                # Make figure for plotting
-                fig, axes = plt.subplots(
-                    figsize=figsize, ncols=3, nrows=1, sharex=True, sharey=True
-                )
-
-                t_min_idx_c = torch.where(xc[0, :, 0] == t_min)[0]
-                t_min_idx = torch.where(x[0, :, 0] == t_min)[0]
-
-                axes[0].scatter(
-                    xc[0, t_min_idx_c, 1],
-                    xc[0, t_min_idx_c, 2],
-                    c=yc[0, t_min_idx_c, 0],
-                    s=50,
-                )
-                axes[1].scatter(
-                    x[0, t_min_idx, 1],
-                    x[0, t_min_idx, 2],
-                    c=mean[0, t_min_idx, 0],
-                    s=50,
-                )
-                axes[2].scatter(
-                    x[0, t_min_idx, 1], x[0, t_min_idx, 2], c=y[0, t_min_idx, 0], s=50
-                )
-
-                axes[0].set_title("Context set", fontsize=18)
-                axes[1].set_title("Predictive mean", fontsize=18)
-                axes[2].set_title("True values", fontsize=18)
-
-                plt.suptitle(
-                    f"prop_ctx = {xc.shape[-2] / x.shape[-2]:.2f}    "
-                    #
-                    f"NLL = {model_nll:.3f}",
-                    fontsize=24,
-                )
-
-                if wandb.run is not None:
-                    wandb.log({f"fig/{name}/{i:03d}/t-{t_min}": wandb.Image(fig)})
-                else:
-                    plt.show()
-
-                plt.close()
+            plt.close()
     else:
         raise NotImplementedError

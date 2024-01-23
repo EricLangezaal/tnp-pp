@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple
+from typing import Callable, List, Tuple, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -14,7 +14,10 @@ matplotlib.rcParams["font.family"] = "STIXGeneral"
 
 
 def plot_kolmogorov(
-    model: nn.Module,
+    model: Union[
+        nn.Module,
+        Callable[..., torch.distributions.Distribution],
+    ],
     batches: List[Batch],
     num_fig: int = 5,
     figsize: Tuple[float, float] = (18.0, 5.0),
@@ -34,12 +37,23 @@ def plot_kolmogorov(
         xt = batch.xt[:1]
         yt = batch.yt[:1]
 
+        if not isinstance(model, nn.Module):
+            # model is callable function that trains model then returns pred.
+            y_pred_dist = model(xc=xc, yc=yc, xt=x)
+            yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+
+            # Detach gradients.
+            y_pred_dist.loc = y_pred_dist.loc.detach().unsqueeze(0)
+            y_pred_dist.scale = y_pred_dist.scale.detach().unsqueeze(0)
+            yt_pred_dist.loc = yt_pred_dist.loc.detach().unsqueeze(0)
+            yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
         with torch.no_grad():
             y_pred_dist = model(xc=xc, yc=yc, xt=x)
             yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
         model_nll = -yt_pred_dist.log_prob(yt).mean()
         mean = y_pred_dist.loc
+        std = y_pred_dist.scale
 
     other_dim = [i for i in range(x.shape[-1]) if i not in plot_dims][0]
 
@@ -55,6 +69,7 @@ def plot_kolmogorov(
     xc_ = xc[0, data_idx_c].cpu()
     yc_ = yc[0, data_idx_c].cpu()
     mean_ = mean[0, data_idx].cpu()
+    std_ = std[0, data_idx].cpu()
 
     # vmin = min(y_.min(), mean_.min())
     # vmax = max(y_.max(), mean_.max())
@@ -123,4 +138,45 @@ def plot_kolmogorov(
             plt.show()
 
     else:
-        return
+        for y_dim in range(y.shape[-1]):
+            for fig_name, x_plot, y_plot in zip(
+                ("context", "ground_truth", "pred_mean", "pred_std"),
+                (xc_, x_, x_, x_),
+                (yc_, y_, mean_, std_),
+            ):
+                fig = plt.figure(figsize=figsize)
+
+                ax = plt.gca()
+                if fig_name == "pred_std":
+                    std_scatter_kwargs = scatter_kwargs
+                    std_scatter_kwargs["vmin"] = y_plot.min()
+                    std_scatter_kwargs["vmax"] = y_plot.max()
+                    sc = ax.scatter(
+                        x_plot[:, plot_dims[0]],
+                        x_plot[:, plot_dims[1]],
+                        c=y_plot[:, y_dim],
+                        **std_scatter_kwargs,
+                    )
+                else:
+                    sc = ax.scatter(
+                        x_plot[:, plot_dims[0]],
+                        x_plot[:, plot_dims[1]],
+                        c=y_plot[:, y_dim],
+                        **scatter_kwargs,
+                    )
+
+                ax.set_aspect("equal")
+                ax.set_xlim(xlim)
+                ax.set_ylim(ylim)
+
+                fname = f"fig/{name}/{i:03d}/{fig_name}/ydim-{y_dim}"
+                if wandb.run is not None and logging:
+                    wandb.log({fname: wandb.Image(fig)})
+                elif savefig:
+                    if not os.path.isdir(f"fig/{name}/{i:03d}/{fig_name}"):
+                        os.makedirs(f"fig/{name}/{i:03d}/{fig_name}")
+                    plt.savefig(fname)
+                else:
+                    plt.show()
+
+                plt.close()
