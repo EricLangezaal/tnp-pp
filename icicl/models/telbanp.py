@@ -26,7 +26,7 @@ class TELBANPEncoder(nn.Module):
 
         self.nested_perceiver_encoder = nested_perceiver_encoder
         self.y_encoder = y_encoder
-        self.inital_token_x_dependencies = initial_token_x_dependencies
+        self.initial_token_x_dependencies = initial_token_x_dependencies
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, nq, dz]"
@@ -39,12 +39,12 @@ class TELBANPEncoder(nn.Module):
     ) -> torch.Tensor:
         yc, yt = preprocess_observations(xt, yc)
 
-        if self.initial_token_dependencies is not None:
+        if self.initial_token_x_dependencies is not None:
             zc = self.y_encoder(
-                torch.cat((yc, xc[..., self.initial_token_dependencies]), dim=-1)
+                torch.cat((yc, xc[..., self.initial_token_x_dependencies]), dim=-1)
             )
             zt = self.y_encoder(
-                torch.cat((yt, xt[..., self.initial_token_dependencies]), dim=-1)
+                torch.cat((yt, xt[..., self.initial_token_x_dependencies]), dim=-1)
             )
         else:
             zc = self.y_encoder(yc)
