@@ -188,7 +188,12 @@ def main():
 
             # Log moving average loglik.
             mean_loglik = torch.stack(results["loglik"]).mean()
-            wandb.log({f"{eval_name}/loglik_ma": mean_loglik})
+            wandb.log(
+                {
+                    f"{eval_name}/loglik_ma": mean_loglik,
+                    f"{eval_name}/elbo_ma": torch.stack(results["elbos"]).mean(),
+                }
+            )
 
             dataset_idx += 1
 

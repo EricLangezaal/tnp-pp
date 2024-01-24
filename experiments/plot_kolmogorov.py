@@ -51,9 +51,9 @@ def plot_kolmogorov(
             y_pred_dist = model(xc=xc, yc=yc, xt=x)
             yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
-        model_nll = -yt_pred_dist.log_prob(yt).mean()
-        mean = y_pred_dist.loc
-        std = y_pred_dist.scale
+        model_nll = -yt_pred_dist.log_prob(yt).mean().cpu()
+        mean = y_pred_dist.loc.cpu()
+        std = y_pred_dist.scale.cpu()
 
     other_dim = [i for i in range(x.shape[-1]) if i not in plot_dims][0]
 

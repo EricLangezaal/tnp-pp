@@ -295,7 +295,7 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
             ckpt_file = run.files("checkpoints/last.ckpt")[0]
             ckpt_file.download(replace=True)
             experiment.model.load_state_dict(
-                torch.load("checkpoints/last.ckpt", map_location="cpu")
+                torch.load("checkpoints/last.ckpt", map_location="cpu"), strict=True
             )
 
         elif experiment.misc.resume_from_path is not None:
@@ -356,7 +356,7 @@ def initialize_evaluation() -> DictConfig:
     ckpt_file.download(replace=True)
 
     experiment.model.load_state_dict(
-        torch.load(f"checkpoints/{args.ckpt}.ckpt", map_location="cpu")
+        torch.load(f"checkpoints/{args.ckpt}.ckpt", map_location="cpu"), strict=True
     )
 
     # Initialise wandb.
