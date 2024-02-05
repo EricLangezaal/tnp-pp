@@ -2,10 +2,11 @@
 
 import argparse
 import os
-from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections import OrderedDict, defaultdict
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import einops
+import hiyapyco
 import lightning.pytorch as pl
 import torch
 from hydra.utils import instantiate
@@ -241,7 +242,7 @@ def create_default_config() -> DictConfig:
 
 
 def extract_config(
-    config_file: str,
+    raw_config: Union[str, Dict],
     config_changes: Optional[List[str]] = None,
     combine_default: bool = True,
 ) -> Tuple[DictConfig, Dict]:
@@ -259,7 +260,10 @@ def extract_config(
     if not OmegaConf.has_resolver("eval"):
         OmegaConf.register_new_resolver("eval", eval)
 
-    config = OmegaConf.load(config_file)
+    if isinstance(raw_config, str):
+        config = OmegaConf.load(raw_config)
+    else:
+        config = OmegaConf.create(raw_config)
 
     if combine_default:
         default_config = create_default_config()
@@ -272,6 +276,20 @@ def extract_config(
     return config, config_dict
 
 
+def deep_convert_dict(layer: Any):
+    to_ret = layer
+    if isinstance(layer, OrderedDict):
+        to_ret = dict(layer)
+
+    try:
+        for key, value in to_ret.items():
+            to_ret[key] = deep_convert_dict(value)
+    except AttributeError:
+        pass
+
+    return to_ret
+
+
 def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     # Make argument parser with config argument.
     parser = argparse.ArgumentParser()
@@ -279,21 +297,20 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     parser.add_argument("--generator_config", type=str)
     args, config_changes = parser.parse_known_args()
 
-    # Initialise experiment, make path.
-    config, config_dict = extract_config(args.config, config_changes)
-
-    # Initialise data_config, if not None, and merge with config.
     if args.generator_config is not None:
-        generator_config, _ = extract_config(
-            args.generator_config, combine_default=False
+        # Merge generator config with config.
+        raw_config = deep_convert_dict(
+            hiyapyco.load(
+                (args.config, args.generator_config),
+                method=hiyapyco.METHOD_MERGE,
+                usedefaultyamlloader=True,
+            )
         )
-        # Merge with config.
-        config = OmegaConf.merge(config, generator_config)
-        config_dict = OmegaConf.to_container(config, resolve=True)
     else:
-        assert hasattr(
-            config, "generators"
-        ), "Must either specifiy generators in config or generator_config."
+        raw_config = args.config
+
+    # Initialise experiment, make path.
+    config, config_dict = extract_config(raw_config, config_changes)
 
     # Get run and potentially override config before instantiation.
     if config.misc.resume_from_checkpoint is not None:
