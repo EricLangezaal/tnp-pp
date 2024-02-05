@@ -1,0 +1,74 @@
+model:
+  _target_: icicl.models.convcnp.ConvCNP
+  encoder: ${convcnp_encoder}
+  decoder: ${convcnp_decoder}
+  likelihood: ${likelihood}
+
+convcnp_encoder:
+  _target_: icicl.models.convcnp.ConvCNPEncoder
+  conv_net: ${cnn}
+  setconv_encoder: ${setconv_encoder}
+  resizer: ${encoder_resizer}
+
+setconv_encoder:
+  _target_: icicl.networks.setconv.SetConvEncoder
+  dim: ${params.dim}
+  points_per_unit: ${params.points_per_unit}
+  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
+  margin: 0.1
+  train_lengthscale: True
+
+cnn:
+  _target_: icicl.networks.cnn.UNet
+  dim: ${params.dim}
+  num_channels: ${params.num_channels}
+  num_blocks: ${params.num_blocks}
+  kernel_size: ${params.kernel_size}
+
+encoder_resizer:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${eval:'${params.dim_y} + 1'}
+  out_dim: ${params.num_channels}
+  num_layers: 2
+  width: ${params.num_channels}
+
+convcnp_decoder:
+  _target_: icicl.models.convcnp.ConvCNPDecoder
+  setconv_decoder: ${setconv_decoder}
+  resizer: ${decoder_resizer}
+
+setconv_decoder:
+  _target_: icicl.networks.setconv.SetConvDecoder
+  dim: ${params.dim_x}
+  init_lengthscale: .1
+  scaling_factor: ${eval:'${params.points_per_unit} ** ${params.dim_x}'}
+
+decoder_resizer:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.num_channels}
+  out_dim: ${eval:'2 * ${params.dim_y}'}
+  num_layers: 2
+  width: ${params.num_channels}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.AdamW
+  _partial_: True
+  lr: 5e-4
+
+params:
+  epochs: 200
+  points_per_unit: 64
+  num_channels: 128
+  num_blocks: 11
+  kernel_size: 5
+
+misc:
+  name: ConvCNP-L${params.num_blocks}-C${params.num_channels}-K${params.kernel_size}-P${params.points_per_unit}
+  resume_from_checkpoint: null
+  plot_ar_mode: False
+  gradient_clip_val: 0.5
+  plot_interval: 10
+  logging: True

@@ -1,0 +1,38 @@
+generators:
+  train:
+    _target_: icicl.data.gp.RandomScaleGPGenerator
+    dim: ${params.dim}
+    kernel_type: random
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 16000
+    batch_size: 16
+  val:
+    _target_: icicl.data.gp.RandomScaleGPGenerator
+    dim: ${params.dim}
+    kernel_type: random
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    samples_per_epoch: 4096
+    batch_size: 16
+
+  params:
+    dim_x: 1
+    dim_y: 1
+
+  misc:
+    project: synthetic-1d-random-kernel

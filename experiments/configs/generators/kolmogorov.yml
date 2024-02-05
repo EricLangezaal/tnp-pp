@@ -1,0 +1,30 @@
+generators:
+  train:
+    _target_: icicl.data.kolmogorov.KolmogorovGenerator
+    data_dir: /Users/matt/Downloads/kolmogorov
+    split: train
+    batch_grid_size: [16, 16, 16]
+    min_num_ctx: 1
+    max_num_ctx: 500
+    min_num_trg: 1000
+    max_num_trg: 1000
+    samples_per_epoch: 16
+    batch_size: 16
+  val:
+    _target_: icicl.data.kolmogorov.KolmogorovGenerator
+    data_dir: /Users/matt/Downloads/kolmogorov
+    split: train
+    batch_grid_size: [16, 16, 16]
+    min_num_ctx: 1
+    max_num_ctx: 500
+    min_num_trg: 1000
+    max_num_trg: 1000
+    samples_per_epoch: 16
+    batch_size: 16
+
+  params:
+    dim_x: 3
+    dim_y: 2
+
+  misc:
+    project: kolmogorov

@@ -1,0 +1,41 @@
+generators:
+  train:
+    _target_: icicl.data.mnist.TranslatedMNISTGenerator
+    min_prop_ctx: 0.01
+    max_prop_ctx: 0.3
+    nt: 1000
+    data_dir: /Users/matt/projects/tnp-pp/data
+    train: True
+    download: True
+    zero_shot: False
+    max_translation: [14, 14]
+    stationary_image_size: [56, 56, 1]
+    translated_image_size: [56, 56, 1]
+    x_mean: [27.5000, 27.5000]
+    x_std: [16.1658, 16.1658]
+    samples_per_epoch: 8_000
+    batch_size: 8
+    return_as_gridded: False
+  val:
+    _target_: icicl.data.mnist.TranslatedMNISTGenerator
+    min_prop_ctx: 0.01
+    max_prop_ctx: 0.3
+    data_dir: /Users/matt/projects/tnp-pp/data
+    train: False
+    download: True
+    zero_shot: False
+    max_translation: [14, 14]
+    stationary_image_size: [56, 56, 1]
+    translated_image_size: [56, 56, 1]
+    x_mean: [27.5000, 27.5000]
+    x_std: [16.1658, 16.1658]
+    samples_per_epoch: 4096
+    batch_size: 16
+    return_as_gridded: False
+
+  params:
+    dim_x: 2
+    dim_y: 1
+
+  misc:
+    project: mnist-translated
