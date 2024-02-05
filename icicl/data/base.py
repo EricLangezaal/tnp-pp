@@ -30,6 +30,19 @@ class Batch:
     xt: torch.Tensor
     yt: torch.Tensor
 
+    def __add__(self, b):
+        return Batch(
+            x=torch.cat((self.x, b.x), dim=0),
+            y=torch.cat((self.y, b.y), dim=0),
+            xc=torch.cat((self.xc, b.xc), dim=0),
+            yc=torch.cat((self.yc, b.yc), dim=0),
+            xt=torch.cat((self.xt, b.xt), dim=0),
+            yt=torch.cat((self.yt, b.yt), dim=0),
+        )
+
+    def __radd__(self, b):
+        return self.__add__(b)
+
 
 @dataclass
 class ICBatch(Batch):
@@ -79,7 +92,7 @@ class DataGenerator(ABC):
         return self.generate_batch()
 
     @abstractmethod
-    def generate_batch(self) -> Batch:
+    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
         """Generate batch of data.
 
         Returns:
