@@ -4,6 +4,7 @@ import torch
 from icicl.likelihoods.gaussian import NormalLikelihood
 from icicl.models.convcnp import ConvCNP, ConvCNPEncoder
 from icicl.networks.cnn import CNN, UNet
+from icicl.networks.mlp import MLP
 from icicl.networks.setconv import SetConvDecoder, SetConvEncoder
 
 # @pytest.mark.parametrize("ndim", [1, 2])
@@ -100,7 +101,13 @@ def test_setconv(ndim: int):
 
     unet = UNet(dim=ndim, num_channels=num_channels, num_blocks=num_blocks)
 
-    convcnp_encoder = ConvCNPEncoder(unet, setconv_encoder)
+    encoder_resizer = MLP(
+        in_dim=ndim, out_dim=num_channels, num_layers=2, width=num_channels
+    )
+
+    convcnp_encoder = ConvCNPEncoder(
+        conv_net=unet, setconv_encoder=setconv_encoder, resizer=encoder_resizer
+    )
 
     likelihood = NormalLikelihood(noise=1e-1)
 
@@ -114,7 +121,7 @@ def test_setconv(ndim: int):
 
 
 @pytest.mark.parametrize("ndim", [1, 2])
-def test_setcon_cnn(ndim: int):
+def test_setconv_cnn(ndim: int):
     # Set test constants
     nc = 128
     nt = 64
@@ -148,7 +155,13 @@ def test_setcon_cnn(ndim: int):
 
     unet = CNN(dim=ndim, num_channels=num_channels, num_blocks=num_blocks)
 
-    convcnp_encoder = ConvCNPEncoder(unet, setconv_encoder)
+    encoder_resizer = MLP(
+        in_dim=ndim, out_dim=num_channels, num_layers=2, width=num_channels
+    )
+
+    convcnp_encoder = ConvCNPEncoder(
+        conv_net=unet, setconv_encoder=setconv_encoder, resizer=encoder_resizer
+    )
 
     likelihood = NormalLikelihood(noise=1e-1)
 

@@ -20,7 +20,6 @@ def test_kolmogorov():
     generator = KolmogorovGenerator(
         data_dir=data_dir,
         split=split,
-        forecasting=forecasting,
         batch_grid_size=batch_grid_size,
         min_num_ctx=min_num_ctx,
         max_num_ctx=max_num_ctx,
