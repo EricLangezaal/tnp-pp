@@ -127,12 +127,10 @@ likelihood:
 optimiser:
   _target_: torch.optim.AdamW
   _partial_: True
-  lr: 5e-4
+  lr: 5.0e-4
 
 params:
   epochs: 200
-  dim_x: 1
-  dim_y: 1
   embed_dim: 32
   num_heads: 4
   head_dim: 8
