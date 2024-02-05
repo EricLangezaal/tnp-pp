@@ -191,7 +191,7 @@ class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
         xq, tq = self.pseudo_token_initialiser(xq, xc, tq, tc)
 
         # Cache for plotting.
-        self.tq_cache = tq.detach()
+        self.tq_cache = tq.cpu().detach()
 
         # Add mean of context input-locations to make translation equivariant.
         for mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
@@ -215,7 +215,7 @@ class NestedTEISetTransformerEncoder(nn.Module):
         mhca_qtoc_layer: MultiHeadCrossTEAttentionLayer,
         mhca_qtot_layer: MultiHeadCrossTEAttentionLayer,
         num_layers: int,
-        pseudo_token_initialiser: PseudoTokenInitialiser,
+        pseudo_token_initialiser: Optional[PseudoTokenInitialiser] = None,
     ):
         super().__init__()
 
@@ -234,7 +234,13 @@ class NestedTEISetTransformerEncoder(nn.Module):
         self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
         self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
 
-        self.pseudo_token_initialiser = pseudo_token_initialiser
+        if pseudo_token_initialiser is None:
+            self.pseudo_token_initialiser = lambda xq, xc, tq, tc: (
+                xq,
+                tq + tc.mean(-2, keepdim=True),
+            )
+        else:
+            self.pseudo_token_initialiser = pseudo_token_initialiser
 
     @check_shapes(
         "xc: [m, nc, dx]",
@@ -259,7 +265,7 @@ class NestedTEISetTransformerEncoder(nn.Module):
         xq, tq = self.pseudo_token_initialiser(xq, xc, tq, tc)
 
         # Cache for plotting.
-        self.tq_cache = tq.detach()
+        self.tq_cache = tq.cpu().detach()
         for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
             self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
         ):
