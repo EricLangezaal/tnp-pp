@@ -1,12 +1,10 @@
 from abc import ABC
-from typing import Callable, Optional
+from typing import Optional
 
 import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..utils.group_actions import translation
-from .kernels import Kernel
 from .teattention import (
     MultiHeadCrossTEAttention,
     MultiHeadSelfTEAttention,
@@ -18,33 +16,20 @@ class MultiHeadTEAttentionLayer(nn.Module, ABC):
     def __init__(
         self,
         embed_dim: int,
-        num_heads: int,
-        head_dim: int,
         attention: MultiHeadTEAttention,
-        kernel: Kernel,
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
-        post_kernel: bool = False,
-        group_action: Callable = translation,
-        phi_t: Optional[nn.Module] = None,
         activation: nn.Module = nn.ReLU(),
         norm_first: bool = False,
-        qk_dim: Optional[int] = None,
+        **kwargs
     ):
         super().__init__()
         feedforward_dim = embed_dim if feedforward_dim is None else feedforward_dim
 
         self.embed_dim = embed_dim
         self.attn = attention(
-            kernel=kernel,
             embed_dim=embed_dim,
-            num_heads=num_heads,
-            head_dim=head_dim,
-            p_dropout=p_dropout,
-            post_kernel=post_kernel,
-            group_action=group_action,
-            phi_t=phi_t,
-            qk_dim=qk_dim,
+            **kwargs,
         )
 
         # Feedforward model.

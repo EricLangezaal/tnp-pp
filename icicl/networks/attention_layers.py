@@ -12,29 +12,24 @@ from .attention import (
     MultiHeadCrossAttention,
     MultiHeadSelfAttention,
 )
-from .kernels import Kernel
 
 
 class BaseMultiHeadAttentionLayer(nn.Module, ABC):
     def __init__(
         self,
         embed_dim: int,
-        num_heads: int,
-        head_dim: int,
         attention: Union[BaseMultiHeadAttention, partial[BaseMultiHeadAttention]],
         feedforward_dim: Optional[int] = None,
         p_dropout: float = 0.0,
         activation: nn.Module = nn.ReLU(),
         norm_first: bool = False,
-        kernel: Optional[Kernel] = None,
+        **kwargs,
     ):
         super().__init__()
         feedforward_dim = embed_dim if feedforward_dim is None else feedforward_dim
 
         self.embed_dim = embed_dim
-        self.attn = attention(
-            num_heads=num_heads, head_dim=head_dim, p_dropout=p_dropout, kernel=kernel
-        )
+        self.attn = attention(**kwargs)
 
         # Feedforward model.
         self.ff_block = nn.Sequential(

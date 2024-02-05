@@ -2,9 +2,15 @@ import torch
 from check_shapes import check_shapes
 
 
-@check_shapes("x1: [m, n1, dx]", "x2: [m, n2, dx]", "return: [m, n1, n2, dx]")
-def translation(x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
-    return x1[:, :, None, :] - x2[:, None, :, :]
+@check_shapes("x1: [m, n1, dx]", "x2: [m, n2, dx]", "return: [m, ..., dx]")
+def translation(
+    x1: torch.Tensor, x2: torch.Tensor, diagonal: bool = False
+) -> torch.Tensor:
+    if not diagonal:
+        return x1[:, :, None, :] - x2[:, None, :, :]
+
+    assert x1.shape == x2.shape, "Must be the same shape."
+    return x1 - x2
 
 
 @check_shapes("x1: [m, n1, dx]", "x2: [m, n2, dx]", "return: [m, n1, n2, dout]")

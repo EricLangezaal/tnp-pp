@@ -236,6 +236,9 @@ def create_default_config() -> DictConfig:
             "lightning_eval": False,
             "num_plots": 5,
             "gradient_clip_val": None,
+            "only_plots": False,
+            "savefig": False,
+            "subplots": True,
         }
     }
     return OmegaConf.create(default_config)
