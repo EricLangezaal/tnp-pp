@@ -187,8 +187,6 @@ class LitWrapper(pl.LightningModule):
                     batches=results["batch"],
                     num_fig=min(5, len(results["batch"])),
                     figsize=(18.0, 5.0),
-                    plot_dims=(0, 2),
-                    other_dim_slice=0,
                     subplots=True,
                     name=f"epoch-{self.current_epoch:04d}",
                 )

@@ -1,7 +1,7 @@
 import itertools
 import os
 import random
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import h5py
 import numpy as np
@@ -21,6 +21,7 @@ class KolmogorovGenerator(DataGenerator):
         max_num_ctx: int,
         min_num_trg: int,
         max_num_trg: int,
+        forecast_window: Optional[int] = None,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -30,6 +31,7 @@ class KolmogorovGenerator(DataGenerator):
         self.max_num_ctx = torch.as_tensor(max_num_ctx, dtype=torch.int)
         self.min_num_trg = torch.as_tensor(min_num_trg, dtype=torch.int)
         self.max_num_trg = torch.as_tensor(max_num_trg, dtype=torch.int)
+        self.forecast_window = forecast_window
 
         fname = os.path.join(data_dir, split + ".h5")
         self.dataset, self.spatial_range, self.time_range = self.load_data(fname)
@@ -68,18 +70,41 @@ class KolmogorovGenerator(DataGenerator):
         start_spatial_idx2 = random.sample(
             range(len(self.spatial_range) - 1 - self.batch_grid_size[1]), batch_size
         )
-        start_time_idx = random.sample(
-            range(len(self.time_range) - 1 - self.batch_grid_size[2]), batch_size
-        )
+
+        if self.forecast_window is None:
+            start_time_idx = random.sample(
+                range(len(self.time_range) - 1 - self.batch_grid_size[2]), batch_size
+            )
+        else:
+            start_time_idx = random.sample(
+                range(
+                    len(self.time_range)
+                    - 1
+                    - self.batch_grid_size[2]
+                    - self.forecast_window
+                ),
+                batch_size,
+            )
 
         for i, j, k in zip(start_spatial_idx1, start_spatial_idx2, start_time_idx):
-            idx.append(
-                (
-                    list(range(i, i + self.batch_grid_size[0])),
-                    list(range(j, j + self.batch_grid_size[1])),
-                    list(range(k, k + self.batch_grid_size[2])),
+            if self.forecast_window is None:
+                idx.append(
+                    (
+                        list(range(i, i + self.batch_grid_size[0])),
+                        list(range(j, j + self.batch_grid_size[1])),
+                        list(range(k, k + self.batch_grid_size[2])),
+                    )
                 )
-            )
+            else:
+                idx.append(
+                    (
+                        list(range(i, i + self.batch_grid_size[0])),
+                        list(range(j, j + self.batch_grid_size[1])),
+                        list(
+                            range(k, k + self.batch_grid_size[2] + self.forecast_window)
+                        ),
+                    )
+                )
 
         return idx
 
@@ -112,43 +137,103 @@ class KolmogorovGenerator(DataGenerator):
         dataset_idxs: List[int],
         batch_grids: List[Tuple[List, List, List]],
     ) -> Batch:
-        x_list: List[torch.Tensor] = []
-        x_shuffled_list: List[torch.Tensor] = []
-        y_list: List[torch.Tensor] = []
-        y_shuffled_list: List[torch.Tensor] = []
+        x_list, xc_list, xt_list = [], [], []
+        y_list, yc_list, yt_list = [], [], []
         for dataset_idx, batch_grid in zip(dataset_idxs, batch_grids):
-            batch_grid_product = np.array(list(itertools.product(*batch_grid)))
-            y = self.dataset[dataset_idx][
-                batch_grid_product[:, 0],
-                batch_grid_product[:, 1],
-                batch_grid_product[:, 2],
-            ]
-            x = torch.stack(
-                (
-                    self.spatial_range[batch_grid_product[:, 0]],
-                    self.spatial_range[batch_grid_product[:, 1]],
-                    self.time_range[batch_grid_product[:, 2]],
-                ),
-                dim=-1,
-            )
+            if self.forecast_window is None:
+                batch_grid_product = np.array(list(itertools.product(*batch_grid)))
+                y = self.dataset[dataset_idx][
+                    batch_grid_product[:, 0],
+                    batch_grid_product[:, 1],
+                    batch_grid_product[:, 2],
+                ]
+                x = torch.stack(
+                    (
+                        self.spatial_range[batch_grid_product[:, 0]],
+                        self.spatial_range[batch_grid_product[:, 1]],
+                        self.time_range[batch_grid_product[:, 2]],
+                    ),
+                    dim=-1,
+                )
 
-            # Now randomly select context and target points.
-            shuffled_idx = list(range(len(x)))
-            random.shuffle(shuffled_idx)
+                # Now randomly select context and target points.
+                shuffled_idx = list(range(len(x)))
+                random.shuffle(shuffled_idx)
 
-            x_list.append(x)
-            y_list.append(y)
-            x_shuffled_list.append(x[shuffled_idx])
-            y_shuffled_list.append(y[shuffled_idx])
+                x_list.append(x)
+                y_list.append(y)
+                xc_list.append(x[shuffled_idx[:num_ctx]])
+                yc_list.append(y[shuffled_idx[:num_ctx]])
+                xt_list.append(x[shuffled_idx[num_ctx : (num_ctx + num_trg)]])
+                yt_list.append(y[shuffled_idx[num_ctx : (num_ctx + num_trg)]])
+
+            else:
+                context_batch_grid_product = np.asarray(
+                    list(
+                        itertools.product(
+                            batch_grid[0],
+                            batch_grid[1],
+                            batch_grid[2][: -self.forecast_window],
+                        )
+                    )
+                )
+                target_batch_grid_product = np.asarray(
+                    list(
+                        itertools.product(
+                            batch_grid[0],
+                            batch_grid[1],
+                            batch_grid[2][-self.forecast_window :],
+                        )
+                    )
+                )
+
+                yc_all = self.dataset[dataset_idx][
+                    context_batch_grid_product[:, 0],
+                    context_batch_grid_product[:, 1],
+                    context_batch_grid_product[:, 2],
+                ]
+                xc_all = torch.stack(
+                    (
+                        self.spatial_range[context_batch_grid_product[:, 0]],
+                        self.spatial_range[context_batch_grid_product[:, 1]],
+                        self.time_range[context_batch_grid_product[:, 2]],
+                    ),
+                    dim=-1,
+                )
+
+                yt_all = self.dataset[dataset_idx][
+                    target_batch_grid_product[:, 0],
+                    target_batch_grid_product[:, 1],
+                    target_batch_grid_product[:, 2],
+                ]
+                xt_all = torch.stack(
+                    (
+                        self.spatial_range[target_batch_grid_product[:, 0]],
+                        self.spatial_range[target_batch_grid_product[:, 1]],
+                        self.time_range[target_batch_grid_product[:, 2]],
+                    ),
+                    dim=-1,
+                )
+
+                # Now randomly select context and target points.
+                context_shuffled_idx = list(range(len(xc_all)))
+                random.shuffle(context_shuffled_idx)
+                target_shuffled_idx = list(range(len(xt_all)))
+                random.shuffle(target_shuffled_idx)
+
+                x_list.append(xt_all)
+                y_list.append(yt_all)
+                xc_list.append(xc_all[context_shuffled_idx[:num_ctx]])
+                yc_list.append(yc_all[context_shuffled_idx[:num_ctx]])
+                xt_list.append(xt_all[target_shuffled_idx[:num_trg]])
+                yt_list.append(yt_all[target_shuffled_idx[:num_trg]])
 
         x = torch.stack(x_list)
         y = torch.stack(y_list)
-        x_shuffled = torch.stack(x_shuffled_list)
-        y_shuffled = torch.stack(y_shuffled_list)
-        xc = x_shuffled[:, :num_ctx, :]
-        yc = y_shuffled[:, :num_ctx, :]
-        xt = x_shuffled[:, num_ctx : (num_ctx + num_trg), :]
-        yt = y_shuffled[:, num_ctx : (num_ctx + num_trg), :]
+        xc = torch.stack(xc_list)
+        yc = torch.stack(yc_list)
+        xt = torch.stack(xt_list)
+        yt = torch.stack(yt_list)
 
         return Batch(
             x=x,

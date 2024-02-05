@@ -25,9 +25,6 @@ def optimise_gp(
     yc: torch.Tensor,
     **kwargs,
 ) -> Tuple[gpytorch.Module, gpytorch.likelihoods.Likelihood, dict]:
-    # GPytorch requires these to have no output dimension.
-    yc = einops.rearrange(yc, "n 1 -> n")
-
     # Initialise and train the model.
     likelihood = init_likelihood()
     model = init_model(train_x=xc, train_y=yc, likelihood=likelihood)
@@ -63,7 +60,7 @@ def optimise_gp_and_return_pred_dist(
             xc.shape[0] == 1 and yc.shape[0] == 1 and xt.shape[0] == 1
         ), "Can only accept a batch size of 1."
         xc = einops.rearrange(xc, "1 n d -> n d")
-        yc = einops.rearrange(yc, "1 n 1 -> n 1")
+        yc = einops.rearrange(yc, "1 n d -> n d")
         xt = einops.rearrange(xt, "1 n d -> n d")
 
     model, likelihood, _ = optimise_gp(
@@ -80,8 +77,13 @@ def optimise_gp_and_return_pred_dist(
     model.eval()
     likelihood.eval()
     output = likelihood(model(xt))
-    pred_mean = einops.rearrange(output.mean, "n -> n 1")
-    pred_var = einops.rearrange(output.variance, "n -> n 1")
+    if len(output.mean.shape) == 1:
+        pred_mean = einops.rearrange(output.mean, "n -> n 1")
+        pred_var = einops.rearrange(output.variance, "n -> n 1")
+    else:
+        pred_mean = output.mean
+        pred_var = output.variance
+
     pred_dist = torch.distributions.Normal(pred_mean, pred_var**0.5)
     return pred_dist
 
@@ -138,9 +140,8 @@ def main():
                 ),
                 batches=batches,
                 num_fig=min(experiment.misc.num_plots, len(batches)),
-                figsize=(18.0, 5.0),
-                plot_dims=(0, 1),
-                other_dim_slice=0,
+                figsize=(5.0, 5.0),
+                name=eval_name,
                 savefig=experiment.misc.savefig,
                 logging=experiment.misc.logging,
                 subplots=experiment.misc.subplots,
@@ -188,10 +189,14 @@ def main():
 
             # Log moving average loglik.
             mean_loglik = torch.stack(results["loglik"]).mean()
+            std_loglik = torch.stack(results["loglik"]).std() / (
+                len(results["loglik"]) ** 0.5
+            )
             wandb.log(
                 {
                     f"{eval_name}/loglik_ma": mean_loglik,
-                    f"{eval_name}/elbo_ma": torch.stack(results["elbos"]).mean(),
+                    f"{eval_name}/std_loglik_ma": std_loglik,
+                    f"{eval_name}/loglik": loglik.mean(),
                 }
             )
 
