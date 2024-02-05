@@ -7,18 +7,23 @@ import torch
 import torch.distributions as td
 
 from .base import GroundTruthPredictor
-from .synthetic import ICSyntheticGenerator, SyntheticGenerator
+from .synthetic import (
+    ICSyntheticGeneratorBimodalInput,
+    ICSyntheticGeneratorUniformInput,
+    SyntheticGeneratorBimodalInput,
+    SyntheticGeneratorUniformInput,
+)
 
 KERNEL_TYPES = [
     "random",
     "eq",
-    "matern12",
-    "matern32",
+    # "matern12",
+    # "matern32",
     "matern52",
-    "noisy_mixture",
-    "weakly_periodic",
+    # "noisy_mixture",
+    # "weakly_periodic",
     "periodic",
-    "noisy_periodic_mixture",
+    # "noisy_periodic_mixture",
 ]
 
 
@@ -144,7 +149,6 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
 
         if self.kernel_type == "random":
             kernel_type = random.choice(KERNEL_TYPES[1:])
-            # kernel_type = random.choice(["eq", "periodic"])
         else:
             kernel_type = self.kernel_type
 
@@ -196,11 +200,27 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         return kernel
 
 
-class RandomScaleGPGenerator(RandomScaleGPGeneratorBase, SyntheticGenerator):
+class RandomScaleGPGenerator(
+    RandomScaleGPGeneratorBase, SyntheticGeneratorUniformInput
+):
     pass
 
 
-class ICRandomScaleGPGenerator(RandomScaleGPGeneratorBase, ICSyntheticGenerator):
+class RandomScaleGPGeneratorBimodalInput(
+    RandomScaleGPGeneratorBase, SyntheticGeneratorBimodalInput
+):
+    pass
+
+
+class ICRandomScaleGPGenerator(
+    RandomScaleGPGeneratorBase, ICSyntheticGeneratorUniformInput
+):
+    pass
+
+
+class ICRandomScaleGPGeneratorBimodalInput(
+    RandomScaleGPGeneratorBase, ICSyntheticGeneratorBimodalInput
+):
     pass
 
 

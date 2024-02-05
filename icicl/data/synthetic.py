@@ -32,8 +32,6 @@ class SyntheticGenerator(DataGenerator, ABC):
         max_num_ctx: int,
         min_num_trg: int,
         max_num_trg: int,
-        context_range: torch.Tensor,
-        target_range: torch.Tensor,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -44,9 +42,6 @@ class SyntheticGenerator(DataGenerator, ABC):
         self.max_num_ctx = torch.as_tensor(max_num_ctx, dtype=torch.int)
         self.min_num_trg = torch.as_tensor(min_num_trg, dtype=torch.int)
         self.max_num_trg = torch.as_tensor(max_num_trg, dtype=torch.int)
-
-        self.context_range = torch.as_tensor(context_range, dtype=torch.float)
-        self.target_range = torch.as_tensor(target_range, dtype=torch.float)
 
     def generate_batch(self) -> Batch:
         """Generate batch of data.
@@ -108,31 +103,11 @@ class SyntheticGenerator(DataGenerator, ABC):
             gt_pred=gt_pred,
         )
 
+    @abstractmethod
     def sample_inputs(
-        self,
-        num_ctx: int,
-        num_trg: Optional[int] = None,
-        batch_shape: Optional[torch.Size] = None,
+        self, num_ctx: int, num_trg: int, batch_shape: Optional[torch.Size] = None
     ) -> torch.Tensor:
-        if batch_shape is None:
-            batch_shape = torch.Size((self.batch_size,))
-
-        xc = (
-            torch.rand((*batch_shape, num_ctx, self.dim))
-            * (self.context_range[:, 1] - self.context_range[:, 0])
-            + self.context_range[:, 0]
-        )
-
-        if num_trg is not None:
-            xt = (
-                torch.rand((*batch_shape, num_trg, self.dim))
-                * (self.target_range[:, 1] - self.target_range[:, 0])
-                + self.target_range[:, 0]
-            )
-
-            return torch.concat([xc, xt], axis=1)
-
-        return xc
+        raise NotImplementedError
 
     @abstractmethod
     def sample_outputs(
@@ -225,6 +200,15 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
 
         return num_ctx, num_trg, num_dc, num_dc_ctx
 
+    @abstractmethod
+    def sample_inputs(
+        self,
+        num_ctx: int,
+        num_trg: Optional[int] = None,
+        batch_shape: Optional[torch.Size] = None,
+    ) -> torch.Tensor:
+        raise NotImplementedError
+
     def sample_ic_batch(
         self, num_ctx: int, num_trg: int, num_dc: int, num_dc_ctx: int
     ) -> ICBatch:
@@ -252,3 +236,100 @@ class ICSyntheticGenerator(SyntheticGenerator, ABC):
             yic=yic,
             gt_pred=gt_pred,
         )
+
+
+class SyntheticGeneratorUniformInput(SyntheticGenerator):
+    def __init__(
+        self,
+        *,
+        context_range: Tuple[float, float],
+        target_range: Tuple[float, float],
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.context_range = torch.as_tensor(context_range, dtype=torch.float)
+        self.target_range = torch.as_tensor(target_range, dtype=torch.float)
+
+    def sample_inputs(
+        self,
+        num_ctx: int,
+        num_trg: Optional[int] = None,
+        batch_shape: Optional[torch.Size] = None,
+    ) -> torch.Tensor:
+        if batch_shape is None:
+            batch_shape = torch.Size((self.batch_size,))
+
+        xc = (
+            torch.rand((*batch_shape, num_ctx, self.dim))
+            * (self.context_range[:, 1] - self.context_range[:, 0])
+            + self.context_range[:, 0]
+        )
+
+        if num_trg is not None:
+            xt = (
+                torch.rand((*batch_shape, num_trg, self.dim))
+                * (self.target_range[:, 1] - self.target_range[:, 0])
+                + self.target_range[:, 0]
+            )
+
+            return torch.concat([xc, xt], axis=1)
+
+        return xc
+
+
+class ICSyntheticGeneratorUniformInput(
+    ICSyntheticGenerator, SyntheticGeneratorUniformInput
+):
+    pass
+
+
+class SyntheticGeneratorBimodalInput(SyntheticGenerator):
+    def __init__(
+        self,
+        *,
+        context_range: Tuple[Tuple[float, float], Tuple[float, float]],
+        target_range: Tuple[Tuple[float, float], Tuple[float, float]],
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.context_range = torch.as_tensor(context_range, dtype=torch.float)
+        self.target_range = torch.as_tensor(target_range, dtype=torch.float)
+
+    def sample_inputs(
+        self,
+        num_ctx: int,
+        num_trg: Optional[int] = None,
+        batch_shape: Optional[torch.Size] = None,
+    ) -> torch.Tensor:
+        if batch_shape is None:
+            batch_shape = torch.Size((self.batch_size,))
+
+        # Sample the mode.
+        ctx_bernoulli_probs = torch.empty(*batch_shape, num_ctx).fill_(0.5)
+        ctx_modes = torch.bernoulli(ctx_bernoulli_probs).int()
+
+        xc = torch.rand((*batch_shape, num_ctx, self.dim)) * (
+            self.context_range[..., ctx_modes, 1].permute(1, 2, 0)
+            - self.context_range[..., ctx_modes, 0].permute(1, 2, 0)
+        ) + self.context_range[..., ctx_modes, 0].permute(1, 2, 0)
+
+        if num_trg is not None:
+            # Sample the mode.
+            trg_bernoulli_probs = torch.empty(*batch_shape, num_trg).fill_(0.5)
+            trg_modes = torch.bernoulli(trg_bernoulli_probs).int()
+            xt = torch.rand((*batch_shape, num_trg, self.dim)) * (
+                self.target_range[..., trg_modes, 1].permute(1, 2, 0)
+                - self.target_range[..., trg_modes, 0].permute(1, 2, 0)
+            ) + self.target_range[..., trg_modes, 0].permute(1, 2, 0)
+
+            return torch.concat([xc, xt], axis=1)
+
+        return xc
+
+
+class ICSyntheticGeneratorBimodalInput(
+    ICSyntheticGenerator, SyntheticGeneratorBimodalInput
+):
+    pass
