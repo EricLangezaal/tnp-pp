@@ -242,6 +242,7 @@ class StochasticNestedISetTransformerEncoder(nn.Module):
         num_layers: int,
         min_num_latents: int = 1,
         max_num_latents: int = 32,
+        random_projection: bool = False,
     ):
         super().__init__()
 
@@ -255,6 +256,7 @@ class StochasticNestedISetTransformerEncoder(nn.Module):
         self.embed_dim = mhca_ctoq_layer.embed_dim
         self.min_num_latents = min_num_latents
         self.max_num_latents = max_num_latents
+        self.random_projection = random_projection
 
         self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
         self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
@@ -270,7 +272,11 @@ class StochasticNestedISetTransformerEncoder(nn.Module):
         num_latents = random.choice(
             list(range(self.min_num_latents, self.max_num_latents + 1))
         )
-        xq = torch.randn((xc.shape[0], num_latents, self.embed_dim))
+        if self.random_projection:
+            rand_mat = torch.randn((xc.shape[0], num_latents, xc.shape[1]))
+            xq = rand_mat @ xc
+        else:
+            xq = torch.randn((xc.shape[0], num_latents, self.embed_dim))
 
         for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
             self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
