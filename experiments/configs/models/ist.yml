@@ -13,11 +13,19 @@ perceiver_encoder:
   _target_: icicl.networks.transformer.NestedISetTransformerEncoder
   num_latents: ${params.num_latents}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
-  mhca_qtoc_layer: ${mhca_ctoq_layer}
+  mhca_qtoc_layer: ${mhca_qtoc_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
   num_layers: ${params.num_layers}
 
 mhca_ctoq_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhca_qtoc_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
