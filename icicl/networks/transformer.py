@@ -1,4 +1,5 @@
 import copy
+import random
 from abc import ABC
 from typing import Optional
 
@@ -222,6 +223,55 @@ class NestedISetTransformerEncoder(nn.Module):
         self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
+        for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
+            self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
+        ):
+            xq = mhca_ctoq_layer(xq, xc, mask)
+            xc = mhca_qtoc_layer(xc, xq)
+            xt = mhca_qtot_layer(xt, xq)
+
+        return xt
+
+
+class StochasticNestedISetTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        mhca_ctoq_layer: MultiHeadSelfAttentionLayer,
+        mhca_qtoc_layer: MultiHeadCrossAttentionLayer,
+        mhca_qtot_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+        min_num_latents: int = 1,
+        max_num_latents: int = 32,
+    ):
+        super().__init__()
+
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtoc_layer.embed_dim
+        ), "embed_dim mismatch."
+        assert (
+            mhca_ctoq_layer.embed_dim == mhca_qtot_layer.embed_dim
+        ), "embed_dim mismatch."
+
+        self.embed_dim = mhca_ctoq_layer.embed_dim
+        self.min_num_latents = min_num_latents
+        self.max_num_latents = max_num_latents
+
+        self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
+        self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
+        self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+
+    @check_shapes(
+        "xc: [m, nc, dx]", "xt: [m, nt, dx]", "mask: [m, nq, n]", "return: [m, nq, d]"
+    )
+    def forward(
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        # Initialise with randomly sampled latents.
+        num_latents = random.choice(
+            list(range(self.min_num_latents, self.max_num_latents + 1))
+        )
+        xq = torch.randn((xc.shape[0], num_latents, self.embed_dim))
+
         for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
             self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
         ):

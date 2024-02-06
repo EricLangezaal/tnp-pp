@@ -298,14 +298,16 @@ class SyntheticGeneratorBimodalInput(SyntheticGenerator):
     def __init__(
         self,
         *,
-        context_range: Tuple[Tuple[float, float], Tuple[float, float]],
-        target_range: Tuple[Tuple[float, float], Tuple[float, float]],
+        context_range: Tuple[Tuple[Tuple[float, float], Tuple[float, float]], ...],
+        target_range: Tuple[Tuple[Tuple[float, float], Tuple[float, float]], ...],
+        mode_offset_range: Tuple[Tuple[float, float], ...] = ((0.0, 0.0),),
         **kwargs,
     ):
         super().__init__(**kwargs)
 
         self.context_range = torch.as_tensor(context_range, dtype=torch.float)
         self.target_range = torch.as_tensor(target_range, dtype=torch.float)
+        self.mode_offset_range = torch.as_tensor(mode_offset_range, dtype=torch.float)
 
     def sample_inputs(
         self,
@@ -320,19 +322,28 @@ class SyntheticGeneratorBimodalInput(SyntheticGenerator):
         ctx_bernoulli_probs = torch.empty(*batch_shape, num_ctx).fill_(0.5)
         ctx_modes = torch.bernoulli(ctx_bernoulli_probs).int()
 
+        # Apply offset to the range of each mode.
+        mode_offset = (
+            torch.rand((self.dim, 2))
+            * (self.mode_offset_range[..., 1] - self.mode_offset_range[..., 0])
+            + self.mode_offset_range[..., 0]
+        )
+        context_range = self.context_range + mode_offset[..., None]
+        target_range = self.target_range + mode_offset[..., None]
+
         xc = torch.rand((*batch_shape, num_ctx, self.dim)) * (
-            self.context_range[..., ctx_modes, 1].permute(1, 2, 0)
-            - self.context_range[..., ctx_modes, 0].permute(1, 2, 0)
-        ) + self.context_range[..., ctx_modes, 0].permute(1, 2, 0)
+            context_range[..., ctx_modes, 1].permute(1, 2, 0)
+            - context_range[..., ctx_modes, 0].permute(1, 2, 0)
+        ) + context_range[..., ctx_modes, 0].permute(1, 2, 0)
 
         if num_trg is not None:
             # Sample the mode.
             trg_bernoulli_probs = torch.empty(*batch_shape, num_trg).fill_(0.5)
             trg_modes = torch.bernoulli(trg_bernoulli_probs).int()
             xt = torch.rand((*batch_shape, num_trg, self.dim)) * (
-                self.target_range[..., trg_modes, 1].permute(1, 2, 0)
-                - self.target_range[..., trg_modes, 0].permute(1, 2, 0)
-            ) + self.target_range[..., trg_modes, 0].permute(1, 2, 0)
+                target_range[..., trg_modes, 1].permute(1, 2, 0)
+                - target_range[..., trg_modes, 0].permute(1, 2, 0)
+            ) + target_range[..., trg_modes, 0].permute(1, 2, 0)
 
             return torch.concat([xc, xt], axis=1)
 
@@ -349,9 +360,9 @@ class SyntheticGeneratorMixture(SyntheticGenerator):
     def __init__(
         self,
         *,
-        mix_samples: bool = False,
         generators: Tuple[SyntheticGenerator, ...],
         mixture_probs: Tuple[float, ...],
+        mix_samples: bool = False,
         **kwargs,
     ):
         assert len(generators) == len(

@@ -1,0 +1,88 @@
+model:
+  _target_: icicl.models.lbanp.LBANP
+  encoder: ${lbanp_encoder}
+  decoder: ${lbanp_decoder}
+  likelihood: ${likelihood}
+
+lbanp_encoder:
+  _target_: icicl.models.lbanp.NestedLBANPEncoder
+  perceiver_encoder: ${perceiver_encoder}
+  xy_encoder: ${xy_encoder}
+
+perceiver_encoder:
+  _target_: icicl.networks.transformer.StochasticNestedISetTransformerEncoder
+  mhca_ctoq_layer: ${mhca_ctoq_layer}
+  mhca_qtoc_layer: ${mhca_qtoc_layer}
+  mhca_qtot_layer: ${mhca_qtot_layer}
+  num_layers: ${params.num_layers}
+  min_num_latents: ${params.min_num_latents}
+  max_num_latents: ${params.max_num_latents}
+
+mhca_ctoq_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhca_qtoc_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhca_qtot_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+xy_encoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${eval:'${params.dim_x} + ${params.dim_y} + 1'}
+  out_dim: ${params.embed_dim}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+lbanp_decoder:
+  _target_: icicl.models.lbanp.NestedLBANPDecoder
+  z_decoder: ${z_decoder}
+
+z_decoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.embed_dim}
+  out_dim: ${eval:'${params.dim_y} * 2'}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.AdamW
+  _partial_: True
+  lr: 5.0e-4
+
+params:
+  epochs: 200
+  embed_dim: 32
+  num_heads: 4
+  head_dim: 8
+  norm_first: True
+  num_layers: 5
+  min_num_latents: 1
+  max_num_latents: 32
+
+
+misc:
+  name: SIST-L${params.num_layers}-H${params.num_heads}-D${params.embed_dim}-min-M${params.min_num_latents}-max-M${params.max_num_latents}
+  resume_from_checkpoint: null
+  logging: True
+  seed: 0
+  plot_interval: 10
+  gradient_clip_val: 0.5
