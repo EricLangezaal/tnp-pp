@@ -2,9 +2,10 @@ import pytest
 import torch
 
 from icicl.likelihoods.gaussian import NormalLikelihood
-from icicl.models.tnp import TNPD, TNPDDecoder, TNPDEncoder, gen_tnpd_mask
+from icicl.models.tnp import TNPD, EfficientTNPDEncoder, TNPDDecoder, gen_tnpd_mask
+from icicl.networks.attention_layers import MultiHeadCrossAttentionLayer
 from icicl.networks.mlp import MLP
-from icicl.networks.transformer import MultiHeadSelfAttentionLayer, TransformerEncoder
+from icicl.networks.transformer import TNPDTransformerEncoder
 
 
 @pytest.mark.parametrize("ndim", [1, 2])
@@ -26,19 +27,19 @@ def test_tnpd(ndim: int):
     yc = torch.randn(m, nc, 1)
     xt = torch.randn(m, nt, ndim)
 
-    transformer_encoder_layer = MultiHeadSelfAttentionLayer(
+    mhca_layer = MultiHeadCrossAttentionLayer(
         embed_dim=embed_dim,
         num_heads=num_heads,
         head_dim=head_dim,
         feedforward_dim=feedforward_dim,
     )
-    transformer_encoder = TransformerEncoder(
-        encoder_layer=transformer_encoder_layer, num_layers=num_layers
+    transformer_encoder = TNPDTransformerEncoder(
+        mhca_layer=mhca_layer, num_layers=num_layers
     )
     xy_encoder = MLP(dy + ndim + 1, embed_dim, num_layers=2, width=64)
     z_decoder = MLP(embed_dim, dy, num_layers=2, width=64)
 
-    tnpd_encoder = TNPDEncoder(
+    tnpd_encoder = EfficientTNPDEncoder(
         transformer_encoder=transformer_encoder, xy_encoder=xy_encoder
     )
     tnpd_decoder = TNPDDecoder(z_decoder=z_decoder)

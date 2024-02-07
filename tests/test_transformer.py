@@ -1,6 +1,7 @@
 import torch
 
-from icicl.networks.transformer import MultiHeadSelfAttentionLayer, TransformerEncoder
+from icicl.networks.attention_layers import MultiHeadSelfAttentionLayer
+from icicl.networks.transformer import TransformerEncoder
 
 
 def test_transformer():
@@ -22,6 +23,6 @@ def test_transformer():
         head_dim=head_dim,
         feedforward_dim=feedforward_dim,
     )
-    transformer = TransformerEncoder(encoder_layer=layer, num_layers=num_layers)
+    transformer = TransformerEncoder(mhsa_layer=layer, num_layers=num_layers)
 
     transformer(x, mask)
