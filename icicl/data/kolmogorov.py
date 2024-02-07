@@ -36,21 +36,22 @@ class KolmogorovGenerator(DataGenerator):
         fname = os.path.join(data_dir, split + ".h5")
         self.dataset, self.spatial_range, self.time_range = self.load_data(fname)
 
-    def generate_batch(self) -> Batch:
+    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
         """Generate batch of data.
 
         Returns:
             batch: Batch.
         """
+        batch_size = self.batch_size if batch_shape is None else batch_shape[0]
 
         # Sample num_ctx and num_trg.
         nc, nt = self.sample_num_ctx_trg()
 
         # Sample dataset idx.
-        dataset_idxs = self.sample_dataset_idx(self.batch_size)
+        dataset_idxs = self.sample_dataset_idx(batch_size)
 
         # Sample batch grids from within datasets.
-        batch_grids = self.sample_batch_grid(self.batch_size)
+        batch_grids = self.sample_batch_grid(batch_size)
 
         # Get the data.
         batch = self.sample_batch(

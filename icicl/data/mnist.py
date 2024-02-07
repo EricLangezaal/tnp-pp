@@ -2,7 +2,7 @@ from abc import ABC
 
 import torchvision
 
-from .image import ICImageGenerator, ImageGenerator
+from .image import ImageGenerator
 from .image_datasets import TranslatedImageGenerator, ZeroShotMultiImageGenerator
 
 
@@ -27,15 +27,9 @@ class MNISTGenerator(MNIST, ImageGenerator):
         self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
     ):
         MNIST.__init__(self, data_dir, train, download)
+        # Add channel dimension.
+        self.dataset.data = self.dataset.data.unsqueeze(-1)
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
-
-
-class ICMNISTGenerator(MNIST, ICImageGenerator):
-    def __init__(
-        self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
-    ):
-        MNIST.__init__(self, data_dir, train, download)
-        ICImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
 
 class ZeroShotMultiMNISTGenerator(ZeroShotMultiImageGenerator):

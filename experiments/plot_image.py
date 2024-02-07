@@ -9,7 +9,7 @@ import torch
 from torch import nn
 
 import wandb
-from icicl.data.image import GriddedImageBatch, ICImageBatch, ImageBatch
+from icicl.data.image import GriddedImageBatch, ImageBatch
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -37,16 +37,7 @@ def plot_image(
         mc = batch.mc[:1]
 
         with torch.no_grad():
-            if isinstance(batch, ICImageBatch):
-                y_plot_pred_dist = model(
-                    xc=xc,
-                    yc=yc,
-                    xic=batch.xic,
-                    yic=batch.yic,
-                    xt=x,
-                )
-                yt_pred_dist = model(xc=xc, yc=yc, xic=batch.xic, yic=batch.yic, xt=xt)
-            elif isinstance(batch, GriddedImageBatch):
+            if isinstance(batch, GriddedImageBatch):
                 y_plot_pred_dist = model(
                     mc=batch.mc_grid,
                     y=batch.y_grid,

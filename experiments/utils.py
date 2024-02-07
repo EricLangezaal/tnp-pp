@@ -15,10 +15,10 @@ from torch import nn
 from tqdm.auto import tqdm
 
 import wandb
-from icicl.data.base import Batch, DataGenerator, ICBatch
+from icicl.data.base import Batch, DataGenerator
 from icicl.data.image import GriddedImageBatch
 from icicl.data.synthetic import SyntheticBatch
-from icicl.models.base import ICNeuralProcess, NeuralProcess
+from icicl.models.base import NeuralProcess
 from icicl.models.convcnp import GriddedConvCNP
 from icicl.utils.batch import compress_batch_dimensions
 from icicl.utils.initialisation import weights_init
@@ -114,12 +114,7 @@ def np_loss_fn(
     Returns:
         loss: average negative log likelihood.
     """
-    if isinstance(batch, ICBatch):
-        assert isinstance(model, ICNeuralProcess)
-        pred_dist = model(
-            xc=batch.xc, yc=batch.yc, xic=batch.xic, yic=batch.yic, xt=batch.xt
-        )
-    elif isinstance(batch, GriddedImageBatch):
+    if isinstance(batch, GriddedImageBatch):
         assert isinstance(model, GriddedConvCNP)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
     else:
@@ -174,16 +169,7 @@ def val_epoch(
     for batch in tqdm(generator, total=len(generator), desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
-            if isinstance(batch, ICBatch):
-                assert isinstance(model, ICNeuralProcess)
-                pred_dist = model(
-                    xc=batch.xc,
-                    yc=batch.yc,
-                    xic=batch.xic,
-                    yic=batch.yic,
-                    xt=batch.xt,
-                )
-            elif isinstance(batch, GriddedImageBatch):
+            if isinstance(batch, GriddedImageBatch):
                 assert isinstance(model, GriddedConvCNP)
                 pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
             else:
@@ -476,6 +462,65 @@ def ar_predict(
             # Update context.
             xc_ = torch.cat([xc_, xt_[:, i : i + 1]], dim=1)
             yc_ = torch.cat([yc_, pred], dim=1)
+
+    # Compute log probability of sample.
+    samples = torch.cat(samples_list, dim=1)
+    sample_logprobs = torch.cat(sample_logprobs_list, dim=1)
+
+    samples = einops.rearrange(samples, "(s m) n d -> s m n d", s=num_samples)
+    sample_logprobs = einops.rearrange(
+        sample_logprobs, "(s m) n d -> s m n d", s=num_samples
+    )
+    sample_logprobs = sample_logprobs.mean(0)
+
+    return samples, sample_logprobs
+
+
+def updated_ar_predict(
+    model: nn.Module,
+    xc: torch.Tensor,
+    yc: torch.Tensor,
+    xt: torch.Tensor,
+    tidx_blocks: torch.Tensor,
+    num_samples: int,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    samples_list: List[torch.Tensor] = []
+    sample_logprobs_list: List[torch.Tensor] = []
+
+    # Expand tensors for efficient computation.
+    xc_ = einops.repeat(xc, "m n d -> s m n d", s=num_samples)
+    yc_ = einops.repeat(yc, "m n d -> s m n d", s=num_samples)
+    xt_ = einops.repeat(xt, "m n d -> s m n d", s=num_samples)
+    xc_, _ = compress_batch_dimensions(xc_, other_dims=2)
+    yc_, _ = compress_batch_dimensions(yc_, other_dims=2)
+    xt_, _ = compress_batch_dimensions(xt_, other_dims=2)
+
+    # Clear xc_cache.
+    model.clear_cache()
+
+    # AR mode for loop.
+    for tidx_block in tidx_blocks:
+        with torch.no_grad():
+            # Compute conditional distribution, sample and evaluate log probabilities.
+
+            # Select block of targets to predict.
+            xt_block = xt_[:, tidx_block, ...]
+
+            # Get pred distribution for this block of targets.
+            pred_dist = model.ar_forward(xc=xc_, yc=yc_, xt=xt_block)
+            pred = pred_dist.sample()
+            pred_logprob = pred_dist.log_prob(pred)
+
+            # Store samples and probabilities.
+            samples_list.append(pred)
+            sample_logprobs_list.append(pred_logprob)
+
+            # Set xc_ and yc_ to xt_block and pred.
+            xc_ = xt_block
+            yc_ = pred
+
+    # Clear cache again.
+    model.clear_cache()
 
     # Compute log probability of sample.
     samples = torch.cat(samples_list, dim=1)

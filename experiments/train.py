@@ -69,8 +69,6 @@ def main():
                     batches=batches,
                     num_fig=min(5, len(batches)),
                     figsize=(18.0, 5.0),
-                    plot_dims=(0, 2),
-                    other_dim_slice=0,
                     savefig=False,
                     logging=False,
                     subplots=False,

@@ -405,181 +405,63 @@ class SPINDecoder(nn.Module):
         return xqt
 
 
-class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
-    def __init__(
-        self,
-        num_latents: int,
-        num_ic_latents: int,
-        mhsa_layer: MultiHeadSelfAttentionLayer,
-        mhca_ctoq_layer: MultiHeadCrossAttentionLayer,
-        mhca_qtot_layer: MultiHeadCrossAttentionLayer,
-        num_layers: int,
-    ):
-        super().__init__(
-            num_latents, mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer, num_layers
-        )
-
-        embed_dim = mhsa_layer.embed_dim
-        self.ic_latents = nn.Parameter(torch.randn(num_ic_latents, embed_dim))
-
-        self.ic_mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
+class ARTNPDTransformerEncoder(TNPDTransformerEncoder):
+    xc_cache: dict[str, torch.Tensor] = {}
 
     @check_shapes(
-        "xc: [m, nc, dx]",
-        "xic: [m, nic, ncic, dx]",
-        "xt: [m, nt, dx]",
-        "return: [m, nq, d]",
+        "xc: [m, nc, d]", "xt: [m, nt, d]", "mask: [m, nc, nc]", "return: [m, nt, d]"
     )
-    def forward(
-        self, xc: torch.Tensor, xic: torch.Tensor, xt: torch.Tensor
-    ) -> torch.Tensor:
-        xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
-        xqic = einops.repeat(
-            self.ic_latents, "l e -> m n l e", m=xic.shape[0], n=xic.shape[1]
-        )
-        # shape (m x nic, ncic, dx).
-        xic, _ = compress_batch_dimensions(xic, other_dims=2)
-        for (mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer, ic_mhca_qtot_layer,) in zip(
-            self.mhsa_layers,
-            self.mhca_ctoq_layers,
-            self.mhca_qtot_layers,
-            self.ic_mhca_qtot_layers,
-        ):
-            # Cross-attention between latents and context set.
-            xq = mhca_ctoq_layer(xq, xc)
-            # Self-attention between latents.
-            xq = mhsa_layer(xq)
-            xt = mhca_qtot_layer(xt, xq)
-
-            # Attention with in-context datasets.
-            xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
-            xqic = mhca_ctoq_layer(xqic, xic)
-            xqic = mhsa_layer(xqic)
-            xqic = xqic_uncompress(xqic)
-
-            # shape (m, nic x ncic, dx)
-            xqic = einops.rearrange(xqic, "m n l e -> m (n l) e")
-            xt = ic_mhca_qtot_layer(xt, xqic)
-            xqic = einops.rearrange(
-                xqic, "m (n l) e -> m n l e", l=self.ic_latents.shape[0]
-            )
-
-        return xt
-
-
-# class ICNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
-#     def __init__(
-#         self,
-#         num_latents: int,
-#         num_ic_latents: int,
-#         mhsa_layer: MultiHeadSelfAttentionLayer,
-#         mhca_ctoq_layer: MultiHeadCrossAttentionLayer,
-#         mhca_qtot_layer: MultiHeadCrossAttentionLayer,
-#         ic_mhca_qtoq_layer: MultiHeadCrossAttentionLayer,
-#         num_layers: int,
-#     ):
-#         super().__init__(
-#             num_latents, mhsa_layer, mhca_ctoq_layer, mhca_qtot_layer, num_layers
-#         )
-
-#         embed_dim = mhsa_layer.embed_dim
-#         self.ic_latents = nn.Parameter(torch.randn(num_ic_latents, embed_dim))
-
-#         self.ic_mhca_qtoq_layers = _get_clones(ic_mhca_qtoq_layer, num_layers)
-
-#     @check_shapes(
-#         "xc: [m, nc, dx]",
-#         "xic: [m, nic, ncic, dx]",
-#         "xt: [m, nt, dx]",
-#         "return: [m, nq, d]",
-#     )
-#     def forward(
-#         self, xc: torch.Tensor, xic: torch.Tensor, xt: torch.Tensor
-#     ) -> torch.Tensor:
-#         xq = einops.repeat(self.latents, "l e -> m l e", m=xc.shape[0])
-#         xqic = einops.repeat(
-#             self.ic_latents, "l e -> m n l e", m=xic.shape[0], n=xic.shape[1]
-#         )
-#         # shape (m x nic, ncic, dx).
-#         xic, _ = compress_batch_dimensions(xic, other_dims=2)
-#         for (
-#             mhsa_layer,
-#             mhca_ctoq_layer,
-#             mhca_qtot_layer,
-#             ic_mhca_qtoq_layer,
-#         ) in zip(
-#             self.mhsa_layers,
-#             self.mhca_ctoq_layers,
-#             self.mhca_qtot_layers,
-#             self.ic_mhca_qtoq_layers,
-#         ):
-#             # Cross-attention between latents and context set.
-#             xq = mhca_ctoq_layer(xq, xc)
-#             # Self-attention between latents.
-#             xq = mhsa_layer(xq)
-
-#             # Cross-attention between in-context latents and context sets.
-#             xqic, xqic_uncompress = compress_batch_dimensions(xqic, other_dims=2)
-#             xqic = mhca_ctoq_layer(xqic, xic)
-#             # Self-attention between in-context latents.
-#             xqic = mhsa_layer(xqic)
-#             xqic = xqic_uncompress(xqic)
-
-#             # Cross-attention between latents and in-context latents.
-#             xqic = einops.rearrange(xqic, "m n l e -> m (n l) e")
-#             xq = ic_mhca_qtoq_layer(xq, xqic)
-#             xqic = einops.rearrange(
-#                 xqic, "m (n l) e -> m n l e", l=self.ic_latents.shape[0]
-#             )
-
-#             # Cross-attention between target set and latents.
-#             xt = mhca_qtot_layer(xt, xq)
-
-#         return xt
-
-
-class ParallelNestedPerceiverEncoder(BaseNestedPerceiverEncoder):
-    def __init__(self, *, mhca_layer: MultiHeadSelfAttentionLayer, **kwargs):
-        super().__init__(**kwargs)
-
-        self.mhca_layers = _get_clones(mhca_layer, len(self.mhsa_layers))
-
-    @check_shapes(
-        "xc: [m, nc, dx]",
-        "xt: [m, nt, dx]",
-        "mask: [m, nq, n]",
-        "return: [m, nq, d]",
-    )
-    def forward(
+    def ar_forward(
         self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        m = xc.shape[0]
-        l = self.latents.shape[0]
+        """Doesn't update tokens stored in xc_cache, and only uses xc_cache to update xc tokens."""
+        if not bool(self.xc_cache):
+            # Cache is empty: just do usual thing, storing xc in cache at each layer.
+            for i, mhca_layer in enumerate(self.mhca_layers):
+                self.xc_cache[f"layer-{i}"] = xc.clone().detach()
+                if not self.final_layer_cross_attention:
+                    xt = mhca_layer(xt, xc)
 
-        xq = einops.repeat(self.latents, "l e -> m l e", m=m)
-        for mhsa_layer, mhca_layer, mhca_ctoq_layer, mhca_qtot_layer in zip(
-            self.mhsa_layers,
-            self.mhca_layers,
-            self.mhca_ctoq_layers,
-            self.mhca_qtot_layers,
-        ):
-            # Cross-attention between context and latent sets.
-            xq = mhca_ctoq_layer(xq, xc, mask)
-            xq = mhsa_layer(xq)
+                # Mask can be used to apply any masking in first round.
+                xc = mhca_layer(xc, xc, mask=self.mask)
 
-            # shape (1, m x nc, dx).
-            xq = einops.rearrange(xq, "m l e -> 1 (m l) e")
-            mhca_mask = torch.block_diag(*[torch.ones(l, l)] * m) > 0.5
-            mhca_mask = einops.repeat(mhca_mask, "a b -> m a b", m=xq.shape[0])
+            self.xc_cache[f"layer-{len(self.mhca_layers) - 1}"] = xc.clone().detach()
 
-            # Cross-attention betweeen latent sets.
-            xq = mhca_layer(xq, mhca_mask)
+            if self.final_layer_cross_attention:
+                xt = self.mhca_layers[-1](xt, xc)
 
-            # Cross-attention between latent and target sets.
-            xq = einops.rearrange(xq, "1 (m l) e -> m l e", m=m)
-            xt = mhca_qtot_layer(xt, xq)
+        else:
+            # User xc_cache to update xc tokens, then use both to update xt.
+            # Also update xc_cache...
+            xc_cache_update: dict[str, torch.Tensor] = {}
+            for i, mhca_layer in enumerate(self.mhca_layers):
+                xc_cache_update[f"layer-{i}"] = xc.clone().detach()
+                # Set of tokens used to update xt.
+                xc_ = torch.cat((xc, self.xc_cache[f"layer-{i}"]), dim=-2)
+                if not self.final_layer_cross_attention:
+                    xt = mhca_layer(xt, xc_)
+
+                # Update xc using xc_cache.
+                xc = mhca_layer(xc, self.xc_cache[f"layer-{i}"], mask)
+
+            xc_cache_update[f"layer-{len(self.mhca_layers) - 1}"] = xc.clone().detach()
+
+            if self.final_layer_cross_attention:
+                xc_ = torch.cat(
+                    (xc, self.xc_cache[f"layer-{len(self.mhca_layers) - 1}"]), dim=-2
+                )
+                xt = self.mhca_layers[-1](xt, xc_)
+
+            # Update cache with xc_cache_update.
+            for layer in self.xc_cache:
+                self.xc_cache[layer] = torch.cat(
+                    (self.xc_cache[layer], xc_cache_update[layer]), dim=-2
+                )
 
         return xt
+
+    def clear_cache(self):
+        self.xc_cache = {}
 
 
 def _get_clones(module: nn.Module, n: int) -> nn.ModuleList:

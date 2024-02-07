@@ -8,7 +8,7 @@ from torch import nn
 from utils import ar_predict
 
 import wandb
-from icicl.data.base import Batch, ICBatch
+from icicl.data.base import Batch
 from icicl.data.synthetic import SyntheticBatch
 from icicl.models.telbanp import TELBANP
 
@@ -60,20 +60,8 @@ def plot(
                 y_pred_dist.scale = y_pred_dist.scale.detach().unsqueeze(0)
                 yt_pred_dist.loc = yt_pred_dist.loc.detach().unsqueeze(0)
                 yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
-            with torch.no_grad():
-                if isinstance(batch, ICBatch):
-                    y_plot_pred_dist = model(
-                        xc=xc,
-                        yc=yc,
-                        xic=batch.xic[:1],
-                        yic=batch.yic[:1],
-                        xt=x_plot,
-                    )
-                    yt_pred_dist = model(
-                        xc=xc, yc=yc, xic=batch.xic[:1], yic=batch.yic[:1], xt=xt
-                    )
-                else:
-                    assert not hasattr(batch, "xic") and not hasattr(batch, "yic")
+            else:
+                with torch.no_grad():
                     y_plot_pred_dist = model(xc=xc, yc=yc, xt=x_plot)
                     yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
 
@@ -163,7 +151,7 @@ def plot(
 
                 title_str += f" GT NLL = {gt_nll:.3f}"
 
-            if plot_ar_mode and not isinstance(batch, ICBatch):
+            if plot_ar_mode:
                 ar_x_plot = torch.linspace(xc.max(), x_range[1], 50).to(batches[0].xc)[
                     None, :, None
                 ]

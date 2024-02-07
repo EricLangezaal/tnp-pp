@@ -66,7 +66,7 @@ class MultiHeadTEAttention(nn.Module, ABC):
         if not phi_t_reuse_attn:
             self.phi_t_to_q = nn.Linear(embed_dim, inner_dim, bias=False)
             self.phi_t_to_k = nn.Linear(embed_dim, inner_dim, bias=False)
-            self.phi_t_kernel = copy.deepcopy(self.kernel)
+            self.phi_t_kernel: Optional[Kernel] = copy.deepcopy(self.kernel)
         else:
             self.phi_t_to_q = self.phi_t_to_k = self.phi_t_kernel = None
 

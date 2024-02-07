@@ -2,7 +2,7 @@ from abc import ABC
 
 import torchvision
 
-from .image import ICImageGenerator, ImageGenerator
+from .image import ImageGenerator
 from .image_datasets import TranslatedImageGenerator, ZeroShotMultiImageGenerator
 
 
@@ -30,14 +30,6 @@ class CIFAR10Generator(CIFAR10, ImageGenerator):
     ):
         CIFAR10.__init__(self, data_dir, train, download)
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
-
-
-class ICCIFAR10(CIFAR10, ICImageGenerator):
-    def __init__(
-        self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
-    ):
-        CIFAR10.__init__(self, data_dir, train, download)
-        ICImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
 
 class ZeroShotMultiCIFAR10Generator(ZeroShotMultiImageGenerator):

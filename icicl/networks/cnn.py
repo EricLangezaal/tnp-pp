@@ -1,5 +1,3 @@
-"""https://github.com/YannDubs/Neural-Process-Family/blob/master/npf/architectures/cnn.py"""
-
 from typing import List, Optional, Tuple, Union
 
 import torch

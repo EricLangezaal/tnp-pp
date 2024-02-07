@@ -7,12 +7,7 @@ import torch
 import torch.distributions as td
 
 from .base import GroundTruthPredictor
-from .synthetic import (
-    ICSyntheticGeneratorBimodalInput,
-    ICSyntheticGeneratorUniformInput,
-    SyntheticGeneratorBimodalInput,
-    SyntheticGeneratorUniformInput,
-)
+from .synthetic import SyntheticGeneratorBimodalInput, SyntheticGeneratorUniformInput
 
 KERNEL_TYPES = [
     "random",
@@ -208,18 +203,6 @@ class RandomScaleGPGenerator(
 
 class RandomScaleGPGeneratorBimodalInput(
     RandomScaleGPGeneratorBase, SyntheticGeneratorBimodalInput
-):
-    pass
-
-
-class ICRandomScaleGPGenerator(
-    RandomScaleGPGeneratorBase, ICSyntheticGeneratorUniformInput
-):
-    pass
-
-
-class ICRandomScaleGPGeneratorBimodalInput(
-    RandomScaleGPGeneratorBase, ICSyntheticGeneratorBimodalInput
 ):
     pass
 

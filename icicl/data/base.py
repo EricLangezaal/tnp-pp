@@ -44,12 +44,6 @@ class Batch:
         return self.__add__(b)
 
 
-@dataclass
-class ICBatch(Batch):
-    xic: torch.Tensor
-    yic: torch.Tensor
-
-
 class DataGenerator(ABC):
     def __init__(
         self,

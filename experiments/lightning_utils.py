@@ -10,7 +10,7 @@ from plot_kolmogorov import plot_kolmogorov
 from torch import nn
 from utils import ModelCheckpointer, np_loss_fn
 
-from icicl.data.base import Batch, ICBatch
+from icicl.data.base import Batch
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import GriddedImageBatch, ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
@@ -56,15 +56,7 @@ class LitWrapper(pl.LightningModule):
     ) -> None:
         _ = batch_idx
         result = {"batch": batch}
-        if isinstance(batch, ICBatch):
-            pred_dist = self.model(
-                xc=batch.xc,
-                yc=batch.yc,
-                xic=batch.xic,
-                yic=batch.yic,
-                xt=batch.xt,
-            )
-        elif isinstance(batch, GriddedImageBatch):
+        if isinstance(batch, GriddedImageBatch):
             pred_dist = self.model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
         else:
             pred_dist = self.model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
@@ -86,15 +78,7 @@ class LitWrapper(pl.LightningModule):
     ) -> None:
         _ = batch_idx
         result = {"batch": _batch_to_cpu(batch)}
-        if isinstance(batch, ICBatch):
-            pred_dist = self.model(
-                xc=batch.xc,
-                yc=batch.yc,
-                xic=batch.xic,
-                yic=batch.yic,
-                xt=batch.xt,
-            )
-        elif isinstance(batch, GriddedImageBatch):
+        if isinstance(batch, GriddedImageBatch):
             pred_dist = self.model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
         else:
             pred_dist = self.model(xc=batch.xc, yc=batch.yc, xt=batch.xt)

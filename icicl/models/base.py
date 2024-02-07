@@ -27,22 +27,3 @@ class NeuralProcess(BaseNeuralProcess):
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
     ) -> torch.distributions.Distribution:
         return self.likelihood(self.decoder(self.encoder(xc, yc, xt), xt))
-
-
-class ICNeuralProcess(BaseNeuralProcess):
-    @check_shapes(
-        "xc: [m, nc, dx]",
-        "yc: [m, nc, dy]",
-        "xic: [m, nic, ncic, dx]",
-        "yic: [m, nic, ncic, dy]",
-        "xt: [m, nt, dx]",
-    )
-    def forward(
-        self,
-        xc: torch.Tensor,
-        yc: torch.Tensor,
-        xic: torch.Tensor,
-        yic: torch.Tensor,
-        xt: torch.Tensor,
-    ) -> torch.distributions.Distribution:
-        return self.likelihood(self.decoder(self.encoder(xc, yc, xic, yic, xt), xt))

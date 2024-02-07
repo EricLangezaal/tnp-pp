@@ -97,9 +97,10 @@ class CRUDataGenerator(DataGenerator):
         self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
         self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
-    def generate_batch(self) -> Batch:
+    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
+        batch_size = self.batch_size if batch_shape is None else batch_shape[0]
         # (batch_size, n, 3).
-        idxs = self.sample_idx(batch_size=self.batch_size)
+        idxs = self.sample_idx(batch_size=batch_size)
 
         # Sample context proportion.
         pc = self.prop_ctx_dist.sample()
