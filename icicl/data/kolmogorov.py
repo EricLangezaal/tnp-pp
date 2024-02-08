@@ -1,20 +1,26 @@
 import itertools
 import os
 import random
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
 import h5py
 import numpy as np
 import torch
-from torch import Tensor
 
 from .base import Batch, DataGenerator
+
+
+@dataclass
+class KolmogorovBatch(Batch):
+    re: List[int]
 
 
 class KolmogorovGenerator(DataGenerator):
     def __init__(
         self,
         data_dir: str,
+        re_dirs: Dict[int, str],
         split: str,
         batch_grid_size: Tuple[int, int, int],
         min_num_ctx: int,
@@ -33,10 +39,13 @@ class KolmogorovGenerator(DataGenerator):
         self.max_num_trg = torch.as_tensor(max_num_trg, dtype=torch.int)
         self.forecast_window = forecast_window
 
-        fname = os.path.join(data_dir, split + ".h5")
-        self.dataset, self.spatial_range, self.time_range = self.load_data(fname)
+        self.dataset, self.spatial_range, self.time_range = self.load_data(
+            data_dir, re_dirs, split
+        )
 
-    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
+    def generate_batch(
+        self, batch_shape: Optional[torch.Size] = None
+    ) -> KolmogorovBatch:
         """Generate batch of data.
 
         Returns:
@@ -47,21 +56,32 @@ class KolmogorovGenerator(DataGenerator):
         # Sample num_ctx and num_trg.
         nc, nt = self.sample_num_ctx_trg()
 
+        # Sample reynold numbers.
+        re_numbers = self.sample_reynold_numbers(batch_size)
+
         # Sample dataset idx.
-        dataset_idxs = self.sample_dataset_idx(batch_size)
+        dataset_idxs = self.sample_dataset_idx(re_numbers, batch_size)
 
         # Sample batch grids from within datasets.
         batch_grids = self.sample_batch_grid(batch_size)
 
         # Get the data.
         batch = self.sample_batch(
-            num_ctx=nc, num_trg=nt, dataset_idxs=dataset_idxs, batch_grids=batch_grids
+            num_ctx=nc,
+            num_trg=nt,
+            re_numbers=re_numbers,
+            dataset_idxs=dataset_idxs,
+            batch_grids=batch_grids,
         )
 
         return batch
 
-    def sample_dataset_idx(self, batch_size: int) -> List[int]:
-        return random.sample(range(len(self.dataset)), batch_size)
+    def sample_reynold_numbers(self, batch_size: int) -> List[int]:
+        return random.choices(list(self.dataset.keys()), k=batch_size)
+
+    def sample_dataset_idx(self, re_numbers: List[int], batch_size: int) -> List[int]:
+        assert len(re_numbers) == batch_size
+        return [random.choice(range(len(self.dataset[re]))) for re in re_numbers]
 
     def sample_batch_grid(self, batch_size: int) -> List[Tuple[List, List, List]]:
         idx: List[Tuple[List, List, List]] = []
@@ -135,15 +155,18 @@ class KolmogorovGenerator(DataGenerator):
         self,
         num_ctx: int,
         num_trg: int,
+        re_numbers: List[int],
         dataset_idxs: List[int],
         batch_grids: List[Tuple[List, List, List]],
-    ) -> Batch:
+    ) -> KolmogorovBatch:
         x_list, xc_list, xt_list = [], [], []
         y_list, yc_list, yt_list = [], [], []
-        for dataset_idx, batch_grid in zip(dataset_idxs, batch_grids):
+        re_list = []
+        for re, dataset_idx, batch_grid in zip(re_numbers, dataset_idxs, batch_grids):
+            re_list.append(re)
             if self.forecast_window is None:
                 batch_grid_product = np.array(list(itertools.product(*batch_grid)))
-                y = self.dataset[dataset_idx][
+                y = self.dataset[re][dataset_idx][
                     batch_grid_product[:, 0],
                     batch_grid_product[:, 1],
                     batch_grid_product[:, 2],
@@ -188,7 +211,7 @@ class KolmogorovGenerator(DataGenerator):
                     )
                 )
 
-                yc_all = self.dataset[dataset_idx][
+                yc_all = self.dataset[re][dataset_idx][
                     context_batch_grid_product[:, 0],
                     context_batch_grid_product[:, 1],
                     context_batch_grid_product[:, 2],
@@ -202,7 +225,7 @@ class KolmogorovGenerator(DataGenerator):
                     dim=-1,
                 )
 
-                yt_all = self.dataset[dataset_idx][
+                yt_all = self.dataset[re][dataset_idx][
                     target_batch_grid_product[:, 0],
                     target_batch_grid_product[:, 1],
                     target_batch_grid_product[:, 2],
@@ -236,31 +259,28 @@ class KolmogorovGenerator(DataGenerator):
         xt = torch.stack(xt_list)
         yt = torch.stack(yt_list)
 
-        return Batch(
+        return KolmogorovBatch(
             x=x,
             y=y,
             xc=xc,
             yc=yc,
             xt=xt,
             yt=yt,
+            re=re_list,
         )
 
-    def load_data(self, fname: str, window: int = None) -> Tensor:
-        with h5py.File(fname, mode="r") as f:
-            data = f["x"][:]
+    def load_data(
+        self, data_dir: str, re_dirs: Dict[int, str], split: str = "train"
+    ) -> Tuple[Dict[int, torch.Tensor], torch.Tensor, torch.Tensor]:
+        data: Dict[int, torch.Tensor] = {}
+        for re, re_dir in re_dirs.items():
+            fname = os.path.join(data_dir, re_dir, split + ".h5")
+            with h5py.File(fname, mode="r") as f:
+                re_data = f["x"][:]
 
-        data = torch.as_tensor(data, dtype=torch.float)
-
-        if window is None:
-            pass
-        elif window == 1:
-            data = data.flatten(0, 1)
-        else:
-            data = data.unfold(1, window, 1)
-            data = data.movedim(-1, 2)
-            data = data.flatten(2, 3)
-            data = data.flatten(0, 1)
+            re_data = torch.as_tensor(re_data, dtype=torch.float)
+            data[re] = re_data.permute(0, 1, 3, 4, 2)
 
         spatial_range = time_range = torch.linspace(-3, 3, 64)
 
-        return data.permute(0, 1, 3, 4, 2), spatial_range, time_range
+        return data, spatial_range, time_range
