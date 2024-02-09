@@ -134,7 +134,7 @@ class ImageGenerator:
                 torch.meshgrid(
                     *[
                         torch.range(0, dim - 1)
-                        for dim in self.dataset[0][0][0, ...].shape
+                        for dim in self.dataset.data[0, ..., 0].shape
                     ]
                 ),
                 dim=-1,
@@ -236,21 +236,21 @@ class ImageGenerator:
         # Sample batch of data.
         batch_idx = next(self.batch_sampler)
         # (batch_size, num_channels, height, width).
-        y_grid = torch.stack([self.dataset[idx][0] for idx in batch_idx], dim=0)
+        y_grid = torch.stack([self.dataset.data[idx] for idx in batch_idx], dim=0)
         label = torch.stack(
-            [torch.as_tensor(self.dataset[idx][1]) for idx in batch_idx]
+            [torch.as_tensor(self.dataset.targets) for idx in batch_idx]
         )
 
         # Input grid.
         x = torch.stack(
             torch.meshgrid(
-                *[torch.range(0, dim - 1) for dim in y_grid[0, 0, ...].shape]
+                *[torch.range(0, dim - 1) for dim in y_grid[0, ..., 0].shape]
             ),
             dim=-1,
         )
 
         # Rearrange.
-        y = einops.rearrange(y_grid, "m d n1 n2 -> m (n1 n2) d")
+        y = einops.rearrange(y_grid, "m n1 n2 d -> m (n1 n2) d")
         x = einops.rearrange(x, "n1 n2 d -> (n1 n2) d")
 
         # Normalise inputs.

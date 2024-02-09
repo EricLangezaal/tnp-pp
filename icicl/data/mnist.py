@@ -29,6 +29,8 @@ class MNISTGenerator(MNIST, ImageGenerator):
         MNIST.__init__(self, data_dir, train, download)
         # Add channel dimension.
         self.dataset.data = self.dataset.data.unsqueeze(-1)
+        # Rescale between to [0, 1].
+        self.dataset.data = self.dataset.data.float() / self.dataset.data.float().max()
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
 

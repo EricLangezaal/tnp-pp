@@ -29,6 +29,8 @@ class CIFAR10Generator(CIFAR10, ImageGenerator):
         self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
     ):
         CIFAR10.__init__(self, data_dir, train, download)
+        # Rescale between to [0, 1].
+        self.dataset.data = self.dataset.data.float() / self.dataset.data.float().max()
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
 
