@@ -8,13 +8,13 @@ from plot_cru import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 from torch import nn
-from utils import ModelCheckpointer, np_loss_fn
 
 from icicl.data.base import Batch
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import GriddedImageBatch, ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
 from icicl.data.synthetic import SyntheticBatch
+from icicl.utils.experiment_utils import ModelCheckpointer, np_loss_fn
 
 
 class LitWrapper(pl.LightningModule):

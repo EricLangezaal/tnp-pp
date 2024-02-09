@@ -1,6 +1,7 @@
 import lightning.pytorch as pl
 from lightning_utils import LitWrapper
-from utils import initialize_experiment, np_loss_fn
+
+from icicl.utils.experiment_utils import initialize_experiment, np_loss_fn
 
 
 def main():

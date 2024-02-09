@@ -2,17 +2,17 @@ from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
-from utils import (
+
+from icicl.data.cru import CRUDataGenerator
+from icicl.data.image import ImageGenerator
+from icicl.data.kolmogorov import KolmogorovGenerator
+from icicl.utils.experiment_utils import (
     evaluation_summary,
     initialize_experiment,
     np_loss_fn,
     train_epoch,
     val_epoch,
 )
-
-from icicl.data.cru import CRUDataGenerator
-from icicl.data.image import ImageGenerator
-from icicl.data.kolmogorov import KolmogorovGenerator
 
 
 def main():

@@ -5,12 +5,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import torch
 from torch import nn
-from utils import ar_predict
 
 import wandb
 from icicl.data.base import Batch
 from icicl.data.synthetic import SyntheticBatch
 from icicl.models.telbanp import TELBANP
+from icicl.utils.experiment_utils import ar_predict
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
