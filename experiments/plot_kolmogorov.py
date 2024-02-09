@@ -9,7 +9,7 @@ import torch
 from torch import nn
 
 import wandb
-from icicl.data.base import Batch
+from icicl.data.kolmogorov import KolmogorovBatch
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -47,7 +47,7 @@ def plot_kolmogorov(
         nn.Module,
         Callable[..., torch.distributions.Distribution],
     ],
-    batches: List[Batch],
+    batches: List[KolmogorovBatch],
     batch_grid_size: Tuple[int, int, int] = (16, 16, 16),
     time_slice: int = 0,
     num_fig: int = 5,
@@ -65,6 +65,7 @@ def plot_kolmogorov(
         yc = batch.yc[:1]
         xt = batch.xt[:1]
         yt = batch.yt[:1]
+        re = batch.re[0]
 
         if not isinstance(model, nn.Module):
             # model is callable function that trains model then returns pred.
@@ -110,6 +111,8 @@ def plot_kolmogorov(
                 ax.set_title(fig_name)
                 ax.axes.get_xaxis().set_ticks([])
                 ax.axes.get_yaxis().set_ticks([])
+
+            plt.suptitle(f"Reynolds: {re}")
 
             fname = f"fig/{name}/{i:03d}-pc-{pc:2f}"
             if wandb.run is not None and logging:

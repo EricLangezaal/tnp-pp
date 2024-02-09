@@ -85,26 +85,26 @@ class KolmogorovGenerator(DataGenerator):
 
     def sample_batch_grid(self, batch_size: int) -> List[Tuple[List, List, List]]:
         idx: List[Tuple[List, List, List]] = []
-        start_spatial_idx1 = random.sample(
-            range(len(self.spatial_range) - 1 - self.batch_grid_size[0]), batch_size
+        start_spatial_idx1 = random.choices(
+            range(len(self.spatial_range) - 1 - self.batch_grid_size[0]), k=batch_size
         )
-        start_spatial_idx2 = random.sample(
-            range(len(self.spatial_range) - 1 - self.batch_grid_size[1]), batch_size
+        start_spatial_idx2 = random.choices(
+            range(len(self.spatial_range) - 1 - self.batch_grid_size[1]), k=batch_size
         )
 
         if self.forecast_window is None:
-            start_time_idx = random.sample(
-                range(len(self.time_range) - 1 - self.batch_grid_size[2]), batch_size
+            start_time_idx = random.choices(
+                range(len(self.time_range) - 1 - self.batch_grid_size[2]), k=batch_size
             )
         else:
-            start_time_idx = random.sample(
+            start_time_idx = random.choices(
                 range(
                     len(self.time_range)
                     - 1
                     - self.batch_grid_size[2]
                     - self.forecast_window
                 ),
-                batch_size,
+                k=batch_size,
             )
 
         for i, j, k in zip(start_spatial_idx1, start_spatial_idx2, start_time_idx):
