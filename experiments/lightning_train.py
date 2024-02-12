@@ -1,5 +1,4 @@
 import lightning.pytorch as pl
-from lightning_utils import LitWrapper
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
@@ -9,6 +8,7 @@ from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
 from icicl.utils.experiment_utils import initialize_experiment, np_loss_fn, np_pred_fn
+from icicl.utils.lightning_utils import LitWrapper
 
 
 def main():
