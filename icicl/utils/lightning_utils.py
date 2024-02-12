@@ -56,7 +56,7 @@ class LitWrapper(pl.LightningModule):
         loglik = pred_dist.log_prob(batch.yt).mean()
         result["loglik"] = loglik.cpu()
 
-        if batch.gt_pred is not None:
+        if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
@@ -74,7 +74,7 @@ class LitWrapper(pl.LightningModule):
         loglik = pred_dist.log_prob(batch.yt).mean()
         result["loglik"] = loglik.cpu()
 
-        if batch.gt_pred is not None:
+        if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
