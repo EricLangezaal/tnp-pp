@@ -1,7 +1,14 @@
 import lightning.pytorch as pl
 from lightning_utils import LitWrapper
+from plot import plot
+from plot_cru import plot_cru
+from plot_image import plot_image
+from plot_kolmogorov import plot_kolmogorov
 
-from icicl.utils.experiment_utils import initialize_experiment, np_loss_fn
+from icicl.data.cru import CRUDataGenerator
+from icicl.data.image import ImageGenerator
+from icicl.data.kolmogorov import KolmogorovGenerator
+from icicl.utils.experiment_utils import initialize_experiment, np_loss_fn, np_pred_fn
 
 
 def main():
@@ -13,10 +20,59 @@ def main():
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
 
+    if isinstance(gen_val, ImageGenerator):
+
+        def plot_fn(model, batches, name):
+            plot_image(
+                model=model, batches=batches, num_fig=min(5, len(batches)), name=name
+            )
+
+    elif isinstance(gen_val, CRUDataGenerator):
+
+        def plot_fn(model, batches, name):
+            plot_cru(
+                model=model,
+                batches=batches,
+                x_mean=gen_val.x_mean,
+                x_std=gen_val.x_std,
+                y_mean=gen_val.y_mean,
+                y_std=gen_val.y_std,
+                num_fig=min(5, len(batches)),
+                figsize=(24.0, 5.0),
+                lat_range=gen_val.lat_range,
+                lon_range=gen_val.lon_range,
+                time_idx=[0, -1],
+                name=name,
+            )
+
+    elif isinstance(gen_val, KolmogorovGenerator):
+
+        def plot_fn(model, batches, name):
+            plot_kolmogorov(
+                model=model,
+                batches=batches,
+                num_fig=min(5, len(batches)),
+                figsize=(18.0, 5.0),
+                subplots=True,
+                name=name,
+            )
+
+    else:
+
+        def plot_fn(model, batches, name):
+            plot(
+                model=model,
+                batches=batches,
+                num_fig=min(5, len(batches)),
+                name=name,
+            )
+
     lit_model = LitWrapper(
         model=model,
         optimiser=optimiser,
         loss_fn=np_loss_fn,
+        pred_fn=np_pred_fn,
+        plot_fn=plot_fn,
         checkpointer=checkpointer,
         plot_interval=experiment.misc.plot_interval,
     )

@@ -126,6 +126,20 @@ def np_loss_fn(
     return -loglik.mean()
 
 
+def np_pred_fn(
+    model: nn.Module,
+    batch: Batch,
+) -> torch.distributions.Distribution:
+    if isinstance(batch, GriddedImageBatch):
+        assert isinstance(model, GriddedConvCNP)
+        pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
+    else:
+        assert isinstance(model, NeuralProcess)
+        pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+
+    return pred_dist
+
+
 def train_epoch(
     model: nn.Module,
     generator: DataGenerator,
