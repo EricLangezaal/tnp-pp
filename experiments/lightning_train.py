@@ -7,7 +7,7 @@ from plot_kolmogorov import plot_kolmogorov
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
-from icicl.utils.experiment_utils import initialize_experiment, np_loss_fn, np_pred_fn
+from icicl.utils.experiment_utils import initialize_experiment
 from icicl.utils.lightning_utils import LitWrapper
 
 
@@ -24,7 +24,10 @@ def main():
 
         def plot_fn(model, batches, name):
             plot_image(
-                model=model, batches=batches, num_fig=min(5, len(batches)), name=name
+                model=model,
+                batches=batches,
+                num_fig=min(5, len(batches)),
+                name=name,
             )
 
     elif isinstance(gen_val, CRUDataGenerator):
@@ -70,8 +73,8 @@ def main():
     lit_model = LitWrapper(
         model=model,
         optimiser=optimiser,
-        loss_fn=np_loss_fn,
-        pred_fn=np_pred_fn,
+        loss_fn=experiment.misc.loss_fn,
+        pred_fn=experiment.misc.pred_fn,
         plot_fn=plot_fn,
         checkpointer=checkpointer,
         plot_interval=experiment.misc.plot_interval,

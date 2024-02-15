@@ -9,7 +9,6 @@ from icicl.data.kolmogorov import KolmogorovGenerator
 from icicl.utils.experiment_utils import (
     evaluation_summary,
     initialize_experiment,
-    np_loss_fn,
     train_epoch,
     val_epoch,
 )
@@ -31,7 +30,8 @@ def main():
             generator=gen_train,
             optimiser=optimiser,
             step=step,
-            loss_fn=np_loss_fn,
+            loss_fn=experiment.misc.loss_fn,
+            gradient_clip_val=experiment.misc.gradient_clip_val,
         )
         evaluation_summary("train", train_result)
 
