@@ -6,7 +6,7 @@ from torch import nn
 
 from ..networks.tetransformer import TETNPDTransformerEncoder, TETransformerEncoder
 from ..utils.helpers import preprocess_observations
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 from .tnp import TNPDDecoder, gen_tnpd_mask
 
 
@@ -74,7 +74,7 @@ class EfficientTETNPDEncoder(nn.Module):
         return zt
 
 
-class TETNPD(NeuralProcess):
+class TETNPD(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: Union[TETNPDEncoder, EfficientTETNPDEncoder],

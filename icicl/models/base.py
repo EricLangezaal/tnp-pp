@@ -21,9 +21,17 @@ class BaseNeuralProcess(nn.Module, ABC):
         self.likelihood = likelihood
 
 
-class NeuralProcess(BaseNeuralProcess):
+class ConditionalNeuralProcess(BaseNeuralProcess):
     @check_shapes("xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]")
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor
     ) -> torch.distributions.Distribution:
         return self.likelihood(self.decoder(self.encoder(xc, yc, xt), xt))
+
+
+class NeuralProcess(BaseNeuralProcess):
+    @check_shapes("xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]")
+    def forward(
+        self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor, num_samples: int = 1
+    ) -> torch.distributions.Distribution:
+        return self.likelihood(self.decoder(self.encoder(xc, yc, xt, num_samples), xt))

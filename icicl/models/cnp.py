@@ -4,7 +4,7 @@ from check_shapes import check_shapes
 from torch import nn
 
 from ..networks.deepset import DeepSet
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 
 
 class CNPEncoder(nn.Module):
@@ -47,7 +47,7 @@ class CNPDecoder(nn.Module):
         return self.z_decoder(torch.cat((zc, xt), dim=-1))
 
 
-class CNP(NeuralProcess):
+class CNP(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: CNPEncoder,

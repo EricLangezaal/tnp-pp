@@ -6,7 +6,7 @@ from check_shapes import check_shapes
 from torch import nn
 
 from ..networks.setconv import SetConvDecoder, SetConvEncoder
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 
 
 class ConvCNPEncoder(nn.Module):
@@ -96,7 +96,7 @@ class GriddedConvCNPDecoder(nn.Module):
         return zt
 
 
-class ConvCNP(NeuralProcess):
+class ConvCNP(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: ConvCNPEncoder,

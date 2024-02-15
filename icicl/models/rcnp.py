@@ -7,7 +7,7 @@ from torch import nn
 
 from ..networks.mlp import MLP
 from ..utils.group_actions import translation
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 from .cnp import CNPDecoder
 
 
@@ -90,7 +90,7 @@ class RCNPEncoder(nn.Module):
         return self.agg(ztc)
 
 
-class RCNP(NeuralProcess):
+class RCNP(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: RCNPEncoder,

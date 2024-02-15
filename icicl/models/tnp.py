@@ -6,7 +6,7 @@ from torch import nn
 
 from ..networks.transformer import TNPDTransformerEncoder, TransformerEncoder
 from ..utils.helpers import preprocess_observations
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess, NeuralProcess
 
 
 class TNPDEncoder(nn.Module):
@@ -64,9 +64,9 @@ class TNPDDecoder(nn.Module):
 
         self.z_decoder = z_decoder
 
-    @check_shapes("z: [m, n, dz]", "xt: [m, nt, dx]", "return: [m, nt, dy]")
+    @check_shapes("z: [m, ..., n, dz]", "xt: [m, nt, dx]", "return: [m, ..., nt, dy]")
     def forward(self, z: torch.Tensor, xt: torch.Tensor) -> torch.Tensor:
-        zt = z[:, -xt.shape[-2] :, ...]
+        zt = z[..., -xt.shape[-2] :, :]
         return self.z_decoder(zt)
 
 
@@ -98,10 +98,51 @@ class EfficientTNPDEncoder(nn.Module):
         return zt
 
 
-class TNPD(NeuralProcess):
+class StochasticTNPDEncoder(nn.Module):
+    def __init__(
+        self,
+        tnpd_encoder: Union[EfficientTNPDEncoder, TNPDEncoder],
+        min_zt_std: float = 0.0,
+    ):
+        super().__init__()
+
+        self.tnpd_encoder = tnpd_encoder
+        self.min_zt_std = min_zt_std
+
+    @check_shapes(
+        "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, s, n, dz]"
+    )
+    def forward(
+        self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor, num_samples: int
+    ) -> torch.Tensor:
+        _zt = self.tnpd_encoder(xc, yc, xt)
+
+        # Sample zt for decoder.
+        zt_loc = _zt[..., : _zt.shape[-1] // 2]
+        zt_raw_std = _zt[..., _zt.shape[-1] // 2 :]
+        zt_std = nn.functional.softplus(zt_raw_std) + self.min_zt_std
+
+        zt = zt_loc[:, None, ...] + zt_std[:, None, ...] * torch.randn(
+            (zt_std.shape[0], num_samples, *zt_std.shape[1:])
+        )
+
+        return zt
+
+
+class TNPD(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: Union[TNPDEncoder, EfficientTNPDEncoder],
+        decoder: TNPDDecoder,
+        likelihood: nn.Module,
+    ):
+        super().__init__(encoder, decoder, likelihood)
+
+
+class StochasticTNPD(NeuralProcess):
+    def __init__(
+        self,
+        encoder: StochasticTNPDEncoder,
         decoder: TNPDDecoder,
         likelihood: nn.Module,
     ):

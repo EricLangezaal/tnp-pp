@@ -7,7 +7,7 @@ from torch import nn
 
 from ..networks.transformer import SPINDecoder, SPINEncoder
 from ..utils.helpers import preprocess_observations
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 
 
 class IPNPEncoder(nn.Module):
@@ -89,7 +89,7 @@ class IPNPDecoder(nn.Module):
         return self.z_decoder(zt)
 
 
-class IPNP(NeuralProcess):
+class IPNP(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: IPNPEncoder,

@@ -9,7 +9,7 @@ from ..networks.tetransformer import (
     NestedTEPerceiverEncoder,
 )
 from ..utils.helpers import preprocess_observations
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 from .lbanp import LBANPDecoder
 
 
@@ -54,7 +54,7 @@ class TELBANPEncoder(nn.Module):
         return zt
 
 
-class TELBANP(NeuralProcess):
+class TELBANP(ConditionalNeuralProcess):
     def __init__(
         self,
         encoder: TELBANPEncoder,

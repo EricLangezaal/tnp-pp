@@ -4,7 +4,7 @@ from torch import nn
 
 from ..networks.attention_layers import MultiHeadAttentionLayer
 from ..networks.transformer import TransformerEncoder
-from .base import NeuralProcess
+from .base import ConditionalNeuralProcess
 from .tnp import TNPDDecoder
 
 
@@ -39,7 +39,7 @@ class ANPEncoder(nn.Module):
         return zt
 
 
-class ANP(NeuralProcess):
+class ANP(ConditionalNeuralProcess):
     def __init__(
         self, encoder: ANPEncoder, decoder: TNPDDecoder, likelihood: nn.Module
     ):
