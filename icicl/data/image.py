@@ -238,7 +238,7 @@ class ImageGenerator:
         # (batch_size, num_channels, height, width).
         y_grid = torch.stack([self.dataset.data[idx] for idx in batch_idx], dim=0)
         label = torch.stack(
-            [torch.as_tensor(self.dataset.targets) for idx in batch_idx]
+            [torch.as_tensor(self.dataset.targets[idx]) for idx in batch_idx]
         )
 
         # Input grid.
