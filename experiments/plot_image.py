@@ -1,5 +1,6 @@
+import copy
 import os
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 
 import einops
 import matplotlib
@@ -10,6 +11,7 @@ from torch import nn
 
 import wandb
 from icicl.data.image import GriddedImageBatch, ImageBatch
+from icicl.utils.experiment_utils import np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -24,6 +26,8 @@ def plot_image(
     subplots: bool = True,
     savefig: bool = False,
     logging: bool = True,
+    pred_fn: Callable = np_pred_fn,
+    num_np_samples: int = 16,
 ):
     for i in range(num_fig):
         batch = batches[i]
@@ -36,23 +40,35 @@ def plot_image(
         yt = batch.yt[:1]
         mc = batch.mc[:1]
 
+        batch.xc = xc
+        batch.yc = yc
+        batch.xt = xt
+        batch.yt = yt
+
+        if isinstance(batch, GriddedImageBatch):
+            mc_grid = batch.mc_grid[:1]
+            y_grid = batch.y_grid[:1]
+            mt_grid = batch.mt_grid[:1]
+            batch.mc_grid = mc_grid
+            batch.y_grid = y_grid
+            batch.mt_grid = mt_grid
+
+        plot_batch = copy.deepcopy(batch)
+        plot_batch.xt = x
+
+        if isinstance(batch, GriddedImageBatch):
+            assert isinstance(batch, GriddedImageBatch)
+            plot_batch.mt_grid = torch.full(batch.mt_grid.shape, True)
+
         with torch.no_grad():
-            if isinstance(batch, GriddedImageBatch):
-                y_plot_pred_dist = model(
-                    mc=batch.mc_grid,
-                    y=batch.y_grid,
-                    mt=torch.full(batch.mt_grid.shape, True),
-                )
-                yt_pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
-            else:
-                y_plot_pred_dist = model(xc=xc, yc=yc, xt=x)
-                yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+            y_plot_pred_dist = pred_fn(model, plot_batch, num_samples=num_np_samples)
+            yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
             mean, std = (
-                y_plot_pred_dist.loc[:1].numpy(),
-                y_plot_pred_dist.scale[:1].numpy(),
+                y_plot_pred_dist.mean.numpy(),
+                y_plot_pred_dist.stddev.numpy(),
             )
-            model_nll = -yt_pred_dist.log_prob(yt)[:1].mean()
+            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt.numel()
 
         # Reorganise into grid.
         if y.shape[-1] == 1:

@@ -1,3 +1,4 @@
+import copy
 import os
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -10,6 +11,7 @@ from torch import nn
 
 import wandb
 from icicl.data.base import Batch
+from icicl.utils.experiment_utils import np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -35,6 +37,8 @@ def plot_cru(
     savefig: bool = False,
     logging: bool = True,
     colorbar: bool = False,
+    pred_fn: Callable = np_pred_fn,
+    num_np_samples: int = 16,
 ):
     time_idx = [0, -1] if time_idx is None else time_idx
 
@@ -47,6 +51,16 @@ def plot_cru(
         x = batch.x[:1]
         y = batch.y[:1]
 
+        batch.xc = xc
+        batch.yc = yc
+        batch.xt = xt
+        batch.yt = yt
+        batch.x = x
+        batch.y = y
+
+        plot_batch = copy.deepcopy(batch)
+        plot_batch.xt = x
+
         if not isinstance(model, nn.Module):
             y_pred_dist = model(xc=xc, yc=yc, xt=x)
             yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
@@ -58,11 +72,11 @@ def plot_cru(
             yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
         else:
             with torch.no_grad():
-                y_pred_dist = model(xc=xc, yc=yc, xt=x)
-                yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+                y_pred_dist = pred_fn(model, plot_batch, num_samples=num_np_samples)
+                yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
-        model_nll = -yt_pred_dist.log_prob(yt).mean().cpu()
-        pred_mean, pred_std = y_pred_dist.loc.cpu(), y_pred_dist.scale.cpu()
+        model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[:-1].numel()
+        pred_mean, pred_std = y_pred_dist.mean.cpu(), y_pred_dist.stddev.cpu()
 
         # Rescale inputs and outputs.
         xc = (xc[..., :3].cpu() * x_std) + x_mean

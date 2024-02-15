@@ -1,3 +1,4 @@
+import copy
 import os
 from typing import Callable, List, Tuple, Union
 
@@ -10,6 +11,7 @@ from torch import nn
 
 import wandb
 from icicl.data.kolmogorov import KolmogorovBatch
+from icicl.utils.experiment_utils import np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -56,6 +58,8 @@ def plot_kolmogorov(
     savefig: bool = False,
     logging: bool = True,
     subplots: bool = True,
+    pred_fn: Callable = np_pred_fn,
+    num_np_samples: int = 16,
 ):
     for i in range(num_fig):
         batch = batches[i]
@@ -66,6 +70,14 @@ def plot_kolmogorov(
         xt = batch.xt[:1]
         yt = batch.yt[:1]
         re = batch.re[0]
+
+        batch.xc = xc
+        batch.yc = yc
+        batch.xt = xt
+        batch.yt = yt
+
+        plot_batch = copy.deepcopy(batch)
+        plot_batch.xt = x
 
         if not isinstance(model, nn.Module):
             # model is callable function that trains model then returns pred.
@@ -79,11 +91,11 @@ def plot_kolmogorov(
             yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
         else:
             with torch.no_grad():
-                y_pred_dist = model(xc=xc, yc=yc, xt=x)
-                yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+                y_pred_dist = pred_fn(model, plot_batch, num_samples=num_np_samples)
+                yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
         # model_nll = -yt_pred_dist.log_prob(yt).mean().cpu()
-        mean = y_pred_dist.loc.cpu()
+        mean = y_pred_dist.mean.cpu()
         # std = y_pred_dist.scale.cpu()
 
         # Compute vorcitiy.

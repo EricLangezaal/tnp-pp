@@ -1,3 +1,4 @@
+import copy
 import os
 from typing import Callable, List, Tuple, Union
 
@@ -10,7 +11,7 @@ import wandb
 from icicl.data.base import Batch
 from icicl.data.synthetic import SyntheticBatch
 from icicl.models.telbanp import TELBANP
-from icicl.utils.experiment_utils import ar_predict
+from icicl.utils.experiment_utils import ar_predict, np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"
@@ -35,6 +36,8 @@ def plot(
     name: str = "plot",
     savefig: bool = False,
     logging: bool = True,
+    pred_fn: Callable = np_pred_fn,
+    num_np_samples: int = 16,
 ):
     # Get dimension of input data
     dim = batches[0].xc.shape[-1]
@@ -50,6 +53,14 @@ def plot(
             xt = batch.xt[:1]
             yt = batch.yt[:1]
 
+            batch.xc = xc
+            batch.yc = yc
+            batch.xt = xt
+            batch.yt = yt
+
+            plot_batch = copy.deepcopy(batch)
+            plot_batch.xt = x_plot
+
             if not isinstance(model, nn.Module):
                 # model is a callable function.
                 y_pred_dist = model(xc=xc, yc=yc, xt=x_plot)
@@ -62,11 +73,13 @@ def plot(
                 yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
             else:
                 with torch.no_grad():
-                    y_plot_pred_dist = model(xc=xc, yc=yc, xt=x_plot)
-                    yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
+                    y_plot_pred_dist = pred_fn(
+                        model, plot_batch, num_samples=num_np_samples
+                    )
+                    yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
-            model_nll = -yt_pred_dist.log_prob(yt).mean()
-            mean, std = y_plot_pred_dist.loc, y_plot_pred_dist.scale
+            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[:-1].numel()
+            mean, std = y_plot_pred_dist.mean, y_plot_pred_dist.stddev
 
             # Make figure for plotting
             fig = plt.figure(figsize=figsize)
@@ -105,6 +118,21 @@ def plot(
                 alpha=0.2,
                 label="Model",
             )
+
+            if isinstance(y_plot_pred_dist, torch.distributions.MixtureSameFamily):
+                # Plot individual component means.
+                for i in range(num_np_samples):
+                    # Get component distribution.
+                    sample_mean = y_plot_pred_dist.component_distribution.mean[
+                        :, i, ...
+                    ]
+                    plt.plot(
+                        x_plot[0, :, 0].cpu(),
+                        sample_mean[0, :, 0].cpu(),
+                        c="tab:blue",
+                        lw=1,
+                        alpha=0.5,
+                    )
 
             title_str = f"$N = {xc.shape[1]}$ NLL = {model_nll:.3f}"
 
