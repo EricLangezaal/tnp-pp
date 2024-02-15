@@ -18,7 +18,7 @@ import wandb
 from icicl.data.base import Batch, DataGenerator
 from icicl.data.image import GriddedImageBatch
 from icicl.data.synthetic import SyntheticBatch
-from icicl.models.base import NeuralProcess
+from icicl.models.base import ConditionalNeuralProcess, NeuralProcess
 from icicl.models.convcnp import GriddedConvCNP
 from icicl.utils.batch import compress_batch_dimensions
 from icicl.utils.initialisation import weights_init
@@ -103,6 +103,7 @@ class ModelCheckpointer:
 def np_loss_fn(
     model: nn.Module,
     batch: Batch,
+    num_samples: int = 1,
 ) -> torch.Tensor:
     """Perform a single training step, returning the loss, i.e.
     the negative log likelihood.
@@ -114,28 +115,39 @@ def np_loss_fn(
     Returns:
         loss: average negative log likelihood.
     """
-    if isinstance(batch, GriddedImageBatch):
-        assert isinstance(model, GriddedConvCNP)
+    if isinstance(model, GriddedConvCNP):
+        assert isinstance(batch, GriddedImageBatch)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
-    else:
-        assert isinstance(model, NeuralProcess)
+    elif isinstance(model, ConditionalNeuralProcess):
         pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+    elif isinstance(model, NeuralProcess):
+        pred_dist = model(
+            xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples
+        )
+    else:
+        raise ValueError
 
-    loglik = pred_dist.log_prob(batch.yt)
+    loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[:-1].numel()
 
-    return -loglik.mean()
+    return -loglik
 
 
 def np_pred_fn(
     model: nn.Module,
     batch: Batch,
+    num_samples: int = 1,
 ) -> torch.distributions.Distribution:
-    if isinstance(batch, GriddedImageBatch):
-        assert isinstance(model, GriddedConvCNP)
+    if isinstance(model, GriddedConvCNP):
+        assert isinstance(batch, GriddedImageBatch)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
-    else:
-        assert isinstance(model, NeuralProcess)
+    elif isinstance(model, ConditionalNeuralProcess):
         pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+    elif isinstance(model, NeuralProcess):
+        pred_dist = model(
+            xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples
+        )
+    else:
+        raise ValueError
 
     return pred_dist
 
@@ -146,6 +158,7 @@ def train_epoch(
     optimiser: torch.optim.Optimizer,
     step: int,
     loss_fn: Callable = np_loss_fn,
+    gradient_clip_val: Optional[float] = None,
 ) -> Tuple[int, Dict[str, Any]]:
     epoch = tqdm(generator, total=len(generator), desc="Training")
     losses = []
@@ -153,6 +166,10 @@ def train_epoch(
         optimiser.zero_grad()
         loss = loss_fn(model=model, batch=batch)
         loss.backward()
+
+        if gradient_clip_val is not None:
+            nn.utils.clip_grad_norm(model.parameters(), gradient_clip_val)
+
         optimiser.step()
 
         losses.append(loss.detach())
@@ -176,6 +193,7 @@ def train_epoch(
 def val_epoch(
     model: nn.Module,
     generator: DataGenerator,
+    num_samples: int = 1,
 ) -> Tuple[Dict[str, Any], List[Batch]]:
     result = defaultdict(list)
     batches = []
@@ -183,14 +201,19 @@ def val_epoch(
     for batch in tqdm(generator, total=len(generator), desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
-            if isinstance(batch, GriddedImageBatch):
-                assert isinstance(model, GriddedConvCNP)
+            if isinstance(model, GriddedConvCNP):
+                assert isinstance(batch, GriddedImageBatch)
                 pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
-            else:
-                assert isinstance(model, NeuralProcess)
+            elif isinstance(model, ConditionalNeuralProcess):
                 pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+            elif isinstance(model, NeuralProcess):
+                pred_dist = model(
+                    xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples
+                )
+            else:
+                raise ValueError
 
-        loglik = pred_dist.log_prob(batch.yt).mean()
+        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[:-1].numel()
 
         if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
             gt_mean, gt_std, gt_loglik = batch.gt_pred(
@@ -199,15 +222,13 @@ def val_epoch(
                 xt=batch.xt,
                 yt=batch.yt,
             )
-            gt_loglik = gt_loglik.mean() / batch.yt.shape[1]
+            gt_loglik = gt_loglik.sum() / batch.yt[:-1].numel()
 
             result["gt_mean"].append(gt_mean)
             result["gt_std"].append(gt_std)
             result["gt_loglik"].append(gt_loglik)
 
         result["loglik"].append(loglik)
-        result["pred_mean"].append(pred_dist.loc)
-        result["pred_std"].append(pred_dist.scale)
 
     loglik = torch.stack(result["loglik"])
     result["mean_loglik"] = loglik.mean()
@@ -239,6 +260,14 @@ def create_default_config() -> DictConfig:
             "only_plots": False,
             "savefig": False,
             "subplots": True,
+            "loss_fn": {
+                "_target_": "icicl.utils.experiment_utils.np_loss_fn",
+                "_partial_": True,
+            },
+            "pred_fn": {
+                "_target_": "icicl.utils.experiment_utils.np_pred_fn",
+                "_partial_": True,
+            },
         }
     }
     return OmegaConf.create(default_config)
