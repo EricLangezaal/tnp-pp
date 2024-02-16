@@ -4,6 +4,7 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
+from ..networks.np_transformer import StochasticTNPDTransformerEncoder
 from ..networks.transformer import TNPDTransformerEncoder, TransformerEncoder
 from ..utils.helpers import preprocess_observations
 from .base import ConditionalNeuralProcess, NeuralProcess
@@ -101,13 +102,15 @@ class EfficientTNPDEncoder(nn.Module):
 class StochasticTNPDEncoder(nn.Module):
     def __init__(
         self,
-        tnpd_encoder: Union[EfficientTNPDEncoder, TNPDEncoder],
-        min_zt_std: float = 0.0,
+        transformer_encoder: Union[
+            TNPDTransformerEncoder, StochasticTNPDTransformerEncoder
+        ],
+        xy_encoder: nn.Module,
     ):
         super().__init__()
 
-        self.tnpd_encoder = tnpd_encoder
-        self.min_zt_std = min_zt_std
+        self.transformer_encoder = transformer_encoder
+        self.xy_encoder = xy_encoder
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, s, n, dz]"
@@ -115,16 +118,26 @@ class StochasticTNPDEncoder(nn.Module):
     def forward(
         self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor, num_samples: int
     ) -> torch.Tensor:
-        _zt = self.tnpd_encoder(xc, yc, xt)
+        yc, yt = preprocess_observations(xt, yc)
 
-        # Sample zt for decoder.
-        zt_loc = _zt[..., : _zt.shape[-1] // 2]
-        zt_raw_std = _zt[..., _zt.shape[-1] // 2 :]
-        zt_std = nn.functional.softplus(zt_raw_std) + self.min_zt_std
+        zc = torch.cat((xc, yc), dim=-1)
+        zt = torch.cat((xt, yt), dim=-1)
+        zc = self.xy_encoder(zc)
+        zt = self.xy_encoder(zt)
 
-        zt = zt_loc[:, None, ...] + zt_std[:, None, ...] * torch.randn(
-            (zt_std.shape[0], num_samples, *zt_std.shape[1:])
-        )
+        if isinstance(self.transformer_encoder, StochasticTNPDTransformerEncoder):
+            zt = self.transformer_encoder(zc, zt, num_samples=num_samples)
+        else:
+            _zt = self.transformer_encoder(zc, zt)
+
+            # Sample zt for decoder.
+            zt_loc = _zt[..., : _zt.shape[-1] // 2]
+            zt_raw_std = _zt[..., _zt.shape[-1] // 2 :]
+            zt_std = nn.functional.softplus(zt_raw_std) + self.min_zt_std
+
+            zt = zt_loc[:, None, ...] + zt_std[:, None, ...] * torch.randn(
+                (zt_std.shape[0], num_samples, *zt_std.shape[1:])
+            )
 
         return zt
 

@@ -10,6 +10,53 @@ from .attention_layers import MultiHeadCrossAttentionLayer, MultiHeadSelfAttenti
 from .transformer import _get_clones
 
 
+class StochasticTNPDTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        mhca_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+        final_layer_cross_attention: bool = False,
+    ):
+        super().__init__()
+
+        self.mhca_loc_layers = _get_clones(mhca_layer, num_layers)
+        self.mhca_std_layers = _get_clones(mhca_layer, num_layers)
+        self.final_layer_cross_attention = final_layer_cross_attention
+
+    @check_shapes(
+        "xc: [m, nc, d]", "xt: [m, nt, d]", "mask: [m, nt, nc]", "return: [m, s, nt, d]"
+    )
+    def forward(
+        self,
+        xc: torch.Tensor,
+        xt: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        num_samples: int = 1,
+    ) -> torch.Tensor:
+        xc, xt, mask, uncompress_xt = _expand_dims(xc, xt, mask, num_samples)
+        for mhca_loc_layer, mhca_std_layer in zip(
+            self.mhca_loc_layers, self.mhca_std_layers
+        ):
+            if not self.final_layer_cross_attention:
+                # Use the mean layer here.
+                xt = mhca_loc_layer(xt, xc, mask)
+
+            xc_loc = mhca_loc_layer(xc, xc)
+            xc_raw_std = mhca_std_layer(xc, xc)
+            xc_std = nn.functional.softplus(xc_raw_std)
+
+            # Sample xc.
+            xc = xc_loc + xc_std * torch.randn_like(xc_std)
+
+        if self.final_layer_cross_attention:
+            xt = self.mhca_layers[-1](xt, xc, mask)
+
+        # Returns to shape (m, num_samples, nt, dx).
+        xt = uncompress_xt(xt)
+
+        return xt
+
+
 class StochasticNestedPerceiverEncoder(nn.Module):
     def __init__(
         self,

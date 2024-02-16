@@ -4,7 +4,7 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..networks.spt_transformer import (
+from ..networks.np_transformer import (
     StochasticNestedISetTransformerEncoder,
     StochasticNestedPerceiverEncoder,
 )
