@@ -6,16 +6,11 @@ model:
 
 stnpd_encoder:
   _target_: icicl.models.tnp.StochasticTNPDEncoder
-  tnpd_encoder: ${tnpd_encoder}
-  min_zt_std: 1.0e-3
-
-tnpd_encoder:
-  _target_: icicl.models.tnp.EfficientTNPDEncoder
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.networks.np_transformer.StochasticTNPDTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
 
@@ -41,10 +36,10 @@ tnpd_decoder:
 
 z_decoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'${params.embed_dim} // 2'}
+  in_dim: ${params.embed_dim}
   out_dim: ${eval:'2 * ${params.dim_y}'}
   num_layers: 2
-  width: ${eval:'${params.embed_dim} // 2'}
+  width: ${params.embed_dim}
 
 likelihood:
   _target_: icicl.likelihoods.base.UniformMixtureLikelihood

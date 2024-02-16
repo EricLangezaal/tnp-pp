@@ -10,7 +10,7 @@ lbanp_encoder:
   xy_encoder: ${xy_encoder}
 
 perceiver_encoder:
-  _target_: icicl.networks.spt_transformer.StochasticNestedISetTransformerEncoder
+  _target_: icicl.networks.np_transformer.StochasticNestedISetTransformerEncoder
   num_latents: ${params.num_latents}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtoc_layer: ${mhca_qtoc_layer}
