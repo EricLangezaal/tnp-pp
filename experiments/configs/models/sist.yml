@@ -10,13 +10,14 @@ lbanp_encoder:
   xy_encoder: ${xy_encoder}
 
 perceiver_encoder:
-  _target_: icicl.networks.transformer.StochasticNestedISetTransformerEncoder
+  _target_: icicl.networks.transformer.RandomLatentsNestedISetTransformerEncoder
   mhca_ctoq_layer: ${mhca_ctoq_layer}
   mhca_qtoc_layer: ${mhca_qtoc_layer}
   mhca_qtot_layer: ${mhca_qtot_layer}
   num_layers: ${params.num_layers}
   min_num_latents: ${params.min_num_latents}
   max_num_latents: ${params.max_num_latents}
+  random_projection: True
 
 mhca_ctoq_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -82,7 +83,7 @@ params:
 misc:
   name: SIST-L${params.num_layers}-H${params.num_heads}-D${params.embed_dim}-min-M${params.min_num_latents}-max-M${params.max_num_latents}
   resume_from_checkpoint: null
-  logging: True
+  logging: False
   seed: 0
   plot_interval: 10
   gradient_clip_val: 0.5

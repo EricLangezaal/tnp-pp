@@ -233,7 +233,7 @@ class NestedISetTransformerEncoder(nn.Module):
         return xt
 
 
-class StochasticNestedISetTransformerEncoder(nn.Module):
+class RandomLatentsNestedISetTransformerEncoder(nn.Module):
     def __init__(
         self,
         mhca_ctoq_layer: MultiHeadSelfAttentionLayer,
