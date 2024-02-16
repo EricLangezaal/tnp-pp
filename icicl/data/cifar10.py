@@ -1,5 +1,6 @@
 from abc import ABC
 
+import torch
 import torchvision
 
 from .image import ImageGenerator
@@ -8,7 +9,7 @@ from .image_datasets import TranslatedImageGenerator, ZeroShotMultiImageGenerato
 
 class CIFAR10(ABC):
     def __init__(self, data_dir: str, train: bool = True, download: bool = False):
-        self.dim = 28 * 28
+        self.dim = 32 * 32
         self.dataset = torchvision.datasets.CIFAR10(
             root=data_dir,
             train=train,
@@ -30,6 +31,7 @@ class CIFAR10Generator(CIFAR10, ImageGenerator):
     ):
         CIFAR10.__init__(self, data_dir, train, download)
         # Rescale between to [0, 1].
+        self.dataset.data = torch.as_tensor(self.dataset.data)
         self.dataset.data = self.dataset.data.float() / self.dataset.data.float().max()
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
 
