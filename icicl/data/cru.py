@@ -33,6 +33,7 @@ class CRUDataGenerator(DataGenerator):
         y_std: Optional[float] = None,
         ref_date: str = "2000-01-01",
         t_spacing: int = 1,
+        renormalise_time: bool = False,
     ):
         super().__init__(samples_per_epoch=samples_per_epoch, batch_size=batch_size)
 
@@ -97,6 +98,8 @@ class CRUDataGenerator(DataGenerator):
         self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
         self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
+        self.renormalise_time = renormalise_time
+
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
         batch_size = self.batch_size if batch_shape is None else batch_shape[0]
         # (batch_size, n, 3).
@@ -135,17 +138,6 @@ class CRUDataGenerator(DataGenerator):
                 valid_location = True
 
         time_idx: List[List] = []
-        # for _ in range(batch_size):
-        #     i = random.randint(
-        #         0, len(self.data["time"]) - 1 - self.t_spacing * self.batch_grid_size[0]
-        #     )
-        #     time_idx.append(
-        #         list(
-        #             range(
-        #                 i, i + self.t_spacing * self.batch_grid_size[0], self.t_spacing
-        #             )
-        #         )
-        #     )
         for _ in range(batch_size):
             i = random.randint(0, len(self.data["time"]) - 1 - self.batch_grid_size[0])
             time_idx.append(list(range(i, i + self.batch_grid_size[0])))
@@ -163,42 +155,7 @@ class CRUDataGenerator(DataGenerator):
         yts: List[torch.Tensor] = []
 
         for idx in idxs:
-            # Crackers, but fast.
-            idx_grid = self._create_idx_grid(idx)
-
-            x = torch.stack(
-                [
-                    torch.as_tensor(
-                        self.data["time"][idx_grid[:, 0]].data, dtype=torch.float
-                    ),
-                    torch.as_tensor(
-                        self.data["lat"][idx_grid[:, 1]].data, dtype=torch.float
-                    ),
-                    torch.as_tensor(
-                        self.data["lon"][idx_grid[:, 2]].data, dtype=torch.float
-                    ),
-                ],
-                dim=-1,
-            )
-
-            y_raw = self.data["Tair"][idx[0], idx[1], idx[2]]
-            y_mask = np.isnan(y_raw.data)
-
-            y = (
-                torch.as_tensor(y_raw.data[~y_mask], dtype=torch.float32).unsqueeze(-1)
-                - self.y_mean
-            ) / self.y_std
-            x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
-
-            # Sample indices for context / target.
-            shuffled_idx = np.arange(len(y))
-            np.random.shuffle(shuffled_idx)
-            num_ctx = math.ceil(pc * len(y))
-
-            xc = x[shuffled_idx[:num_ctx]]
-            yc = y[shuffled_idx[:num_ctx]]
-            xt = x[shuffled_idx[num_ctx:][: self.max_nt]]
-            yt = y[shuffled_idx[num_ctx:][: self.max_nt]]
+            x, y, xc, yc, xt, yt = self.process_idx(pc, idx)
 
             xs.append(x)
             ys.append(y)
@@ -215,6 +172,60 @@ class CRUDataGenerator(DataGenerator):
         yt = torch.stack(yts)
 
         return Batch(x=x, y=y, xc=xc, yc=yc, xt=xt, yt=yt)
+
+    def process_idx(
+        self, pc: float, idx: Tuple[List[int], List[int], List[int]]
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        # Crackers, but fast.
+        idx_grid = self._create_idx_grid(idx)
+
+        x = torch.stack(
+            [
+                torch.as_tensor(
+                    self.data["time"][idx_grid[:, 0]].data, dtype=torch.float
+                ),
+                torch.as_tensor(
+                    self.data["lat"][idx_grid[:, 1]].data, dtype=torch.float
+                ),
+                torch.as_tensor(
+                    self.data["lon"][idx_grid[:, 2]].data, dtype=torch.float
+                ),
+            ],
+            dim=-1,
+        )
+
+        y_raw = self.data["Tair"][idx[0], idx[1], idx[2]]
+        y_mask = np.isnan(y_raw.data)
+
+        y = (
+            torch.as_tensor(y_raw.data[~y_mask], dtype=torch.float32).unsqueeze(-1)
+            - self.y_mean
+        ) / self.y_std
+        x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
+
+        if self.renormalise_time:
+            t_mean = x[..., 0].mean(dim=0)
+            t_std = x[..., 0].std(dim=0)
+            x[..., 0] = (x[..., 0] - t_mean) / t_std
+
+        # Sample indices for context / target.
+        shuffled_idx = np.arange(len(y))
+        np.random.shuffle(shuffled_idx)
+        num_ctx = math.ceil(pc * len(y))
+
+        xc = x[shuffled_idx[:num_ctx]]
+        yc = y[shuffled_idx[:num_ctx]]
+        xt = x[shuffled_idx[num_ctx:][: self.max_nt]]
+        yt = y[shuffled_idx[num_ctx:][: self.max_nt]]
+
+        return x, y, xc, yc, xt, yt
 
     def _create_idx_grid(self, idx: Tuple[List, List, List]) -> torch.Tensor:
         """Constructs a grid of tensors from given list of indices.
@@ -301,61 +312,7 @@ class CRUDataGeneratorWithElevation(CRUDataGenerator):
         yts: List[torch.Tensor] = []
 
         for idx in idxs:
-            # Crackers, but fast.
-            idx_grid = self._create_idx_grid(idx)
-
-            x = torch.stack(
-                [
-                    torch.as_tensor(
-                        self.data["time"][idx_grid[:, 0]].data, dtype=torch.float
-                    ),
-                    torch.as_tensor(
-                        self.data["lat"][idx_grid[:, 1]].data, dtype=torch.float
-                    ),
-                    torch.as_tensor(
-                        self.data["lon"][idx_grid[:, 2]].data, dtype=torch.float
-                    ),
-                ],
-                dim=-1,
-            )
-
-            elev_raw = self.data["elev"][idx[1], idx[2]]
-            elev_mask = np.isnan(elev_raw.data)
-
-            # Repeat elevations for every time point.
-            elev_mask = einops.repeat(elev_mask, "n2 n3 -> n1 n2 n3", n1=len(idx[0]))
-            elev_data = einops.repeat(
-                elev_raw.data, "n2 n3 -> n1 n2 n3", n1=len(idx[0])
-            )
-
-            y_raw = self.data["Tair"][idx[0], idx[1], idx[2]]
-            y_mask = np.isnan(y_raw.data)
-
-            mask = elev_mask & y_mask
-
-            y = (
-                torch.as_tensor(y_raw.data[~mask], dtype=torch.float32).unsqueeze(-1)
-                - self.y_mean
-            ) / self.y_std
-            elev = (
-                torch.as_tensor(elev_data[~mask], dtype=torch.float32).unsqueeze(-1)
-                - self.elev_mean
-            ) / self.elev_std
-
-            x = (x[~mask.flatten()] - self.x_mean) / self.x_std
-
-            # Concat elevation to input.
-            x = torch.cat((x, elev), dim=-1)
-
-            # Sample indices for context / target.
-            shuffled_idx = np.arange(len(y))
-            np.random.shuffle(shuffled_idx)
-            num_ctx = math.ceil(pc * len(y))
-
-            xc = x[shuffled_idx[:num_ctx]]
-            yc = y[shuffled_idx[:num_ctx]]
-            xt = x[shuffled_idx[num_ctx:][: self.max_nt]]
-            yt = y[shuffled_idx[num_ctx:][: self.max_nt]]
+            x, y, xc, yc, xt, yt = self.process_idx(pc, idx)
 
             xs.append(x)
             ys.append(y)
@@ -372,6 +329,76 @@ class CRUDataGeneratorWithElevation(CRUDataGenerator):
         yt = torch.stack(yts)
 
         return Batch(x=x, y=y, xc=xc, yc=yc, xt=xt, yt=yt)
+
+    def process_idx(
+        self, pc: float, idx: Tuple[List[int], List[int], List[int]]
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        idx_grid = self._create_idx_grid(idx)
+
+        x = torch.stack(
+            [
+                torch.as_tensor(
+                    self.data["time"][idx_grid[:, 0]].data, dtype=torch.float
+                ),
+                torch.as_tensor(
+                    self.data["lat"][idx_grid[:, 1]].data, dtype=torch.float
+                ),
+                torch.as_tensor(
+                    self.data["lon"][idx_grid[:, 2]].data, dtype=torch.float
+                ),
+            ],
+            dim=-1,
+        )
+
+        elev_raw = self.data["elev"][idx[1], idx[2]]
+        elev_mask = np.isnan(elev_raw.data)
+
+        # Repeat elevations for every time point.
+        elev_mask = einops.repeat(elev_mask, "n2 n3 -> n1 n2 n3", n1=len(idx[0]))
+        elev_data = einops.repeat(elev_raw.data, "n2 n3 -> n1 n2 n3", n1=len(idx[0]))
+
+        y_raw = self.data["Tair"][idx[0], idx[1], idx[2]]
+        y_mask = np.isnan(y_raw.data)
+
+        mask = elev_mask & y_mask
+
+        y = (
+            torch.as_tensor(y_raw.data[~mask], dtype=torch.float32).unsqueeze(-1)
+            - self.y_mean
+        ) / self.y_std
+        elev = (
+            torch.as_tensor(elev_data[~mask], dtype=torch.float32).unsqueeze(-1)
+            - self.elev_mean
+        ) / self.elev_std
+
+        x = (x[~mask.flatten()] - self.x_mean) / self.x_std
+
+        if self.renormalise_time:
+            t_mean = x[..., 0].mean(dim=0)
+            t_std = x[..., 0].std(dim=0)
+            x[..., 0] = (x[..., 0] - t_mean) / t_std
+
+        # Concat elevation to input.
+        x = torch.cat((x, elev), dim=-1)
+
+        # Sample indices for context / target.
+        shuffled_idx = np.arange(len(y))
+        np.random.shuffle(shuffled_idx)
+        num_ctx = math.ceil(pc * len(y))
+
+        xc = x[shuffled_idx[:num_ctx]]
+        yc = y[shuffled_idx[:num_ctx]]
+        xt = x[shuffled_idx[num_ctx:][: self.max_nt]]
+        yt = y[shuffled_idx[num_ctx:][: self.max_nt]]
+
+        return x, y, xc, yc, xt, yt
 
     def _get_num_points(
         self,
