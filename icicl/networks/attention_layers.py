@@ -117,7 +117,7 @@ class MultiHeadSelfAttentionLayer(BaseMultiHeadAttentionLayer):
             x = x + self.attn_block(self.norm1(x), mask)
             x = x + self.ff_block(self.norm2(x))
         else:
-            x = x + self.norm1(x + self.attn_block(x, mask))
+            x = self.norm1(x + self.attn_block(x, mask))
             x = self.norm2(x + self.ff_block(x))
 
         return x
