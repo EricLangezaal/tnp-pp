@@ -26,6 +26,7 @@ def main():
 
     step = 0
     for epoch in range(epochs):
+        model.train()
         step, train_result = train_epoch(
             model=model,
             generator=gen_train,
@@ -35,6 +36,7 @@ def main():
         )
         evaluation_summary("train", train_result)
 
+        model.eval()
         val_result, batches = val_epoch(model=model, generator=gen_val)
 
         evaluation_summary("val", val_result)
