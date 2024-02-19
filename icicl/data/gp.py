@@ -6,6 +6,8 @@ import gpytorch
 import torch
 import torch.distributions as td
 
+from icicl.networks.kernels import GibbsKernel
+
 from .base import GroundTruthPredictor
 from .synthetic import SyntheticGeneratorBimodalInput, SyntheticGeneratorUniformInput
 
@@ -19,6 +21,7 @@ KERNEL_TYPES = [
     # "weakly_periodic",
     "periodic",
     # "noisy_periodic_mixture",
+    "gibbs",
 ]
 
 
@@ -188,6 +191,15 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
             kernel2 = gpytorch.kernels.RBFKernel()
             kernel2.lengthscale = self.noisy_mixture_long_lengthscale
             kernel = kernel1 + kernel2
+
+        elif kernel_type == "gibbs":
+            lengthscale_fn = lambda x: torch.where(
+                x < 0,
+                torch.ones(*x.shape).to(x) * 1.0,
+                torch.ones(*x.shape).to(x) * lengthscale,
+            )
+
+            kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)
 
         else:
             raise ValueError("Unknown kernel type.")
