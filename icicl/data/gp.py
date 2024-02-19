@@ -194,9 +194,9 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
 
         elif kernel_type == "gibbs":
             lengthscale_fn = lambda x: torch.where(
-                x < 0,
-                torch.ones(*x.shape).to(x) * 1.0,
-                torch.ones(*x.shape).to(x) * lengthscale,
+                x[..., 0][..., None] < 0,
+                torch.ones(*x[..., 0][..., None].shape).to(x) * 1.0,
+                torch.ones(*x[..., 0][..., None].shape).to(x) * lengthscale,
             )
 
             kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)

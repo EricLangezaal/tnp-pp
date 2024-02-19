@@ -84,9 +84,9 @@ class GibbsKernel(gpytorch.kernels.Kernel):
     def __init__(
         self,
         lengthscale_fn: Callable[[torch.Tensor], torch.Tensor] = lambda x: torch.where(
-            x < 0,
-            torch.ones(*x.shape).to(x) * 1.0,
-            torch.ones(*x.shape).to(x) * 0.25,
+            x[..., 0][..., None] < 0,
+            torch.ones(*x[..., 0][..., None].shape).to(x) * 1.0,
+            torch.ones(*x[..., 0][..., None].shape).to(x) * 0.25,
         ),
         **kwargs,
     ):
