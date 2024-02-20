@@ -50,6 +50,7 @@ class DataGenerator(ABC):
         *,
         samples_per_epoch: int,
         batch_size: int,
+        deterministic: bool = False,
     ):
         """Base data generator, which can be used to derive other data generators,
         such as synthetic generators or real data generators.
@@ -66,11 +67,16 @@ class DataGenerator(ABC):
         # Set batch counter.
         self.batch_counter = 0
 
+        self.deterministic = deterministic
+        self.batches = None
+
     def __len__(self):
         return self.num_batches
 
     def __iter__(self):
         """Reset batch counter and return self."""
+        if self.deterministic and self.batches is None:
+            self.batches = [self.generate_batch() for _ in range(self.num_batches)]
         self.batch_counter = 0
         return self
 
@@ -82,8 +88,13 @@ class DataGenerator(ABC):
         if self.batch_counter >= self.num_batches:
             raise StopIteration
 
+        if self.deterministic and self.batches is not None:
+            batch = self.batches[self.batch_counter]
+        else:
+            batch = self.generate_batch()
+
         self.batch_counter += 1
-        return self.generate_batch()
+        return batch
 
     @abstractmethod
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
