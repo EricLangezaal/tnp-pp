@@ -1,8 +1,8 @@
 generators:
   train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
-    dim: ${params.dim}
-    kernel_type: random
+    dim: ${params.dim_x}
+    kernel_type: [eq, matern52, periodic]
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
@@ -16,8 +16,8 @@ generators:
     batch_size: 16
   val:
     _target_: icicl.data.gp.RandomScaleGPGenerator
-    dim: ${params.dim}
-    kernel_type: random
+    dim: ${params.dim_x}
+    kernel_type: [eq, matern52, periodic]
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
@@ -30,9 +30,9 @@ generators:
     samples_per_epoch: 4096
     batch_size: 16
 
-  params:
-    dim_x: 1
-    dim_y: 1
+params:
+  dim_x: 1
+  dim_y: 1
 
-  misc:
-    project: synthetic-1d-random-kernel
+misc:
+  project: synthetic-1d-random-kernel

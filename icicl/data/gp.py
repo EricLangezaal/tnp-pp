@@ -133,10 +133,6 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
             max_log10_lengthscale, dtype=torch.float64
         )
 
-        assert (
-            self.kernel_type in KERNEL_TYPES
-        ), f"kernel_type must be in {KERNEL_TYPES}, found {self.kernel_type=}."
-
     def set_up_kernel(self) -> gpytorch.kernels.Kernel:
         # Sample lengthscale
         log10_lengthscale = (
@@ -145,13 +141,10 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         )
         lengthscale = 10.0**log10_lengthscale
 
-        if isinstance(self.kernel_type, list):
-            kernel_type = random.choice(self.kernel_type)
-        else:
-            assert (
-                isinstance(self.kernel_type, str) and self.kernel_type in KERNEL_TYPES
-            )
+        if isinstance(self.kernel_type, str):
             kernel_type = self.kernel_type
+        else:
+            kernel_type = random.choice(self.kernel_type)
 
         if kernel_type == "eq":
             kernel = gpytorch.kernels.RBFKernel()
@@ -205,9 +198,9 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
             kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)
 
         elif kernel_type == "gibbs_random_switch":
-            x0 = torch.rand() * 4 - 2
+            x0 = torch.rand((1,)) * 4 - 2
             lengthscale_fn = lambda x: torch.where(
-                x[..., 0][..., None] < x0,
+                x[..., 0][..., None] < x0.to(x),
                 torch.ones(*x[..., 0][..., None].shape).to(x) * 4.0,
                 torch.ones(*x[..., 0][..., None].shape).to(x) * lengthscale,
             )
