@@ -34,13 +34,19 @@ def main():
             step=step,
             loss_fn=np_loss_fn,
         )
-        evaluation_summary("train", train_result)
-
         model.eval()
+
+        evaluation_summary("train", train_result)
+        checkpointer.update_best_and_last_checkpoint(
+            model=model, val_result=train_result, prefix="train_"
+        )
+
         val_result, batches = val_epoch(model=model, generator=gen_val)
 
         evaluation_summary("val", val_result)
-        checkpointer.update_best_and_last_checkpoint(model=model, val_result=val_result)
+        checkpointer.update_best_and_last_checkpoint(
+            model=model, val_result=val_result, prefix="val_", update_last=False
+        )
 
         if epoch % experiment.misc.plot_interval == 0:
             if isinstance(gen_train, ImageGenerator):
