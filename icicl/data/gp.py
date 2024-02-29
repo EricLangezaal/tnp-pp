@@ -1,6 +1,6 @@
 import random
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 import gpytorch
 import torch
@@ -12,16 +12,16 @@ from .base import GroundTruthPredictor
 from .synthetic import SyntheticGeneratorBimodalInput, SyntheticGeneratorUniformInput
 
 KERNEL_TYPES = [
-    "random",
     "eq",
-    # "matern12",
-    # "matern32",
+    "matern12",
+    "matern32",
     "matern52",
-    # "noisy_mixture",
-    # "weakly_periodic",
+    "noisy_mixture",
+    "weakly_periodic",
     "periodic",
-    # "noisy_periodic_mixture",
+    "noisy_periodic_mixture",
     "gibbs",
+    "gibbs_random_switch",
 ]
 
 
@@ -118,7 +118,7 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
     def __init__(
         self,
         *,
-        kernel_type: str,
+        kernel_type: Union[List[str], str],
         min_log10_lengthscale: float,
         max_log10_lengthscale: float,
         **kwargs,
@@ -133,10 +133,6 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
             max_log10_lengthscale, dtype=torch.float64
         )
 
-        assert (
-            self.kernel_type in KERNEL_TYPES
-        ), f"kernel_type must be in {KERNEL_TYPES}, found {self.kernel_type=}."
-
     def set_up_kernel(self) -> gpytorch.kernels.Kernel:
         # Sample lengthscale
         log10_lengthscale = (
@@ -145,10 +141,10 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         )
         lengthscale = 10.0**log10_lengthscale
 
-        if self.kernel_type == "random":
-            kernel_type = random.choice(KERNEL_TYPES[1:])
-        else:
+        if isinstance(self.kernel_type, str):
             kernel_type = self.kernel_type
+        else:
+            kernel_type = random.choice(self.kernel_type)
 
         if kernel_type == "eq":
             kernel = gpytorch.kernels.RBFKernel()
@@ -194,9 +190,19 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
 
         elif kernel_type == "gibbs":
             lengthscale_fn = lambda x: torch.where(
-                x < 0,
-                torch.ones(*x.shape).to(x) * 1.0,
-                torch.ones(*x.shape).to(x) * lengthscale,
+                x[..., 0][..., None] < 0,
+                torch.ones(*x[..., 0][..., None].shape).to(x) * 4.0,
+                torch.ones(*x[..., 0][..., None].shape).to(x) * lengthscale,
+            )
+
+            kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)
+
+        elif kernel_type == "gibbs_random_switch":
+            x0 = torch.rand((1,)) * 4 - 2
+            lengthscale_fn = lambda x: torch.where(
+                x[..., 0][..., None] < x0.to(x),
+                torch.ones(*x[..., 0][..., None].shape).to(x) * 4.0,
+                torch.ones(*x[..., 0][..., None].shape).to(x) * lengthscale,
             )
 
             kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)

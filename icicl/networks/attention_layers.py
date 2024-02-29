@@ -150,7 +150,7 @@ class MultiHeadCrossAttentionLayer(BaseMultiHeadAttentionLayer):
             xq = xq + self.attn_block(self.norm1(xq), self.norm1(xkv), mask)
             xq = xq + self.ff_block(self.norm2(xq))
         else:
-            xq = xq + self.norm1(xq + self.attn_block(xq, xkv, mask))
+            xq = self.norm1(xq + self.attn_block(xq, xkv, mask))
             xq = self.norm2(xq + self.ff_block(xq))
 
         return xq

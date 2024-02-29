@@ -25,7 +25,7 @@ mhsa_layer:
 
 mha_layer:
   _target_: icicl.networks.attention_layers.MultiHeadAttentionLayer
-  qk_dim: ${params.dim}
+  qk_dim: ${params.dim_x}
   v_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -34,7 +34,7 @@ mha_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'1 + ${params.dim_y} + ${params.dim_x}'}
+  in_dim: ${eval:'${params.dim_y} + ${params.dim_x}'}
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
@@ -56,14 +56,14 @@ likelihood:
 optimiser:
   _target_: torch.optim.AdamW
   _partial_: True
-  lr: 5e-4
+  lr: 5.0e-4
 
 params:
   epochs: 200
   embed_dim: 128
   num_heads: 8
   head_dim: 16
-  norm_first: True
+  norm_first: False
   num_layers: 5
 
 
