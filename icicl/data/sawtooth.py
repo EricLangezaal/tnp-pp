@@ -2,10 +2,14 @@ from typing import Optional, Tuple
 
 import torch
 
-from .synthetic import SyntheticGenerator
+from .synthetic import (
+    SyntheticGenerator,
+    SyntheticGeneratorBimodalInput,
+    SyntheticGeneratorUniformInput,
+)
 
 
-class SawtoothGenerator(SyntheticGenerator):
+class SawtoothGeneratorBase(SyntheticGenerator):
     def __init__(self, *, min_freq: float, max_freq: float, noise_std: float, **kwargs):
         super().__init__(**kwargs)
 
@@ -44,3 +48,13 @@ class SawtoothGenerator(SyntheticGenerator):
             + self.min_freq
         )
         return freq
+
+
+class SawtoothGenerator(SawtoothGeneratorBase, SyntheticGeneratorUniformInput):
+    pass
+
+
+class SawtoothGeneratorBimodalInput(
+    SawtoothGeneratorBase, SyntheticGeneratorBimodalInput
+):
+    pass

@@ -60,9 +60,14 @@ class ModelCheckpointer:
             self.best_validation_loss = loss_ci
             if self.logging:
                 assert self.checkpoint_dir is not None
+                if prefix is not None:
+                    name = f"{prefix}best.ckpt"
+                else:
+                    name = "best.ckpy"
+
                 torch.save(
                     model.state_dict(),
-                    os.path.join(self.checkpoint_dir, f"{prefix}best.ckpt"),
+                    os.path.join(self.checkpoint_dir, name),
                 )
 
         if update_last and self.logging:

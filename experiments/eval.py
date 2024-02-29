@@ -1,16 +1,16 @@
 import lightning.pytorch as pl
 import torch
-from lightning_utils import LitWrapper
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
-from utils import initialize_evaluation, val_epoch
 
 import wandb
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
+from icicl.utils.experiment_utils import initialize_evaluation, val_epoch
+from icicl.utils.lightning_utils import LitWrapper
 
 
 def main():
