@@ -35,10 +35,9 @@ def main():
             gradient_clip_val=experiment.misc.gradient_clip_val,
         )
         model.eval()
-
         evaluation_summary("train", train_result)
         checkpointer.update_best_and_last_checkpoint(
-            model=model, val_result=train_result, prefix="train_"
+            model=model, val_result=train_result, prefix="train_", update_last=True
         )
 
         val_result, batches = val_epoch(model=model, generator=gen_val)

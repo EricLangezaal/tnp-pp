@@ -190,6 +190,8 @@ def train_epoch(
         "loglik": loglik,
         "mean_loglik": loglik.mean(),
         "std_loglik": loglik.std() / (len(losses) ** 0.5),
+        "mean_loss": -loglik.mean(),
+        "std_loss": loglik.std() / (len(losses) ** 0.5),
     }
 
     return step, train_result

@@ -83,8 +83,8 @@ class TEPerceiverEncoder(nn.Module):
 
         assert mhsa_layer.embed_dim == mhca_layer.embed_dim, "embed_dim mismatch."
 
-        embed_dim = mhsa_layer.embed_dim
-        self.latent_tokens = nn.Parameter(torch.randn(num_latents, embed_dim))
+        self.embed_dim = mhsa_layer.embed_dim
+        self.latent_tokens = nn.Parameter(torch.randn(num_latents, self.embed_dim))
         self.latent_inputs = nn.Parameter(torch.randn(num_latents, dim))
 
         self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
@@ -148,21 +148,28 @@ class BaseNestedTEPerceiverEncoder(nn.Module, ABC):
         mhca_ctoq_layer: MultiHeadCrossTEAttentionLayer,
         mhca_qtot_layer: MultiHeadCrossTEAttentionLayer,
         num_layers: int,
-        pseudo_token_initialiser: PseudoTokenInitialiser,
+        pseudo_token_initialiser: Optional[PseudoTokenInitialiser] = None,
     ):
         super().__init__()
 
         assert mhsa_layer.embed_dim == mhca_ctoq_layer.embed_dim, "embed_dim mismatch."
         assert mhsa_layer.embed_dim == mhca_qtot_layer.embed_dim, "embed_dim mismatch."
 
-        embed_dim = mhsa_layer.embed_dim
-        self.latent_tokens = nn.Parameter(torch.randn(num_latents, embed_dim))
+        self.embed_dim = mhsa_layer.embed_dim
+        self.latent_tokens = nn.Parameter(torch.randn(num_latents, self.embed_dim))
         self.latent_inputs = nn.Parameter(torch.randn(num_latents, dim))
 
         self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
         self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
         self.mhca_qtot_layers = _get_clones(mhca_qtot_layer, num_layers)
-        self.pseudo_token_initialiser = pseudo_token_initialiser
+
+        if pseudo_token_initialiser is None:
+            self.pseudo_token_initialiser = lambda xq, xc, tq, tc: (
+                xq,
+                tq + tc.mean(-2, keepdim=True),
+            )
+        else:
+            self.pseudo_token_initialiser = pseudo_token_initialiser
 
 
 class NestedTEPerceiverEncoder(BaseNestedTEPerceiverEncoder):
