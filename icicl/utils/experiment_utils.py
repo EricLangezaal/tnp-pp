@@ -132,7 +132,7 @@ def np_loss_fn(
     else:
         raise ValueError
 
-    loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[:-1].numel()
+    loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt.numel()
 
     return -loglik
 
@@ -218,7 +218,7 @@ def val_epoch(
             else:
                 raise ValueError
 
-        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[:-1].numel()
+        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt.numel()
 
         if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
             gt_mean, gt_std, gt_loglik = batch.gt_pred(
@@ -227,7 +227,7 @@ def val_epoch(
                 xt=batch.xt,
                 yt=batch.yt,
             )
-            gt_loglik = gt_loglik.sum() / batch.yt[:-1].numel()
+            gt_loglik = gt_loglik.sum() / batch.yt.numel()
 
             result["gt_mean"].append(gt_mean)
             result["gt_std"].append(gt_std)

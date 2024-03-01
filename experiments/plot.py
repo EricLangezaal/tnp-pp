@@ -78,7 +78,7 @@ def plot(
                     )
                     yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
-            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[:-1].numel()
+            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt.numel()
             mean, std = y_plot_pred_dist.mean, y_plot_pred_dist.stddev
 
             # Make figure for plotting
