@@ -1,5 +1,6 @@
 import copy
 import random
+import warnings
 from abc import ABC
 from typing import Optional
 
@@ -50,14 +51,52 @@ class TNPDTransformerEncoder(nn.Module):
     def forward(
         self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
+        if mask is not None:
+            warnings.warn("mask is not currently being used.")
+
         for mhca_layer in self.mhca_layers:
             if not self.final_layer_cross_attention:
-                xt = mhca_layer(xt, xc, mask)
+                xt = mhca_layer(xt, xc)
 
             xc = mhca_layer(xc, xc)
 
         if self.final_layer_cross_attention:
-            xt = self.mhca_layers[-1](xt, xc, mask)
+            xt = self.mhca_layers[-1](xt, xc)
+
+        return xt
+
+
+class TNPDTransformerEncoderNotShared(nn.Module):
+    def __init__(
+        self,
+        mhsa_layer: MultiHeadSelfAttentionLayer,
+        mhca_layer: MultiHeadCrossAttentionLayer,
+        num_layers: int,
+        final_layer_cross_attention: bool = False,
+    ):
+        super().__init__()
+
+        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
+        self.mhca_layers = _get_clones(mhca_layer, num_layers)
+        self.final_layer_cross_attention = final_layer_cross_attention
+
+    @check_shapes(
+        "xc: [m, nc, d]", "xt: [m, nt, d]", "mask: [m, nc, nc]", "return: [m, nt, d]"
+    )
+    def forward(
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        if mask is not None:
+            warnings.warn("mask is not currently being used.")
+
+        for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
+            xc = mhsa_layer(xc)
+
+            if not self.final_layer_cross_attention:
+                xt = mhca_layer(xt, xc)
+
+        if self.final_layer_cross_attention:
+            xt = self.mhca_layers[-1](xt, xc)
 
         return xt
 
