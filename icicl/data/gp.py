@@ -1,3 +1,4 @@
+import math
 import random
 from abc import ABC, abstractmethod
 from typing import Callable, List, Optional, Tuple, Union
@@ -190,21 +191,35 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
 
         elif kernel_type == "gibbs":
             lengthscale_fn = lambda x: torch.where(
-                x[..., 0][..., None] < 0,
-                torch.ones(*x[..., 0][..., None].shape).to(x) * 4.0,
-                torch.ones(*x[..., 0][..., None].shape).to(x) * lengthscale,
+                x[..., :1] < 0,
+                torch.ones(*x[..., :1].shape).to(x) * 4.0,
+                torch.ones(*x[..., :1].shape).to(x) * lengthscale,
             )
 
             kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)
 
         elif kernel_type == "gibbs_random_switch":
-            x0 = torch.rand((1,)) * 4 - 2
+            # x0 = torch.rand((1,)) * 6 - 3
+            x0 = torch.as_tensor(random.choice([-1.0, 0.0, 1.0]))
             lengthscale_fn = lambda x: torch.where(
-                x[..., 0][..., None] < x0.to(x),
-                torch.ones(*x[..., 0][..., None].shape).to(x) * 4.0,
-                torch.ones(*x[..., 0][..., None].shape).to(x) * lengthscale,
+                x[..., :1] < x0.to(x),
+                torch.ones(*x[..., :1].shape).to(x) * 4.0,
+                torch.ones(*x[..., :1].shape).to(x) * lengthscale,
             )
 
+            kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)
+
+        elif kernel_type == "gibbs_periodic":
+            min_lengthscale = 0.5
+            period_length = lengthscale
+            offset = torch.rand((1,)) * 2 * math.pi
+            lengthscale_fn = (
+                lambda x: (
+                    torch.sin(math.pi * x[..., :1] / period_length + offset.to(x))
+                )
+                ** 2
+                + min_lengthscale
+            )
             kernel = GibbsKernel(lengthscale_fn=lengthscale_fn)
 
         else:
