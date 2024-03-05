@@ -78,7 +78,7 @@ def plot(
                     )
                     yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
-            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt.numel()
+            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[..., 0].numel()
             mean, std = y_plot_pred_dist.mean, y_plot_pred_dist.stddev
 
             # Make figure for plotting
@@ -149,7 +149,7 @@ def plot(
                         xt=xt[:1],
                         yt=yt[:1],
                     )
-                    gt_nll = -gt_loglik.mean() / yt.shape[1]
+                    gt_nll = -gt_loglik.sum() / batch.yt[..., 0].numel()
 
                 # Plot ground truth
                 plt.plot(
@@ -216,7 +216,7 @@ def plot(
                         s=20,
                     )
 
-            # plt.title(title_str, fontsize=24)
+            plt.title(title_str, fontsize=24)
             plt.grid()
 
             # Set axis limits

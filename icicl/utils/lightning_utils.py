@@ -53,14 +53,14 @@ class LitWrapper(pl.LightningModule):
         _ = batch_idx
         result = {"batch": batch}
         pred_dist = self.pred_fn(self.model, batch)
-        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt.numel()
+        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
 
         if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
-            gt_loglik = gt_loglik.sum() / batch.yt.numel()
+            gt_loglik = gt_loglik.sum() / batch.yt[..., 0].numel()
             result["gt_loglik"] = gt_loglik.cpu()
 
         self.val_outputs.append(result)
@@ -71,14 +71,14 @@ class LitWrapper(pl.LightningModule):
         _ = batch_idx
         result = {"batch": _batch_to_cpu(batch)}
         pred_dist = self.pred_fn(self.model, batch)
-        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt.numel()
+        loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
 
         if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )
-            gt_loglik = gt_loglik.sum() / batch.yt.numel()
+            gt_loglik = gt_loglik.sum() / batch.yt[..., 0].numel()
             result["gt_loglik"] = gt_loglik.cpu()
 
         self.test_outputs.append(result)

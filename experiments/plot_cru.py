@@ -75,7 +75,7 @@ def plot_cru(
                 y_pred_dist = pred_fn(model, plot_batch, num_samples=num_np_samples)
                 yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
 
-        model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt.numel()
+        model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[..., 0].numel()
         pred_mean, pred_std = y_pred_dist.mean.cpu(), y_pred_dist.stddev.cpu()
 
         # Rescale inputs and outputs.

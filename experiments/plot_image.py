@@ -68,7 +68,7 @@ def plot_image(
                 y_plot_pred_dist.mean.numpy(),
                 y_plot_pred_dist.stddev.numpy(),
             )
-            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt.numel()
+            model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[..., 0].numel()
 
         # Reorganise into grid.
         if y.shape[-1] == 1:
