@@ -56,6 +56,27 @@ class MLPKernel(Kernel):
         return dots
 
 
+class SpatialGeneralisationMLPKernel(MLPKernel):
+    def __init__(self, dim_x: int, lengthscale: float = 0.5, **kwargs):
+        super().__init__(**kwargs)
+
+        self.dim_x = dim_x
+        self.lengthscale = torch.as_tensor([lengthscale] * dim_x)
+
+    @check_shapes("diff: [m, n1, n2, dx]", "return: [m, n1, n2, dout]")
+    def forward(self, diff: torch.Tensor) -> torch.Tensor:
+        dots = self.mlp(diff)
+
+        # Get actual x_difference.
+        diff_x = diff[..., -self.dim_x :]
+
+        # (m, n1, n2, h).
+        dist_x = (diff_x / self.lengthscale).sum(-1, keepdim=True)
+        dots_x = -0.5 * dist_x**2.0
+
+        return dots_x.exp() * dots
+
+
 class MixtureKernel(Kernel):
     def __init__(self, *kernels: Kernel, train_weights: bool = True):
         super().__init__()
