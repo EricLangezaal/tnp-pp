@@ -2,13 +2,13 @@
 Implements linear model generation from https://arxiv.org/pdf/2306.15063.pdf
 """
 
-from typing import Optional, Tuple
+from typing import Tuple
 
 import gpytorch
 import torch
 
 from .gp import GPGroundTruthPredictor
-from .synthetic import ICSyntheticGenerator, SyntheticGenerator
+from .synthetic import SyntheticGenerator
 
 
 class LinearGenerator(SyntheticGenerator):
@@ -20,8 +20,7 @@ class LinearGenerator(SyntheticGenerator):
     def sample_outputs(
         self,
         x: torch.Tensor,
-        xic: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, GPGroundTruthPredictor, Optional[torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, GPGroundTruthPredictor]:
         w = self.sample_weight()
         gt_pred = LinearGroundTruthPredictor(prior_std=1.0, noise_std=self.noise_std)
 
@@ -29,24 +28,13 @@ class LinearGenerator(SyntheticGenerator):
         f = x @ w[..., None]
         y = f + self.noise_std * torch.randn_like(f)
 
-        if xic is not None:
-            # Generate observations for in-context input locations.
-            fic = xic @ w[:, None, :, None]
-            yic = fic + self.noise_std * torch.randn_like(fic)
-
-            return y, gt_pred, yic
-
-        return y, gt_pred, None
+        return y, gt_pred
 
     def sample_weight(self) -> torch.Tensor:
         # Sample weight vector.
         w = torch.randn((self.batch_size, self.dim))
 
         return w
-
-
-class ICLinearGenerator(LinearGenerator, ICSyntheticGenerator):
-    pass
 
 
 class LinearGroundTruthPredictor(GPGroundTruthPredictor):

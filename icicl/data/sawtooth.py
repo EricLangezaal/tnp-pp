@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Tuple
 
 import torch
 
@@ -20,8 +20,7 @@ class SawtoothGeneratorBase(SyntheticGenerator):
     def sample_outputs(
         self,
         x: torch.Tensor,
-        xic: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, None, Optional[torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, None]:
         # Sample a frequency.
         freq = self.sample_freq()
 
@@ -39,7 +38,7 @@ class SawtoothGeneratorBase(SyntheticGenerator):
         ) % 1
         y = f + self.noise_std * torch.randn_like(f)
 
-        return y, None, None
+        return y, None
 
     def sample_freq(self) -> torch.Tensor:
         # Sample frequency.
