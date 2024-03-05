@@ -21,7 +21,7 @@ def test_gp(kernel: str):
     context_range = ((-2.0, 2.0),)
     target_range = ((-3.0, 3.0),)
 
-    samples_per_epoch = 2
+    samples_per_epoch = 6
     batch_size = 3
 
     generator = RandomScaleGPGenerator(
@@ -51,3 +51,14 @@ def test_gp(kernel: str):
             batches.append(batch)
 
     assert len(batches) == (epochs * generator.num_batches)
+
+    for batch in batches:
+        gt_pred = batch.gt_pred
+        gt_mean, gt_std, gt_loglik = gt_pred(
+            batch.xc[:1], batch.yc[:1], batch.xt[:1], batch.yt[:1]
+        )
+
+
+if __name__ == "__main__":
+    # test_gp(kernel="gibbs_random_switch")
+    test_gp(kernel="eq")
