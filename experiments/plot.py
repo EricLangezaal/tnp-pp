@@ -38,6 +38,7 @@ def plot(
     logging: bool = True,
     pred_fn: Callable = np_pred_fn,
     num_np_samples: int = 16,
+    plot_te_part: bool = False,
 ):
     # Get dimension of input data
     dim = batches[0].xc.shape[-1]
@@ -135,6 +136,34 @@ def plot(
                     )
 
             title_str = f"$N = {xc.shape[1]}$ NLL = {model_nll:.3f}"
+
+            if plot_te_part and isinstance(model, TELBANP):
+                model_copy = copy.deepcopy(model)
+                model_copy.encoder.nested_perceiver_encoder.p_basis_dropout = 1.0
+                model_copy.train()
+
+                with torch.no_grad():
+                    te_y_plot_pred_dist = pred_fn(
+                        model_copy, plot_batch, num_samples=num_np_samples
+                    )
+
+                te_mean, te_std = te_y_plot_pred_dist.mean, te_y_plot_pred_dist.stddev
+                # Plot model predictions
+                plt.plot(
+                    x_plot[0, :, 0].cpu(),
+                    te_mean[0, :, 0].cpu(),
+                    c="tab:red",
+                    lw=3,
+                )
+
+                plt.fill_between(
+                    x_plot[0, :, 0].cpu(),
+                    te_mean[0, :, 0].cpu() - 2.0 * te_std[0, :, 0].cpu(),
+                    te_mean[0, :, 0].cpu() + 2.0 * te_std[0, :, 0].cpu(),
+                    color="tab:red",
+                    alpha=0.2,
+                    label="TE Model",
+                )
 
             if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
                 with torch.no_grad():
