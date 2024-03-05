@@ -20,6 +20,8 @@ def main():
     eval_name = experiment.misc.eval_name
     gen_test = experiment.generators.test
 
+    model.eval()
+
     if experiment.misc.only_plots:
         gen_test.batch_size = 1
         gen_test.num_batches = experiment.misc.num_plots
