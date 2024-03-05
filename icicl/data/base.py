@@ -18,6 +18,12 @@ class GroundTruthPredictor(ABC):
     ) -> Any:
         raise NotImplementedError
 
+    def sample_outputs(
+        self,
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        raise NotImplementedError
+
 
 @dataclass
 class Batch:

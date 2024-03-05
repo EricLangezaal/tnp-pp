@@ -91,7 +91,7 @@ class SyntheticGenerator(DataGenerator, ABC):
         x = self.sample_inputs(
             num_ctx=num_ctx, num_trg=num_trg, batch_shape=batch_shape
         )
-        y, gt_pred, _ = self.sample_outputs(x=x)
+        y, gt_pred = self.sample_outputs(x=x)
 
         xc = x[:, :num_ctx, :]
         yc = y[:, :num_ctx, :]
@@ -118,8 +118,7 @@ class SyntheticGenerator(DataGenerator, ABC):
     def sample_outputs(
         self,
         x: torch.Tensor,
-        xic: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Optional[GroundTruthPredictor], torch.Tensor]:
+    ) -> Tuple[torch.Tensor, Optional[GroundTruthPredictor]]:
         """Sample context and target outputs, given the inputs `x`.
 
         Arguments:
@@ -300,6 +299,5 @@ class SyntheticGeneratorMixture(SyntheticGenerator):
     def sample_outputs(
         self,
         x: torch.Tensor,
-        xic: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Optional[GroundTruthPredictor], torch.Tensor]:
+    ) -> Tuple[torch.Tensor, Optional[GroundTruthPredictor]]:
         raise NotImplementedError
