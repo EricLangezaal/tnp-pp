@@ -2,7 +2,7 @@ from abc import ABC
 
 import torchvision
 
-from .image import ICImageGenerator, ImageGenerator
+from .image import ImageGenerator
 
 
 class FashionMNIST(ABC):
@@ -27,11 +27,3 @@ class FashionMNISTGenerator(FashionMNIST, ImageGenerator):
     ):
         FashionMNIST.__init__(self, data_dir, train, download)
         ImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
-
-
-class ICFashionMNISTGenerator(FashionMNIST, ICImageGenerator):
-    def __init__(
-        self, *, data_dir: str, train: bool = True, download: bool = False, **kwargs
-    ):
-        FashionMNIST.__init__(self, data_dir, train, download)
-        ICImageGenerator.__init__(self, dataset=self.dataset, dim=self.dim, **kwargs)
