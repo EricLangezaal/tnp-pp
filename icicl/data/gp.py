@@ -331,7 +331,9 @@ class MixtureGPGroundTruthPredictor(GroundTruthPredictor):
         # Now compute marginal predictions and gt_logliks.
         posterior_probs = torch.stack(marginal_logliks, dim=-1).softmax(dim=-1)
         if yt is not None:
-            gt_loglik = (torch.stack(gt_logliks, dim=-1) * posterior_probs).sum(-1)
+            gt_loglik = torch.logsumexp(
+                (torch.stack(gt_logliks, dim=-1) + posterior_probs.log()), dim=-1
+            )
         else:
             gt_loglik = None
         means = torch.stack([pyt.mean for pyt in pyts], dim=-1)
