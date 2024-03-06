@@ -74,7 +74,7 @@ class SpatialGeneralisationMLPKernel(MLPKernel):
         dist_x = (diff_x / self.lengthscale).sum(-1, keepdim=True)
         dots_x = -0.5 * dist_x**2.0
 
-        return dots_x * dots
+        return dots_x + dots
 
 
 class MixtureKernel(Kernel):
