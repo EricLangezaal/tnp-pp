@@ -62,7 +62,10 @@ class TNPDTransformerEncoder(nn.Module):
         for i, (mhsa_layer, mhca_layer) in enumerate(
             zip(self.mhsa_layers, self.mhca_layers)
         ):
-            xc = mhsa_layer(xc)
+            if isinstance(mhsa_layer, MultiHeadSelfAttentionLayer):
+                xc = mhsa_layer(xc)
+            elif isinstance(mhsa_layer, MultiHeadCrossAttentionLayer):
+                xc = mhsa_layer(xc, xc)
 
             if (not self.final_layer_cross_attention) or (
                 i == len(self.mhsa_layers) - 1
