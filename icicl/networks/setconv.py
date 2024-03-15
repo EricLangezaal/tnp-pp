@@ -1,6 +1,7 @@
 import math
 from typing import List, Optional, Tuple
 
+import einops
 import torch
 from check_shapes import check_shapes
 from torch import nn
@@ -92,14 +93,25 @@ class SetConvDecoder(nn.Module):
         dim: int,
         init_lengthscale: float = 0.1,
         scaling_factor: float = 1.0,
+        num_kernels: int = 1,
         train_lengthscale: bool = True,
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
 
-        init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=dtype)
+        # Compute log-spacing around init_lengthscale, so max_init_lengthscale = 10 * min_init_lengthscale.
+        log_init_lengthscale = math.log(init_lengthscale, 10)
+        min_log_init_lengthscale = log_init_lengthscale - 0.5
+        max_log_init_lengthscale = log_init_lengthscale + 0.5
+        init_lengthscales = torch.logspace(
+            min_log_init_lengthscale,
+            max_log_init_lengthscale,
+            steps=num_kernels,
+            dtype=dtype,
+        )
+        init_lengthscales = einops.repeat(init_lengthscales, "nk -> d nk", d=dim)
         self.lengthscale_param = nn.Parameter(
-            (torch.tensor(init_lengthscale).exp() - 1).log(),
+            (torch.tensor(init_lengthscales).exp() - 1).log(),
             requires_grad=train_lengthscale,
         )
         self.scaling_factor = scaling_factor
@@ -114,7 +126,7 @@ class SetConvDecoder(nn.Module):
         "grids[0]: [m, ..., dx]",
         "grids[1]: [m, ..., dz]",
         "xt: [m, nt, dx]",
-        "return: [m, nt, dz]",
+        "return: [m, nt, dout]",
     )
     def forward(
         self, grids: Tuple[torch.Tensor, torch.Tensor], xt: torch.Tensor
@@ -141,11 +153,16 @@ class SetConvDecoder(nn.Module):
             x1=xt,
             x2=x_grid,
             lengthscales=self.lengthscale,
-        )  # shape (batch_size, num_trg, num_grid_points)
+        )  # shape (batch_size, num_trg, num_grid_points, num_kernels)
 
-        z_grid = (weights @ z_grid) / self.scaling_factor
+        # Shape (batch_size, num_kernels, num_trg, num_grid_points).
+        weights = einops.rearrange(weights, "b nt ng nk -> b nk nt ng")
 
-        return z_grid  # shape (batch_size, num_trg, Dz)
+        # Shape (batch_size, num_kernels, num_trg, z_dim).
+        z_grid = (weights @ z_grid[:, None, ...]) / self.scaling_factor
+        z_grid = einops.rearrange(z_grid, "b nk nt dz -> b nt (dz nk)")
+
+        return z_grid  # shape (batch_size, num_trg, Dz x num_kernels)
 
 
 def make_adaptive_grid(
@@ -259,24 +276,35 @@ def compute_eq_weights(
     Arguments:
         x1: Tensor of shape (batch_size, num_x1, dim)
         x2: Tensor of shape (batch_size, num_x2, dim)
-        lengthscales: Tensor of shape (dim,)
+        lengthscales: Tensor of shape (dim,) or (dim, num_lengthscales)
 
     Returns:
-        Tensor of shape (batch_size, num_x1, num_x2)
+        Tensor of shape (batch_size, num_x1, num_x2) or (batch_size, num_x1, num_x2, num_lengthscales)
     """
 
     # Expand dimensions for broadcasting
     x1 = x1[:, :, None, :]
     x2 = x2[:, None, :, :]
-    lengthscales = lengthscales[None, None, None, :]
+    lengthscales = lengthscales[None, None, None, ...]
 
     # Compute pairwise distances between x1 and x2
-    dist2 = torch.sum(
-        ((x1 - x2) / lengthscales).pow(2),
-        dim=-1,
-    )  # shape (batch_size, num_x1, num_x2)
+    # TODO: Kinda hate this.
+    if len(lengthscales.shape) == 5:
+        x1 = x1[..., None]
+        x2 = x2[..., None]
+        dist2 = torch.sum(
+            ((x1 - x2) / lengthscales).pow(2),
+            dim=-2,
+        )  # shape (batch_size, num_x1, num_x2, num_lengthscales)
+    elif len(lengthscales.shape) == 4:
+        dist2 = torch.sum(
+            ((x1 - x2) / lengthscales).pow(2),
+            dim=-1,
+        )  # shape (batch_size, num_x1, num_x2)
+    else:
+        raise ValueError("Invalid shape for `lengthscales`.")
 
     # Compute weights
-    weights = torch.exp(-0.5 * dist2)  # shape (batch_size, num_x1, num_x2)
+    weights = torch.exp(-0.5 * dist2)
 
     return weights
