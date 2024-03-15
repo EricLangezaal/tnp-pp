@@ -9,7 +9,6 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..utils.batch import compress_batch_dimensions, compress_data_dimensions
 from .attention_layers import MultiHeadCrossAttentionLayer, MultiHeadSelfAttentionLayer
 
 
@@ -36,13 +35,19 @@ class TransformerEncoder(nn.Module):
 class TNPDTransformerEncoder(nn.Module):
     def __init__(
         self,
-        mhca_layer: MultiHeadCrossAttentionLayer,
         num_layers: int,
+        mhca_layer: MultiHeadCrossAttentionLayer,
+        mhsa_layer: Optional[MultiHeadSelfAttentionLayer] = None,
         final_layer_cross_attention: bool = False,
     ):
         super().__init__()
 
         self.mhca_layers = _get_clones(mhca_layer, num_layers)
+        self.mhsa_layers = (
+            self.mhca_layers
+            if mhsa_layer is None
+            else _get_clones(mhsa_layer, num_layers)
+        )
         self.final_layer_cross_attention = final_layer_cross_attention
 
     @check_shapes(
@@ -54,49 +59,15 @@ class TNPDTransformerEncoder(nn.Module):
         if mask is not None:
             warnings.warn("mask is not currently being used.")
 
-        for mhca_layer in self.mhca_layers:
-            if not self.final_layer_cross_attention:
-                xt = mhca_layer(xt, xc)
-
-            xc = mhca_layer(xc, xc)
-
-        if self.final_layer_cross_attention:
-            xt = self.mhca_layers[-1](xt, xc)
-
-        return xt
-
-
-class TNPDTransformerEncoderNotShared(nn.Module):
-    def __init__(
-        self,
-        mhsa_layer: MultiHeadSelfAttentionLayer,
-        mhca_layer: MultiHeadCrossAttentionLayer,
-        num_layers: int,
-        final_layer_cross_attention: bool = False,
-    ):
-        super().__init__()
-
-        self.mhsa_layers = _get_clones(mhsa_layer, num_layers)
-        self.mhca_layers = _get_clones(mhca_layer, num_layers)
-        self.final_layer_cross_attention = final_layer_cross_attention
-
-    @check_shapes(
-        "xc: [m, nc, d]", "xt: [m, nt, d]", "mask: [m, nc, nc]", "return: [m, nt, d]"
-    )
-    def forward(
-        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        if mask is not None:
-            warnings.warn("mask is not currently being used.")
-
-        for mhsa_layer, mhca_layer in zip(self.mhsa_layers, self.mhca_layers):
+        for i, (mhsa_layer, mhca_layer) in enumerate(
+            zip(self.mhsa_layers, self.mhca_layers)
+        ):
             xc = mhsa_layer(xc)
 
-            if not self.final_layer_cross_attention:
+            if (not self.final_layer_cross_attention) or (
+                i == len(self.mhsa_layers) - 1
+            ):
                 xt = mhca_layer(xt, xc)
-
-        if self.final_layer_cross_attention:
-            xt = self.mhca_layers[-1](xt, xc)
 
         return xt
 
@@ -281,7 +252,9 @@ class RandomLatentsNestedISetTransformerEncoder(nn.Module):
         num_layers: int,
         min_num_latents: int = 1,
         max_num_latents: int = 32,
+        fixed_latents: bool = False,
         random_projection: bool = False,
+        random_subset: bool = False,
     ):
         super().__init__()
 
@@ -295,7 +268,16 @@ class RandomLatentsNestedISetTransformerEncoder(nn.Module):
         self.embed_dim = mhca_ctoq_layer.embed_dim
         self.min_num_latents = min_num_latents
         self.max_num_latents = max_num_latents
+
+        if not (fixed_latents or random_projection or random_subset):
+            raise ValueError("Must specify at least one method for obtaining latents.")
+
+        self.fixed_latents = fixed_latents
+        if fixed_latents:
+            self.latents = nn.Parameter(torch.randn(max_num_latents, self.embed_dim))
+
         self.random_projection = random_projection
+        self.random_subset = random_subset
 
         self.mhca_ctoq_layers = _get_clones(mhca_ctoq_layer, num_layers)
         self.mhca_qtoc_layers = _get_clones(mhca_qtoc_layer, num_layers)
@@ -311,11 +293,22 @@ class RandomLatentsNestedISetTransformerEncoder(nn.Module):
         num_latents = random.choice(
             list(range(self.min_num_latents, self.max_num_latents + 1))
         )
-        if self.random_projection:
-            rand_mat = torch.randn((xc.shape[0], num_latents, xc.shape[1]))
+        if self.fixed_latents:
+            xq = einops.repeat(
+                self.latents[:num_latents], "n d -> m n d", m=xc.shape[0]
+            )
+        elif self.random_projection:
+            rand_mat = torch.randn((xc.shape[0], num_latents, xc.shape[1])).to(xc) / (
+                xc.shape[1] ** 0.5
+            )
             xq = rand_mat @ xc
+        elif self.random_subset:
+            rand_idx = random.sample(
+                list(range(xc.shape[1])), k=min(num_latents, xc.shape[1])
+            )
+            xq = xc[..., rand_idx, :].clone().detach()
         else:
-            xq = torch.randn((xc.shape[0], num_latents, self.embed_dim))
+            xq = torch.randn((xc.shape[0], num_latents, self.embed_dim)).to(xc)
 
         for mhca_ctoq_layer, mhca_qtoc_layer, mhca_qtot_layer in zip(
             self.mhca_ctoq_layers, self.mhca_qtoc_layers, self.mhca_qtot_layers
@@ -325,123 +318,6 @@ class RandomLatentsNestedISetTransformerEncoder(nn.Module):
             xt = mhca_qtot_layer(xt, xq)
 
         return xt
-
-
-class SPINEncoder(nn.Module):
-    def __init__(
-        self,
-        num_latent_features: int,
-        num_latent_datapoints: int,
-        xaba_layer: MultiHeadCrossAttentionLayer,
-        abla_layer: MultiHeadSelfAttentionLayer,
-        xabd_layer: MultiHeadCrossAttentionLayer,
-        num_layers: int,
-    ):
-        super().__init__()
-
-        assert xaba_layer.embed_dim == abla_layer.embed_dim, "embed_dim mismatch."
-        assert (
-            xabd_layer.embed_dim == abla_layer.embed_dim * num_latent_features
-        ), "embed_dim mismatch."
-
-        embed_dim = xaba_layer.embed_dim
-        self.latent_features = nn.Parameter(torch.randn(num_latent_features, embed_dim))
-        self.latent_datapoints = nn.Parameter(
-            torch.randn(num_latent_datapoints, embed_dim * num_latent_features)
-        )
-
-        self.xaba_layers = _get_clones(xaba_layer, num_layers)
-        self.abla_layers = _get_clones(abla_layer, num_layers)
-        self.xabd_layers = _get_clones(xabd_layer, num_layers)
-
-    @check_shapes("x: [m, n, dx, e]", "mask: [m, nq, n]", "return: [m, nq, fe]")
-    def forward(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        xqf = einops.repeat(
-            self.latent_features, "f e -> m n f e", m=x.shape[0], n=x.shape[1]
-        )
-        xqd = einops.repeat(self.latent_datapoints, "nq fe -> m nq fe", m=x.shape[0])
-
-        # shape (m x n, dx, e).
-        x, _ = compress_batch_dimensions(x, other_dims=2)
-
-        for xaba_layer, abla_layer, xabd_layer in zip(
-            self.xaba_layers, self.abla_layers, self.xabd_layers
-        ):
-            # shape (m x n, nqf, e).
-            xqf, xqf_uncompress = compress_batch_dimensions(xqf, other_dims=2)
-
-            xqf = xaba_layer(xqf, x)
-            xqf = abla_layer(xqf)
-            xqf = xqf_uncompress(xqf)
-
-            # shape (m, n, nqf x e).
-            xqf, xqf_uncompress = compress_data_dimensions(xqf, other_dims=2)
-
-            # shape (m, nqd, nqf x e).
-            xqd = xabd_layer(xqd, xqf, mask=mask)
-
-            xqf = xqf_uncompress(xqf)
-
-        return xqd
-
-
-class SPINDecoder(nn.Module):
-    def __init__(
-        self,
-        num_latent_features: int,
-        xaba_layer: MultiHeadCrossAttentionLayer,
-        abla_layer: MultiHeadSelfAttentionLayer,
-        xabd_layer: MultiHeadCrossAttentionLayer,
-        num_layers: int,
-    ):
-        super().__init__()
-
-        assert xaba_layer.embed_dim == abla_layer.embed_dim, "embed_dim mismatch."
-        assert (
-            xabd_layer.embed_dim == xaba_layer.embed_dim * num_latent_features
-        ), "embed_dim mismatch."
-
-        embed_dim = xaba_layer.embed_dim
-        self.latent_features = nn.Parameter(torch.randn(num_latent_features, embed_dim))
-
-        self.xaba_layers = _get_clones(xaba_layer, num_layers)
-        self.abla_layers = _get_clones(abla_layer, num_layers)
-        self.xabd_layers = _get_clones(xabd_layer, num_layers)
-
-    @check_shapes(
-        "xt: [m, n, d, e]", "xqc: [m, nq, dz]", "mask: [m, n, nq]", "return: [m, n, dz]"
-    )
-    def forward(
-        self, xt: torch.Tensor, xqc: torch.Tensor, mask: Optional[torch.Tensor] = None
-    ):
-        _ = mask
-
-        xqt = einops.repeat(
-            self.latent_features, "f e -> m n f e", m=xt.shape[0], n=xt.shape[1]
-        )
-
-        # shape (m, n, f, e).
-        xqt, xqt_uncompress = compress_batch_dimensions(xqt, other_dims=2)
-        xt, _ = compress_batch_dimensions(xt, other_dims=2)
-
-        # Obtain latent attribute embeddings.
-        for (
-            xaba_layer,
-            abla_layer,
-        ) in zip(self.xaba_layers, self.abla_layers):
-            xqt = xaba_layer(xqt, xt)
-            xqt = abla_layer(xqt)
-
-        xqt = xqt_uncompress(xqt)
-        xqt, _ = compress_data_dimensions(xqt, other_dims=2)
-        # Cross-attention with context representation.
-        for xabd_layer in self.xabd_layers:
-            xqt = xabd_layer(xqt, xqc)
-
-        # shape (m, n, dz).
-        return xqt
 
 
 class ARTNPDTransformerEncoder(TNPDTransformerEncoder):
