@@ -43,7 +43,7 @@ class StochasticTNPDTransformerEncoder(nn.Module):
 
             xc_loc = mhca_loc_layer(xc, xc)
             xc_raw_std = mhca_std_layer(xc, xc)
-            xc_std = nn.functional.softplus(xc_raw_std)
+            xc_std = nn.functional.softplus(xc_raw_std)  # pylint: disable=not-callable
 
             # Sample xc.
             xc = xc_loc + xc_std * torch.randn_like(xc_std)
@@ -110,7 +110,10 @@ class StochasticNestedPerceiverEncoder(nn.Module):
         ):
             xq_loc = mhca_ctoq_loc_layer(xq, xc, mask)
             xq_raw_std = mhca_ctoq_std_layer(xq, xc, mask)
-            xq_std = nn.functional.softplus(xq_raw_std) + self.min_latent_std
+            xq_std = (
+                nn.functional.softplus(xq_raw_std)  # pylint: disable=not-callable
+                + self.min_latent_std
+            )
 
             # Sample xq.
             xq = xq_loc + xq_std * torch.randn_like(xq_std)
@@ -181,7 +184,10 @@ class StochasticNestedISetTransformerEncoder(nn.Module):
         ):
             xq_loc = mhca_ctoq_loc_layer(xq, xc, mask)
             xq_raw_std = mhca_ctoq_std_layer(xq, xc, mask)
-            xq_std = nn.functional.softplus(xq_raw_std) + self.min_latent_std
+            xq_std = (
+                nn.functional.softplus(xq_raw_std)  # pylint: disable=not-callable
+                + self.min_latent_std
+            )
 
             # Sample xq.
             xq = xq_loc + xq_std * torch.randn_like(xq_std)
