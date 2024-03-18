@@ -129,7 +129,7 @@ class MultiHeadCrossAttentionLayer(BaseMultiHeadAttentionLayer):
         super().__init__(embed_dim=embed_dim, attention=attention, **kwargs)
 
     @check_shapes(
-        "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, n, n]", "return: [m, n, d]"
+        "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, nq, nkv]", "return: [m, n, d]"
     )
     def attn_block(
         self,
@@ -141,7 +141,7 @@ class MultiHeadCrossAttentionLayer(BaseMultiHeadAttentionLayer):
         return self.attn_dropout(x)
 
     @check_shapes(
-        "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, n, n]", "return: [m, n, d]"
+        "xq: [m, nq, d]", "xkv: [m, nkv, d]", "mask: [m, nq, nkv]", "return: [m, n, d]"
     )
     def forward(
         self, xq: torch.Tensor, xkv: torch.Tensor, mask: Optional[torch.Tensor] = None
