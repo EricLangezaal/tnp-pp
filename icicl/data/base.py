@@ -57,6 +57,7 @@ class DataGenerator(ABC):
         samples_per_epoch: int,
         batch_size: int,
         deterministic: bool = False,
+        deterministic_seed: int = 0,
     ):
         """Base data generator, which can be used to derive other data generators,
         such as synthetic generators or real data generators.
@@ -74,6 +75,7 @@ class DataGenerator(ABC):
         self.batch_counter = 0
 
         self.deterministic = deterministic
+        self.deterministic_seed = deterministic_seed
         self.batches = None
 
     def __len__(self):
@@ -82,7 +84,12 @@ class DataGenerator(ABC):
     def __iter__(self):
         """Reset batch counter and return self."""
         if self.deterministic and self.batches is None:
+            # Set deterministic seed.
+            current_seed = torch.seed()
+            torch.manual_seed(self.deterministic_seed)
             self.batches = [self.generate_batch() for _ in range(self.num_batches)]
+            torch.manual_seed(current_seed)
+
         self.batch_counter = 0
         return self
 
