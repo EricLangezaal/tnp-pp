@@ -28,47 +28,6 @@ KERNEL_TYPES = [
 
 
 class GPGeneratorBase(ABC):
-    def __init__(
-        self,
-        *,
-        noise_std: float,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-
-        self.noise_std = noise_std
-
-    def sample_outputs(
-        self,
-        x: torch.Tensor,
-    ) -> Tuple[torch.Tensor, GroundTruthPredictor]:
-        """Sample context and target outputs, given the inputs `x`.
-
-        Arguments:
-            x: Tensor of shape (batch_size, num_ctx + num_trg, dim) containing
-                the context and target inputs.
-
-        Returns:
-            y: Tensor of shape (batch_size, num_ctx + num_trg, 1) containing
-                the context and target outputs.
-        """
-
-        # Set up GP kernel
-        gt_pred = self.set_up_gp()
-        y = gt_pred.sample_outputs(x)
-
-        return y.to(torch.float32), gt_pred
-
-    @abstractmethod
-    def set_up_gp(self) -> GroundTruthPredictor:
-        """Set up GP kernel.
-
-        Returns:
-            kernel: GP kernel.
-        """
-
-
-class RandomScaleGPGeneratorBase(GPGeneratorBase):
     noisy_mixture_long_lengthscale: float = 1.0
     weakly_periodic_period: float = 1.0
 
@@ -78,6 +37,7 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         kernel_type: Union[List[str], str],
         min_log10_lengthscale: float,
         max_log10_lengthscale: float,
+        noise_std: float,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -89,6 +49,7 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         self.max_log10_lengthscale = torch.as_tensor(
             max_log10_lengthscale, dtype=torch.float64
         )
+        self.noise_std = noise_std
 
     def set_up_gp(self) -> GroundTruthPredictor:
         # Sample lengthscale
@@ -177,15 +138,34 @@ class RandomScaleGPGeneratorBase(GPGeneratorBase):
         return gt_pred
 
 
-class RandomScaleGPGenerator(
-    RandomScaleGPGeneratorBase, SyntheticGeneratorUniformInput
-):
+class GPGenerator(GPGeneratorBase):
+    def sample_outputs(
+        self,
+        x: torch.Tensor,
+    ) -> Tuple[torch.Tensor, GroundTruthPredictor]:
+        """Sample context and target outputs, given the inputs `x`.
+
+        Arguments:
+            x: Tensor of shape (batch_size, num_ctx + num_trg, dim) containing
+                the context and target inputs.
+
+        Returns:
+            y: Tensor of shape (batch_size, num_ctx + num_trg, 1) containing
+                the context and target outputs.
+        """
+
+        # Set up GP kernel
+        gt_pred = self.set_up_gp()
+        y = gt_pred.sample_outputs(x)
+
+        return y.to(torch.float32), gt_pred
+
+
+class RandomScaleGPGenerator(GPGenerator, SyntheticGeneratorUniformInput):
     pass
 
 
-class RandomScaleGPGeneratorBimodalInput(
-    RandomScaleGPGeneratorBase, SyntheticGeneratorBimodalInput
-):
+class RandomScaleGPGeneratorBimodalInput(GPGenerator, SyntheticGeneratorBimodalInput):
     pass
 
 
