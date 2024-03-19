@@ -8,10 +8,36 @@ import gpytorch
 import torch
 
 from .gp import GPGroundTruthPredictor
-from .synthetic import SyntheticGenerator
+from .synthetic import SyntheticGeneratorBimodalInput, SyntheticGeneratorUniformInput
 
 
-class LinearGenerator(SyntheticGenerator):
+class LinearGeneratorUniformInput(SyntheticGeneratorUniformInput):
+    def __init__(self, *, noise_std: float, **kwargs):
+        super().__init__(**kwargs)
+
+        self.noise_std = noise_std
+
+    def sample_outputs(
+        self,
+        x: torch.Tensor,
+    ) -> Tuple[torch.Tensor, GPGroundTruthPredictor]:
+        w = self.sample_weight()
+        gt_pred = LinearGroundTruthPredictor(prior_std=1.0, noise_std=self.noise_std)
+
+        # Generate observations.
+        f = x @ w[..., None]
+        y = f + self.noise_std * torch.randn_like(f)
+
+        return y, gt_pred
+
+    def sample_weight(self) -> torch.Tensor:
+        # Sample weight vector.
+        w = torch.randn((self.batch_size, self.dim))
+
+        return w
+
+
+class LinearGeneratorBimodalInput(SyntheticGeneratorBimodalInput):
     def __init__(self, *, noise_std: float, **kwargs):
         super().__init__(**kwargs)
 

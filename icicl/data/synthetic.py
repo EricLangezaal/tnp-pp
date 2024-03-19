@@ -50,6 +50,9 @@ class SyntheticGenerator(DataGenerator, ABC):
             batch: Tuple of tensors containing the context and target data.
         """
 
+        if batch_shape is None:
+            batch_shape = torch.Size((self.batch_size,))
+
         # Sample number of context and target points
         num_ctx, num_trg = self.sample_num_ctx_trg()
 
@@ -85,7 +88,10 @@ class SyntheticGenerator(DataGenerator, ABC):
         return num_ctx, num_trg
 
     def sample_batch(
-        self, num_ctx: int, num_trg: int, batch_shape: Optional[torch.Size]
+        self,
+        num_ctx: int,
+        num_trg: int,
+        batch_shape: torch.Size,
     ) -> SyntheticBatch:
         # Sample inputs, then outputs given inputs
         x = self.sample_inputs(
@@ -110,7 +116,10 @@ class SyntheticGenerator(DataGenerator, ABC):
 
     @abstractmethod
     def sample_inputs(
-        self, num_ctx: int, num_trg: int, batch_shape: Optional[torch.Size] = None
+        self,
+        num_ctx: int,
+        batch_shape: torch.Size,
+        num_trg: Optional[int] = None,
     ) -> torch.Tensor:
         raise NotImplementedError
 
@@ -147,12 +156,9 @@ class SyntheticGeneratorUniformInput(SyntheticGenerator):
     def sample_inputs(
         self,
         num_ctx: int,
+        batch_shape: torch.Size,
         num_trg: Optional[int] = None,
-        batch_shape: Optional[torch.Size] = None,
     ) -> torch.Tensor:
-        if batch_shape is None:
-            batch_shape = torch.Size((self.batch_size,))
-
         xc = (
             torch.rand((*batch_shape, num_ctx, self.dim))
             * (self.context_range[:, 1] - self.context_range[:, 0])
@@ -189,11 +195,9 @@ class SyntheticGeneratorBimodalInput(SyntheticGenerator):
     def sample_inputs(
         self,
         num_ctx: int,
+        batch_shape: torch.Size,
         num_trg: Optional[int] = None,
-        batch_shape: Optional[torch.Size] = None,
     ) -> torch.Tensor:
-        if batch_shape is None:
-            batch_shape = torch.Size((self.batch_size,))
 
         # Sample the mode.
         ctx_bernoulli_probs = torch.empty(*batch_shape, num_ctx).fill_(0.5)
@@ -292,7 +296,10 @@ class SyntheticGeneratorMixture(SyntheticGenerator):
         )
 
     def sample_inputs(
-        self, num_ctx: int, num_trg: int, batch_shape: Optional[torch.Size] = None
+        self,
+        num_ctx: int,
+        batch_shape: torch.Size,
+        num_trg: Optional[int] = None,
     ) -> torch.Tensor:
         raise NotImplementedError
 
