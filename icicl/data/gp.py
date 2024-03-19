@@ -1,6 +1,6 @@
 import math
 import random
-from abc import ABC, abstractmethod
+from abc import ABC
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
@@ -232,10 +232,14 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std**2.0
 
         # Sample from GP with zero mean and covariance kxx.
-        py = td.MultivariateNormal(
-            loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64), covariance_matrix=kxx
-        )
-        y = py.sample().unsqueeze(-1)
+        if kxx.numel() > 0:
+            py = td.MultivariateNormal(
+                loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
+                covariance_matrix=kxx,
+            )
+            y = py.sample().unsqueeze(-1)
+        else:
+            y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
 
         return y.to(torch.float32)
 
