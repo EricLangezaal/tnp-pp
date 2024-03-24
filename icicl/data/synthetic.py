@@ -144,8 +144,8 @@ class SyntheticGeneratorUniformInput(SyntheticGenerator):
     def __init__(
         self,
         *,
-        context_range: Tuple[float, float],
-        target_range: Tuple[float, float],
+        context_range: Tuple[Tuple[float, float], ...],
+        target_range: Tuple[Tuple[float, float], ...],
         **kwargs,
     ):
         super().__init__(**kwargs)
