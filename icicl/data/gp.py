@@ -11,7 +11,11 @@ import torch.distributions as td
 from icicl.networks.kernels import GibbsKernel
 
 from .base import GroundTruthPredictor
-from .synthetic import SyntheticGeneratorBimodalInput, SyntheticGeneratorUniformInput
+from .synthetic import (
+    SyntheticGeneratorBimodalInput,
+    SyntheticGeneratorUniformInput,
+    SyntheticGeneratorUniformInputRandomOffset,
+)
 
 KERNEL_TYPES = [
     "eq",
@@ -162,6 +166,12 @@ class GPGenerator(GPGeneratorBase):
 
 
 class RandomScaleGPGenerator(GPGenerator, SyntheticGeneratorUniformInput):
+    pass
+
+
+class RandomScaleGPGeneratorRandomOffset(
+    GPGenerator, SyntheticGeneratorUniformInputRandomOffset
+):
     pass
 
 

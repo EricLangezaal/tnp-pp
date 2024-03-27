@@ -177,6 +177,35 @@ class SyntheticGeneratorUniformInput(SyntheticGenerator):
         return xc
 
 
+class SyntheticGeneratorUniformInputRandomOffset(SyntheticGeneratorUniformInput):
+    def __init__(
+        self,
+        *,
+        offset_range: Tuple[Tuple[float, float], ...],
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.offset_range = torch.as_tensor(offset_range, dtype=torch.float)
+
+    def sample_inputs(
+        self,
+        num_ctx: int,
+        batch_shape: torch.Size,
+        num_trg: Optional[int] = None,
+    ) -> torch.Tensor:
+        x = super().sample_inputs(num_ctx, batch_shape, num_trg)
+
+        # Apply offset.
+        offset = (
+            torch.rand(*batch_shape, 1, self.dim)
+            * (self.offset_range[:, 1] - self.offset_range[:, 0])
+            + self.offset_range[:, 0]
+        )
+        x = x + offset
+        return x
+
+
 class SyntheticGeneratorBimodalInput(SyntheticGenerator):
     def __init__(
         self,
