@@ -1,0 +1,41 @@
+generators:
+  train:
+    _target_: icicl.data.gp.RandomScaleGPGeneratorRandomOffset
+    dim: ${params.dim_x}
+    kernel_type: [eq, matern12, matern32, matern52, noisy_mixture, weakly_periodic, periodic, noisy_periodic_mixture]
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    offset_range: [[-1.0, 1.0]]
+    samples_per_epoch: 16_000
+    batch_size: 16
+  val:
+    _target_: icicl.data.gp.RandomScaleGPGeneratorRandomOffset
+    dim: ${params.dim_x}
+    kernel_type: [eq, matern12, matern32, matern52, noisy_mixture, weakly_periodic, periodic, noisy_periodic_mixture]
+    min_log10_lengthscale: -0.602
+    max_log10_lengthscale: 0.602
+    noise_std: 0.2
+    min_num_ctx: 1
+    max_num_ctx: 64
+    min_num_trg: 128
+    max_num_trg: 128
+    context_range: [[-2.0, 2.0]]
+    target_range: [[-3.0, 3.0]]
+    offset_range: [[-1.0, 1.0]]
+    samples_per_epoch: 4096
+    batch_size: 16
+    deterministic: True
+
+params:
+  dim_x: 1
+  dim_y: 1
+
+misc:
+  project: synthetic-1d-random-kernel-shifted-inputs
