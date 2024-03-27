@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
 from check_shapes import check_shapes
@@ -33,21 +33,26 @@ class DeepSet(nn.Module):
         self.xy_comb = xy_comb
 
         if agg == "sum":
-            self.agg = lambda x: torch.sum(x, dim=-2)
+            self.agg = lambda x: torch.nansum(x, dim=-2)
         elif agg == "mean":
-            self.agg = lambda x: torch.mean(x, dim=-2)
+            self.agg = lambda x: torch.nanmean(x, dim=-2)
         else:
             raise ValueError("agg must be one of 'sum', 'mean'")
 
     @check_shapes(
         "x: [m, n, dx]",
         "y: [m, n, dy]",
+        "mask: [m, n]",
         "return: [m, dz]",
     )
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, y: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         x_enc = self.x_encoder(x)
         y_enc = self.y_encoder(y)
         z = self.xy_comb(x_enc, y_enc)
         z = self.z_encoder(z)
+        if mask is not None:
+            z[mask] = torch.nan
         z = self.agg(z)
         return z
