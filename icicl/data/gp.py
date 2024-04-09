@@ -1,3 +1,4 @@
+import itertools
 import math
 import random
 from abc import ABC
@@ -28,6 +29,7 @@ KERNEL_TYPES = [
     "noisy_periodic_mixture",
     "gibbs_switch",
     "gibbs_random_switch",
+    "gibbs_random_switch_and_direction",
 ]
 
 
@@ -131,6 +133,22 @@ class GPGeneratorBase(ABC):
                     )
                 )
                 for x0 in [-1.0, 0.0, 1.0]
+            ]
+            gt_pred = MixtureGPGroundTruthPredictor(
+                kernels=kernels, noise_std=self.noise_std
+            )
+        elif kernel_type == "gibbs_random_switch_and_direction":
+            kernels = [
+                GibbsKernel(
+                    lengthscale_fn=partial(
+                        switching_lengthscale_and_direction_fn,
+                        torch.as_tensor(x0),
+                        direction,
+                    )
+                )
+                for (x0, direction) in itertools.product(
+                    [-1.0, 0.0, 1.0], [True, False]
+                )
             ]
             gt_pred = MixtureGPGroundTruthPredictor(
                 kernels=kernels, noise_std=self.noise_std
@@ -364,6 +382,22 @@ class MixtureGPGroundTruthPredictor(GroundTruthPredictor):
 def switching_lengthscale_fn(x0: torch.Tensor, x: torch.Tensor):
     return torch.where(
         x[..., :1] < x0.to(x),
+        torch.ones(*x[..., :1].shape).to(x) * 4.0,
+        torch.ones(*x[..., :1].shape).to(x) * 0.1,
+    )
+
+
+def switching_lengthscale_and_direction_fn(
+    x0: torch.Tensor, direction: bool, x: torch.Tensor
+):
+    if direction:
+        return torch.where(
+            x[..., :1] < x0.to(x),
+            torch.ones(*x[..., :1].shape).to(x) * 4.0,
+            torch.ones(*x[..., :1].shape).to(x) * 0.1,
+        )
+    return torch.where(
+        x[..., :1] > x0.to(x),
         torch.ones(*x[..., :1].shape).to(x) * 4.0,
         torch.ones(*x[..., :1].shape).to(x) * 0.1,
     )
