@@ -13,6 +13,7 @@ class PseudoTokenInitialiser(nn.Module):
         num_heads: int,
         head_dim: int,
         p_dropout: float = 0.0,
+        residual_connection: bool = True,
     ):
         super().__init__()
 
@@ -33,6 +34,8 @@ class PseudoTokenInitialiser(nn.Module):
 
         # Pre-softmax weighting of location attention weights.
         self.raw_head_weights = nn.Parameter(torch.ones((num_heads,)))
+
+        self.residual_connection = residual_connection
 
     @property
     def head_weights(self):
@@ -79,7 +82,11 @@ class PseudoTokenInitialiser(nn.Module):
         # Now do weighted sum over heads.
         tq_update = einops.rearrange(tq_update, "m h n d -> m n d h")
         tq_update = tq_update @ self.head_weights
-        tq_out = tq + tq_update
+
+        if self.residual_connection:
+            tq_out = tq + tq_update
+        else:
+            tq_out = tq_update
 
         # return out, tq_out
         return xq, tq_out
