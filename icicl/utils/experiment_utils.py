@@ -63,7 +63,7 @@ class ModelCheckpointer:
                 if prefix is not None:
                     name = f"{prefix}best.ckpt"
                 else:
-                    name = "best.ckpy"
+                    name = "best.ckpt"
 
                 torch.save(
                     model.state_dict(),
@@ -404,70 +404,45 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 def initialize_evaluation() -> DictConfig:
     # Make argument parser with config argument.
     parser = argparse.ArgumentParser()
+    parser.add_argument("--run_path", type=str)
     parser.add_argument("--config", type=str)
-    parser.add_argument("--run_path", type=str, default=None)
-    parser.add_argument("--model_config", type=str, default=None)
-    parser.add_argument("--model_ckpt", type=str, default=None)
     parser.add_argument(
         "--ckpt", type=str, choices=["val_best", "train_best", "last"], default="last"
     )
     args, config_changes = parser.parse_known_args()
 
+    api = wandb.Api()
+    run = api.run(args.run_path)
+
     # Initialise evaluation, make path.
     config, _ = extract_config(args.config, config_changes)
 
-    if args.run_path is not None:
-        api = wandb.Api()
-        run = api.run(args.run_path)
-        model_config = run.config
-        config.misc.project = run.project
-        config.misc.name = run.name
-        config.misc.id = run.id
-        resume = "must"
-    elif args.model_config is not None:
-        assert args.model_ckpt is not None, "Need local ckpt file."
-        assert hasattr(config.misc, "project"), "Must specify project."
-        assert hasattr(config.misc, "name"), "Must specify name."
-        assert hasattr(config.misc, "id"), "Must specify id."
-        raw_model_config = deep_convert_dict(
-            hiyapyco.load(
-                (args.model_config, args.config),
-                method=hiyapyco.METHOD_MERGE,
-                usedefaultyamlloader=True,
-            )
-        )
-        model_config, _ = extract_config(raw_model_config)
-        resume = None
-    else:
-        raise ValueError("Must specific either run_path or model_config.")
+    # Set model to run.config.model.
+    config.model = run.config["model"]
 
     # Set random seed.
     pl.seed_everything(config.misc.seed)
 
     # Instantiate.
     experiment = instantiate(config)
-    model_experiment = instantiate(model_config)
-    experiment.model = model_experiment.model
 
     # Set random seed.
     pl.seed_everything(config.misc.seed)
 
-    if args.run_path is not None:
-        # Downloads to "./checkpoints/last.ckpt"
-        ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
-        ckpt_file.download(replace=True)
-        ckpt = f"checkpoints/{args.ckpt}.ckpt"
-    elif args.model_ckpt is not None:
-        ckpt = args.model_ckpt
+    # Downloads to "./checkpoints/last.ckpt"
+    ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
+    ckpt_file.download(replace=True)
 
-    experiment.model.load_state_dict(torch.load(ckpt, map_location="cpu"), strict=True)
+    experiment.model.load_state_dict(
+        torch.load(f"checkpoints/{args.ckpt}.ckpt", map_location="cpu"), strict=True
+    )
 
     # Initialise wandb.
     wandb.init(
-        resume=resume,
-        project=config.misc.project,
-        name=config.misc.name,
-        id=config.misc.id,
+        resume="must",
+        project=run.project,
+        name=run.name,
+        id=run.id,
     )
 
     return experiment
