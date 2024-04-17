@@ -35,3 +35,8 @@ def rotation_1d(
     x2_ = torch.cat((torch.sin(x2_), torch.cos(x2_)), dim=-1)
 
     return translation(x1_, x2_)
+
+
+@check_shapes("x1: [m, n1, dx]", "x2: [m, n2, dx]", "return: [m, n1, n2, 1]")
+def euclidean(x1: torch.Tensor, x2: torch.Tensor):
+    return (translation(x1, x2) ** 2).sum(-1, keepdim=True)
