@@ -18,7 +18,8 @@ import wandb
 from icicl.data.base import Batch, DataGenerator
 from icicl.data.image import GriddedImageBatch
 from icicl.data.synthetic import SyntheticBatch
-from icicl.models.base import ConditionalNeuralProcess, NeuralProcess
+from icicl.data.on_off_grid import OOTGBatch
+from icicl.models.base import ConditionalNeuralProcess, NeuralProcess, OOTGConditionalNeuralProcess
 from icicl.models.convcnp import GriddedConvCNP
 from icicl.utils.batch import compress_batch_dimensions
 from icicl.utils.initialisation import weights_init
@@ -120,7 +121,17 @@ def np_loss_fn(
     Returns:
         loss: average negative log likelihood.
     """
-    if isinstance(model, GriddedConvCNP):
+    #print(model)
+    if isinstance(model, OOTGConditionalNeuralProcess):
+        assert isinstance(batch, OOTGBatch)
+        pred_dist = model(
+            xc_off_grid = batch.xc_off_grid, 
+            yc_off_grid = batch.yc_off_grid, 
+            xc_on_grid = batch.xc_on_grid,
+            yc_on_grid = batch.yc_on_grid,
+            xt = batch.xt
+        )
+    elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
     elif isinstance(model, ConditionalNeuralProcess):
@@ -142,7 +153,16 @@ def np_pred_fn(
     batch: Batch,
     num_samples: int = 1,
 ) -> torch.distributions.Distribution:
-    if isinstance(model, GriddedConvCNP):
+    if isinstance(model, OOTGConditionalNeuralProcess):
+        assert isinstance(batch, OOTGBatch)
+        pred_dist = model(
+            xc_off_grid = batch.xc_off_grid, 
+            yc_off_grid = batch.yc_off_grid, 
+            xc_on_grid = batch.xc_on_grid,
+            yc_on_grid = batch.yc_on_grid,
+            xt = batch.xt
+        )
+    elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
     elif isinstance(model, ConditionalNeuralProcess):
@@ -350,6 +370,7 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
     # Initialise experiment, make path.
     config, config_dict = extract_config(raw_config, config_changes)
+    print(config_dict)
 
     # Get run and potentially override config before instantiation.
     if config.misc.resume_from_checkpoint is not None:
