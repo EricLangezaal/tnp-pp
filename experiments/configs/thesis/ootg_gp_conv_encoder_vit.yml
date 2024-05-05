@@ -52,7 +52,11 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
+  _target_: icicl.models.ootg_tnp.OOTG_ViTEncoder
+  patch_size: ${params.patch_size}
+  in_dim_x: ${params.dim}
+  out_dim_x: ${params.embed_dim}
+  out_dim_y: ${params.embed_dim}
   grid_encoder: ${tnpd_grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
@@ -77,7 +81,7 @@ mhsa_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'3 + ${params.dim}'} # 3 since it was 2 before and now stack output for on & off the grid
+  in_dim: ${eval:'2 + ${params.embed_dim}'} # Guess
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: 32
@@ -103,7 +107,8 @@ optimiser:
 
 params:
   dim: 1
-  points_per_unit: 4 # low such that num_ontg doesn't explode
+  points_per_unit: 64
+  patch_size: 16
   epochs: 50
   embed_dim: 32
   num_heads: 4
@@ -112,5 +117,5 @@ params:
 
 misc:
   project: tnp-on-off-grid
-  name: conv_set_encoder_tnp
+  name: conv_set_encoder_vit
   resume_from_checkpoint: null

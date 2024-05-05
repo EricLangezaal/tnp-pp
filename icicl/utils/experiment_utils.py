@@ -228,7 +228,16 @@ def val_epoch(
     for batch in tqdm(generator, total=len(generator), desc="Validation"):
         batches.append(batch)
         with torch.no_grad():
-            if isinstance(model, GriddedConvCNP):
+            if isinstance(model, OOTGConditionalNeuralProcess):
+                assert isinstance(batch, OOTGBatch)
+                pred_dist = model(
+                    xc_off_grid = batch.xc_off_grid, 
+                    yc_off_grid = batch.yc_off_grid, 
+                    xc_on_grid = batch.xc_on_grid,
+                    yc_on_grid = batch.yc_on_grid,
+                    xt = batch.xt
+                )
+            elif isinstance(model, GriddedConvCNP):
                 assert isinstance(batch, GriddedImageBatch)
                 pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
             elif isinstance(model, ConditionalNeuralProcess):

@@ -7,15 +7,12 @@ from .synthetic import SyntheticGenerator
 from ..utils.conv import make_grid, flatten_grid
 
 @dataclass
-class OOTGBatch:
+class OOTGBatch(Batch):
     xc_on_grid: torch.Tensor
     yc_on_grid: torch.Tensor
 
     xc_off_grid: torch.Tensor
     yc_off_grid: torch.Tensor
-
-    xt: torch.Tensor
-    yt: torch.Tensor
 
 
 class SyntheticOOTGGenerator(DataGenerator):
@@ -79,13 +76,20 @@ class SyntheticOOTGGenerator(DataGenerator):
         offtg_y = y[:, :offtg_x.shape[-2], :]
         ontg_y = y[:, offtg_x.shape[-2]:, :]
 
+
         offtg_xc = offtg_x[:, :num_ctx, :]
         offtg_yc = offtg_y[:, :num_ctx, :]
+        xc = torch.cat((offtg_xc, ontg_x), dim=-2)
+        yc = torch.cat((offtg_yc, ontg_y), dim=-2)
 
         xt = offtg_x[:, num_ctx:, :]
         yt = offtg_y[:, num_ctx:, :]
 
         return OOTGBatch(
+            x=x,
+            y=y,
+            xc=xc,
+            yc=yc,
             xc_off_grid=offtg_xc,
             yc_off_grid=offtg_yc,
             xc_on_grid=ontg_x,

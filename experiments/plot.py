@@ -9,6 +9,7 @@ from torch import nn
 
 import wandb
 from icicl.data.base import Batch
+from icicl.data.on_off_grid import OOTGBatch
 from icicl.data.synthetic import SyntheticBatch
 from icicl.models.telbanp import TELBANP
 from icicl.utils.experiment_utils import ar_predict, np_pred_fn
@@ -53,6 +54,12 @@ def plot(
             yc = batch.yc[:1]
             xt = batch.xt[:1]
             yt = batch.yt[:1]
+
+            if isinstance(batch, OOTGBatch):
+                batch.xc_on_grid = batch.xc_on_grid[:1]
+                batch.xc_off_grid = batch.xc_off_grid[:1]
+                batch.yc_on_grid = batch.yc_on_grid[:1]
+                batch.yc_off_grid = batch.yc_off_grid[:1]
 
             batch.xc = xc
             batch.yc = yc
@@ -165,6 +172,7 @@ def plot(
                     label="TE Model",
                 )
 
+            gt_mean, gt_std = None, None
             if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
                 with torch.no_grad():
                     gt_mean, gt_std, _ = batch.gt_pred(
@@ -251,10 +259,11 @@ def plot(
             # Set axis limits
             plt.xlim(x_range)
             # plt.ylim(y_lim)
-            y_max = 0.25 + max(gt_mean[0, ...] + 2 * gt_std[0, ...])
-            y_min = -0.25 + min(gt_mean[0, ...] - 2 * gt_std[0, ...])
-            y_lim = (y_min, y_max)
-            plt.ylim(y_lim)
+            if gt_mean is not None and gt_std is not None:
+                y_max = 0.25 + max(gt_mean[0, ...] + 2 * gt_std[0, ...])
+                y_min = -0.25 + min(gt_mean[0, ...] - 2 * gt_std[0, ...])
+                y_lim = (y_min, y_max)
+                plt.ylim(y_lim)
 
             plt.xticks(fontsize=24)
             plt.yticks(fontsize=24)
