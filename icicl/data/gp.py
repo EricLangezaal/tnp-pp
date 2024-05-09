@@ -44,6 +44,7 @@ class GPGeneratorBase(ABC):
         min_log10_lengthscale: float,
         max_log10_lengthscale: float,
         noise_std: float,
+        out_dim: int = 1,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -56,6 +57,7 @@ class GPGeneratorBase(ABC):
             max_log10_lengthscale, dtype=torch.float64
         )
         self.noise_std = noise_std
+        self.out_dim = out_dim
 
     def set_up_gp(self) -> GroundTruthPredictor:
         # Sample lengthscale
@@ -152,10 +154,17 @@ class GPGeneratorBase(ABC):
             ]
             gt_pred = MixtureGPGroundTruthPredictor(
                 kernels=kernels, noise_std=self.noise_std
-            )
+            )        
 
         else:
             raise ValueError("Unknown kernel type.")
+        
+        if self.out_dim > 1:
+            assert isinstance(gt_pred, GPGroundTruthPredictor)
+            multi_kernel = gpytorch.kernels.MultitaskKernel(
+                kernel, num_tasks=self.out_dim, rank=1
+            )
+            gt_pred = GPGroundTruthPredictor(multi_kernel, noise_std=self.noise_std)
 
         return gt_pred
 
@@ -251,7 +260,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         return mean, std, gt_loglik
 
     def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
-        kernel = self.kernel.to(x)
+        kernel = self.kernel.to(x).to(torch.float64)
 
         # Set up covariance at input locations
         with torch.no_grad():
@@ -261,11 +270,17 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
 
         # Sample from GP with zero mean and covariance kxx.
         if kxx.numel() > 0:
-            py = td.MultivariateNormal(
-                loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
-                covariance_matrix=kxx,
-            )
-            y = py.sample().unsqueeze(-1)
+            if isinstance(kernel, gpytorch.kernels.MultitaskKernel):
+                y = gpytorch.distributions.MultitaskMultivariateNormal(
+                    mean=torch.zeros(x.shape[:-1] + (kernel.num_tasks,), dtype=torch.float64),
+                    covariance_matrix=kxx,
+                ).sample()
+            else:
+                py = td.MultivariateNormal(
+                    loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
+                    covariance_matrix=kxx,
+                )
+                y = py.sample().unsqueeze(-1)
         else:
             y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
 

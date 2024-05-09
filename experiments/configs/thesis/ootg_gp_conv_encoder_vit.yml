@@ -1,3 +1,5 @@
+# File inspired from 'efficient-tnpd-synthetic-1d.yml'
+
 generators:
   train:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
@@ -21,6 +23,7 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
+    out_dim: ${params.gp_output_dim}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -36,6 +39,7 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
+    out_dim: ${params.gp_output_dim}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -54,13 +58,11 @@ model:
 tnpd_encoder:
   _target_: icicl.models.ootg_tnp.OOTG_ViTEncoder
   patch_size: ${params.patch_size}
-  in_dim_x: ${params.dim}
-  out_dim_x: ${params.embed_dim}
-  out_dim_y: ${params.embed_dim}
+  dim: ${params.dim}
+  embed_dim: ${params.embed_dim}
   grid_encoder: ${tnpd_grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-  ar_mode: False
 
 tnpd_grid_encoder:
   _target_: icicl.models.ootg_tnp.OOTGSetConvEncoder
@@ -68,12 +70,12 @@ tnpd_grid_encoder:
   init_lengthscale:  ${eval:'2 * 1 / ${params.points_per_unit}'}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TransformerEncoder
-  mhsa_layer: ${mhsa_layer}
-  num_layers: 5
+  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  num_layers: 3
 
-mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -81,7 +83,7 @@ mhsa_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + ${params.embed_dim}'} # Guess
+  in_dim: ${eval:'3 + ${params.dim}'} # 3 since it was 2 before and now stack output for on & off the grid
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: 32
@@ -103,19 +105,20 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 0.0001 # 3e-4 is weirdly enough treated as string?
+  lr: 5e-4
 
 params:
   dim: 1
-  points_per_unit: 64
-  patch_size: 16
+  gp_output_dim: 1
+  points_per_unit: 32
   epochs: 50
   embed_dim: 32
-  num_heads: 4
-  head_dim: 8
+  num_heads: 3
+  head_dim: 16
+  patch_size: 16
 
 
 misc:
   project: tnp-on-off-grid
-  name: conv_set_encoder_vit
+  name: conv_set_encoder_tnp
   resume_from_checkpoint: null

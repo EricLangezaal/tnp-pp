@@ -94,8 +94,8 @@ def plot(
 
             # Plot context and target points
             plt.scatter(
-                xc[0, :, 0].numpy(),
-                yc[0, :, 0].numpy(),
+                xc[0, :, 0].cpu().numpy(),
+                yc[0, :, 0].cpu().numpy(),
                 c="k",
                 label="Context",
                 s=30,
@@ -103,8 +103,8 @@ def plot(
 
             if plot_target:
                 plt.scatter(
-                    xt[0, :, 0].numpy(),
-                    yt[0, :, 0].numpy(),
+                    xt[0, :, 0].cpu().numpy(),
+                    yt[0, :, 0].cpu().numpy(),
                     c="r",
                     label="Target",
                     s=30,

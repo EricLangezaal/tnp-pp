@@ -1,3 +1,5 @@
+# File inspired from 'efficient-tnpd-synthetic-1d.yml'
+
 generators:
   train:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
@@ -21,6 +23,7 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
+    out_dim: ${params.gp_output_dim}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -36,6 +39,7 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
+    out_dim: ${params.gp_output_dim}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -56,7 +60,6 @@ tnpd_encoder:
   grid_encoder: ${tnpd_grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-  ar_mode: False
 
 tnpd_grid_encoder:
   _target_: icicl.models.ootg_tnp.OOTGSetConvEncoder
@@ -64,12 +67,12 @@ tnpd_grid_encoder:
   init_lengthscale:  ${eval:'2 * 1 / ${params.points_per_unit}'}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TransformerEncoder
-  mhsa_layer: ${mhsa_layer}
-  num_layers: 5
+  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  num_layers: 3
 
-mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -99,15 +102,16 @@ likelihood:
 optimiser:
   _target_: torch.optim.Adam
   _partial_: True
-  lr: 0.0001 # 3e-4 is weirdly enough treated as string?
+  lr: 5e-4
 
 params:
   dim: 1
-  points_per_unit: 4 # low such that num_ontg doesn't explode
+  gp_output_dim: 1
+  points_per_unit: 32 # low such that num_ontg doesn't explode
   epochs: 50
   embed_dim: 32
-  num_heads: 4
-  head_dim: 8
+  num_heads: 3
+  head_dim: 16
 
 
 misc:

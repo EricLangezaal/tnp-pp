@@ -3,11 +3,10 @@ from abc import abstractmethod
 
 import torch
 from torch import nn
-import einops
 
 from .base import OOTGConditionalNeuralProcess
-from .tnp import TNPDEncoder, TNPDDecoder, gen_tnpd_mask
-from ..utils.conv import compute_eq_weights
+from .tnp import EfficientTNPDEncoder, TNPDDecoder
+from ..utils.conv import compute_eq_weights, unflatten_grid, flatten_grid, convNd
 from ..utils.helpers import preprocess_observations
 
 
@@ -22,7 +21,7 @@ class OOTGSetConvEncoder(nn.Module):
         super().__init__()  
         init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=dtype)
         self.lengthscale_param = nn.Parameter(
-            (torch.tensor(init_lengthscale).exp() - 1).log(),
+            (init_lengthscale.clone().detach().exp() - 1).log(),
             requires_grad=train_lengthscale,
         )
 
@@ -58,7 +57,7 @@ class OOTGSetConvEncoder(nn.Module):
         return xc, yc
     
 
-class OOTG_TNPDEncoder(TNPDEncoder):
+class OOTG_TNPDEncoder(EfficientTNPDEncoder):
 
     def __init__(
             self, 
@@ -83,32 +82,34 @@ class OOTG_TNPDEncoder(TNPDEncoder):
     
     
 class OOTG_ViTEncoder(OOTG_TNPDEncoder):
+    """
+    Implements a very basic ViT encoding without positional embeddings
+
+    This relies on applying convolutions to coarsen the grid, which only works for grids that span up to 3 dimensions
+    The dimensionality of the data is unrestricted.
+    """
 
     def __init__(
             self,
             *,
             patch_size: int,
-            in_dim_x: int,
-            out_dim_x: int,
-            out_dim_y: int,
-            in_dim_y: int = 2,
+            dim: int,
+            embed_dim: int,
             **kwargs
     ):
-         super().__init__(**kwargs)
-         # TODO this assumes xdim is one, since my grid is just flattened...
-         # Would have to use convNd otherwise?
-         self.xpatcher = nn.Conv1d(in_channels=in_dim_x, out_channels=out_dim_x, kernel_size=patch_size, stride=patch_size)
-         self.ypatcher = nn.Conv1d(in_channels=in_dim_y, out_channels=out_dim_y, kernel_size=patch_size, stride=patch_size)
+        super().__init__(**kwargs)
+        self.dim = dim
+        self.patcher = convNd(n=dim, in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size)        
 
-    def coarsen_grid(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = einops.rearrange(x, "b n d -> b d n")
-        x = self.xpatcher(x)
-        x = einops.rearrange(x, "b e n -> b n e")
-
-        y = einops.rearrange(y, "b n d -> b d n")
-        y = self.ypatcher(y)
-        y = einops.rearrange(y, "b e n -> b n e")
-        return x, y
+    def coarsen_grid(self, z: torch.Tensor) -> torch.Tensor:
+        # z will be of shape (batch, num_on_grid, embed_dim)
+        z = unflatten_grid(z, dim=self.dim)
+        # move 'channels' (i.e embed_dim) right after batch
+        z = z.movedim(-1, 1)
+        z = self.patcher(z)
+        # move 'channels' (i.e embed_dim) to end again
+        z = z.movedim(1, -1)
+        return flatten_grid(z)
 
     def forward(
         self,
@@ -118,10 +119,19 @@ class OOTG_ViTEncoder(OOTG_TNPDEncoder):
         yc_on_grid: torch.Tensor,
         xt: torch.Tensor
     ) -> torch.Tensor:
+        # this will make yc's last dimension 2.
         xc, yc = self.grid_encoder(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)
-        xc, yc = self.coarsen_grid(x=xc, y=yc)
+        # this makes yc's last dimension 3.
+        yc, yt = preprocess_observations(xt, yc) # 
+        zc = torch.cat((xc, yc), dim=-1)
+        # So zc is 3 + xdim
+        zc = self.xy_encoder(zc)
+        zc = self.coarsen_grid(zc)   
 
-        return TNPDEncoder.forward(self, xc=xc, yc=yc, xt=xt)
+        zt = torch.cat((xt, yt), dim=-1)
+        zt = self.xy_encoder(zt)
+
+        return self.transformer_encoder(zc, zt)
 
 
 
