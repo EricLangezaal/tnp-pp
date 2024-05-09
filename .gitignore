@@ -1,9 +1,8 @@
 /data/
 lightning_logs
+checkpoints
+slurm_files/logs/
 wandb
-experiments/configs/*.yml
-!experiments/configs/models/
-!experiments/configs/generators/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

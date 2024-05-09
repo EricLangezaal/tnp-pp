@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from typing import Tuple, Optional
 import torch
 
-from .base import Batch, DataGenerator
-from .synthetic import SyntheticGenerator
+from .base import DataGenerator
+from .synthetic import SyntheticGenerator, SyntheticBatch
 from ..utils.conv import make_grid, flatten_grid
 
 @dataclass
-class OOTGBatch(Batch):
+class OOTGBatch(SyntheticBatch):
     xc_on_grid: torch.Tensor
     yc_on_grid: torch.Tensor
 
@@ -30,7 +30,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         self.grid_range = torch.as_tensor(grid_range, dtype=torch.float)
         self.points_per_unit = torch.as_tensor(points_per_unit)
 
-    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
+    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
         """
         Generate batch of data.
         Returns:
@@ -72,7 +72,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         x = torch.cat((offtg_x, ontg_x), dim=-2)
 
         # (batch_shape, num_ctx + num_trg + num_ontg, GP_out_dim). GP_out_dim should be 2.
-        y, _  = self.otg_generator.sample_outputs(x=x)
+        y, gt_pred = self.otg_generator.sample_outputs(x=x)
         offtg_y = y[:, :offtg_x.shape[-2], :1]
         # Use the other dimension if present, otherwise use same dimension
         ontg_y = y[:, offtg_x.shape[-2]:, 1 if y.shape[-1] > 1 else 0].unsqueeze(-1)
@@ -96,4 +96,5 @@ class SyntheticOOTGGenerator(DataGenerator):
             yc_on_grid=ontg_y,
             xt=xt,
             yt=yt,
+            gt_pred=None #TODO re-enable this once it works.
         )

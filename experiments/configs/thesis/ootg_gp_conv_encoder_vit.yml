@@ -8,6 +8,7 @@ generators:
     points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 16000
     batch_size: 16
+    deterministic: True # makes it generate whole dataset up front and re-use over epochs
   val:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
@@ -15,6 +16,7 @@ generators:
     points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 4096
     batch_size: 16
+    deterministic: True
     
   off_grid_generator_train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
@@ -109,9 +111,9 @@ optimiser:
 
 params:
   dim: 1
-  gp_output_dim: 1
+  gp_output_dim: 2
   points_per_unit: 32
-  epochs: 50
+  epochs: 200
   embed_dim: 32
   num_heads: 3
   head_dim: 16
@@ -120,5 +122,5 @@ params:
 
 misc:
   project: tnp-on-off-grid
-  name: conv_set_encoder_tnp
+  name: conv_set_encoder_vit
   resume_from_checkpoint: null

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 import torch
+from tqdm import tqdm
 
 
 class GroundTruthPredictor(ABC):
@@ -87,7 +88,7 @@ class DataGenerator(ABC):
             # Set deterministic seed.
             current_seed = torch.seed()
             torch.manual_seed(self.deterministic_seed)
-            self.batches = [self.generate_batch() for _ in range(self.num_batches)]
+            self.batches = [self.generate_batch() for _ in tqdm(range(self.num_batches), desc="Batch generation")]
             torch.manual_seed(current_seed)
 
         self.batch_counter = 0

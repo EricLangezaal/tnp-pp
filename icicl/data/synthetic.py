@@ -14,6 +14,11 @@ from .base import Batch, DataGenerator, GroundTruthPredictor
 
 @dataclass
 class SyntheticBatch(Batch):
+    gt_pred: Optional[GroundTruthPredictor]
+
+
+@dataclass
+class SyntheticDefaultBatch(SyntheticBatch):
     gt_mean: Optional[torch.Tensor] = None
     gt_std: Optional[torch.Tensor] = None
 
@@ -92,7 +97,7 @@ class SyntheticGenerator(DataGenerator, ABC):
         num_ctx: int,
         num_trg: int,
         batch_shape: torch.Size,
-    ) -> SyntheticBatch:
+    ) -> SyntheticDefaultBatch:
         # Sample inputs, then outputs given inputs
         x = self.sample_inputs(
             num_ctx=num_ctx, num_trg=num_trg, batch_shape=batch_shape
@@ -104,7 +109,7 @@ class SyntheticGenerator(DataGenerator, ABC):
         xt = x[:, num_ctx:, :]
         yt = y[:, num_ctx:, :]
 
-        return SyntheticBatch(
+        return SyntheticDefaultBatch(
             x=x,
             y=y,
             xc=xc,

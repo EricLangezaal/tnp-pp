@@ -218,6 +218,9 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         xt: torch.Tensor,
         yt: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+        if isinstance(self.kernel, gpytorch.kernels.MultitaskKernel):
+            return self.__call_mult_dim(xt, yt)
+
         dtype = xc.dtype
 
         xc = xc.to(torch.float64)
@@ -258,6 +261,30 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         std = std.to(dtype)[:, :, None]
 
         return mean, std, gt_loglik
+    
+    def __call_mult_dim(self,
+        xt: torch.Tensor,
+        yt: Optional[torch.Tensor] = None,
+    ):
+            kxx = self.kernel.to(xt.device)(xt).evaluate()
+            kxx += torch.eye(kxx.shape[-1]) * self.noise_std**2.0
+
+            py = gpytorch.distributions.MultitaskMultivariateNormal(
+                    mean=torch.zeros(xt.shape[:-1] + (self.kernel.num_tasks,)).to(xt.device),
+                    covariance_matrix=kxx,
+                )
+
+            trueDist = gpytorch.likelihoods.MultitaskGaussianLikelihood(self.kernel.num_tasks, rank=1)(py)
+
+            gt_loglik = None
+            if yt is not None:
+                # only first dimension of GP is related to targets since off grid
+                stacked_yt = yt.repeat_interleave(self.kernel.num_tasks, dim=-1)
+                # so fake stacked yt and then ignore second output layer
+                gt_loglik = trueDist.log_prob(stacked_yt)[..., 0].sum(-1).to(xt.dtype)
+
+            return trueDist.mean[..., :1], trueDist.stddev[..., :1], gt_loglik
+    
 
     def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
         kernel = self.kernel.to(x).to(torch.float64)
