@@ -96,5 +96,5 @@ class SyntheticOOTGGenerator(DataGenerator):
             yc_on_grid=ontg_y,
             xt=xt,
             yt=yt,
-            gt_pred=None #TODO re-enable this once it works.
+            gt_pred=gt_pred,
         )

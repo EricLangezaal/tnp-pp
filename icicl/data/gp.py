@@ -5,6 +5,7 @@ from abc import ABC
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
+from tqdm import tqdm
 import gpytorch
 import torch
 import torch.distributions as td
@@ -218,15 +219,15 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         xt: torch.Tensor,
         yt: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        if isinstance(self.kernel, gpytorch.kernels.MultitaskKernel):
-            return self.__call_mult_dim(xt, yt)
-
         dtype = xc.dtype
 
         xc = xc.to(torch.float64)
         yc = yc.to(torch.float64)
         xt = xt.to(torch.float64)
         num_ctx = xc.shape[-2]
+
+        if isinstance(self.kernel, gpytorch.kernels.MultitaskKernel):
+            return self.__call_mult_dim(xc=xc, yc=yc, xt=xt, yt=yt)
 
         x = torch.cat((xc, xt), dim=-2)
         with torch.no_grad():
@@ -262,28 +263,39 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
 
         return mean, std, gt_loglik
     
-    def __call_mult_dim(self,
-        xt: torch.Tensor,
-        yt: Optional[torch.Tensor] = None,
-    ):
-            kxx = self.kernel.to(xt.device)(xt).evaluate()
-            kxx += torch.eye(kxx.shape[-1]) * self.noise_std**2.0
+    def __call_mult_dim(self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor,yt: Optional[torch.Tensor] = None):
+            
+            target_len = xt.shape[-2]
+            likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=self.kernel.num_tasks)
 
-            py = gpytorch.distributions.MultitaskMultivariateNormal(
-                    mean=torch.zeros(xt.shape[:-1] + (self.kernel.num_tasks,)).to(xt.device),
-                    covariance_matrix=kxx,
-                )
+            yc_stacked = yc.repeat_interleave(self.kernel.num_tasks, dim=-1)
+            model = MultitaskGPModel(xc, yc_stacked, self.kernel, likelihood)
 
-            trueDist = gpytorch.likelihoods.MultitaskGaussianLikelihood(self.kernel.num_tasks, rank=1)(py)
+            # with torch.enable_grad():
+            #     model.train()
+            #     likelihood.train()
+            #     # Use the adam optimizer
+            #     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+            #     # "Loss" for GPs - the marginal log likelihood
+            #     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+            #     for _ in tqdm(range(50)):
+            #         optimizer.zero_grad()
+            #         output = model(xc)
+            #         loss = -mll(output, yc_stacked)
+            #         loss.backward()
+            #         optimizer.step()
+
+            model.eval()
+            outputDist = model(xt)
 
             gt_loglik = None
             if yt is not None:
                 # only first dimension of GP is related to targets since off grid
-                stacked_yt = yt.repeat_interleave(self.kernel.num_tasks, dim=-1)
-                # so fake stacked yt and then ignore second output layer
-                gt_loglik = trueDist.log_prob(stacked_yt)[..., 0].sum(-1).to(xt.dtype)
+                stacked_y = yt.repeat_interleave(self.kernel.num_tasks, dim=-1)
+                gt_loglik = outputDist.log_prob(stacked_y)[..., 0].sum(-1).to(xt.dtype)
 
-            return trueDist.mean[..., :1], trueDist.stddev[..., :1], gt_loglik
+            return outputDist.loc[..., :target_len], outputDist.stddev[..., 0], gt_loglik
     
 
     def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
@@ -312,6 +324,20 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
             y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
 
         return y.to(torch.float32)
+
+
+class MultitaskGPModel(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, kernel, likelihood):
+        super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.MultitaskMean(
+            gpytorch.means.ConstantMean(), num_tasks=2
+        )
+        self.covar_module = kernel
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultitaskMultivariateNormal(mean_x, covar_x)
 
 
 class MixtureGPGroundTruthPredictor(GroundTruthPredictor):
