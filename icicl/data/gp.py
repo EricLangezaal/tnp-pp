@@ -261,41 +261,39 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         mean = mean.to(dtype)[:, :, None]
         std = std.to(dtype)[:, :, None]
 
-        return mean, std, gt_loglik
+        return mean, std, gt_loglik      
     
     def __call_mult_dim(self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor,yt: Optional[torch.Tensor] = None):
-            
-            target_len = xt.shape[-2]
-            likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=self.kernel.num_tasks)
+        target_len = xt.shape[-2]
 
-            yc_stacked = yc.repeat_interleave(self.kernel.num_tasks, dim=-1)
-            model = MultitaskGPModel(xc, yc_stacked, self.kernel, likelihood)
+        likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=self.kernel.num_tasks)
 
-            # with torch.enable_grad():
-            #     model.train()
-            #     likelihood.train()
-            #     # Use the adam optimizer
-            #     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
-            #     # "Loss" for GPs - the marginal log likelihood
-            #     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        model = MultitaskGPModel(xc, yc, self.kernel, likelihood)
 
-            #     for _ in tqdm(range(50)):
-            #         optimizer.zero_grad()
-            #         output = model(xc)
-            #         loss = -mll(output, yc_stacked)
-            #         loss.backward()
-            #         optimizer.step()
+        # with torch.enable_grad():
+        #     model.train()
+        #     likelihood.train()
+        #     # Use the adam optimizer
+        #     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+        #     # "Loss" for GPs - the marginal log likelihood
+        #     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
-            model.eval()
-            outputDist = model(xt)
+        #     for _ in tqdm(range(50)):
+        #         optimizer.zero_grad()
+        #         output = model(xc)
+        #         loss = -mll(output, yc)
+        #         loss.backward()
+        #         optimizer.step()
 
-            gt_loglik = None
-            if yt is not None:
-                # only first dimension of GP is related to targets since off grid
-                stacked_y = yt.repeat_interleave(self.kernel.num_tasks, dim=-1)
-                gt_loglik = outputDist.log_prob(stacked_y)[..., 0].sum(-1).to(xt.dtype)
+        model.eval()
+        outputDist = model(xt)
 
-            return outputDist.loc[..., :target_len], outputDist.stddev[..., 0], gt_loglik
+        gt_loglik = None
+        if yt is not None:
+            # only first dimension of GP is related to targets since off grid
+            gt_loglik = outputDist.log_prob(yt)[..., 0].sum(-1).to(xt.dtype)
+
+        return outputDist.loc[..., :target_len], outputDist.stddev[..., 0], gt_loglik
     
 
     def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
@@ -311,7 +309,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         if kxx.numel() > 0:
             if isinstance(kernel, gpytorch.kernels.MultitaskKernel):
                 y = gpytorch.distributions.MultitaskMultivariateNormal(
-                    mean=torch.zeros(x.shape[:-1] + (kernel.num_tasks,), dtype=torch.float64),
+                    mean = torch.zeros(x.shape[:-1] + (kernel.num_tasks,), dtype=torch.float64),
                     covariance_matrix=kxx,
                 ).sample()
             else:
@@ -330,7 +328,7 @@ class MultitaskGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, kernel, likelihood):
         super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.MultitaskMean(
-            gpytorch.means.ConstantMean(), num_tasks=2
+            gpytorch.means.ZeroMean(), num_tasks=kernel.num_tasks
         )
         self.covar_module = kernel
 

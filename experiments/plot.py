@@ -174,6 +174,11 @@ def plot(
 
             gt_mean, gt_std = None, None
             if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
+                if isinstance(batch, OOTGBatch):
+                    # restore 2d output temporarily
+                    num_oftg = batch.xc_off_grid.shape[-2] + batch.xt.shape[-2]
+                    yc = torch.cat((batch.y[:, :batch.xc_off_grid.shape[-2], :], batch.y[:, num_oftg:, :]), dim=-2)
+                    yt = batch.y[:, batch.xc_off_grid.shape[-2]: num_oftg, :]
                 with torch.no_grad():
                     gt_mean, gt_std, _ = batch.gt_pred(
                         xc=xc[:1],
