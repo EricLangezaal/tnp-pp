@@ -32,8 +32,6 @@ class CRUDataGenerator(DataGenerator):
         y_mean: Optional[float] = None,
         y_std: Optional[float] = None,
         ref_date: str = "2000-01-01",
-        lat_spacing: int = 1,
-        lon_spacing: int = 1,
         t_spacing: int = 1,
         renormalise_time: bool = False,
         use_time: bool = True,
@@ -46,8 +44,6 @@ class CRUDataGenerator(DataGenerator):
         self.batch_grid_size = batch_grid_size
         self.max_nt = max_nt
         self.min_num_total = min_num_total
-        self.lat_spacing = lat_spacing
-        self.lon_spacing = lon_spacing
         self.t_spacing = t_spacing
 
         # Store ranges for plotting.
@@ -79,8 +75,7 @@ class CRUDataGenerator(DataGenerator):
 
         self.data = {
             "Tair": dataset["Tair"][:, lat_idx, lon_idx],
-            # "time": dataset["time"][:],
-            "time": dataset["time"],
+            "time": dataset["time"][:],
             "lat": dataset["lat"][lat_idx],
             "lon": dataset["lon"][lon_idx],
         }
@@ -104,6 +99,7 @@ class CRUDataGenerator(DataGenerator):
         self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
         self.renormalise_time = renormalise_time
+        self.use_time = use_time
 
         if batch_grid_size[0] > 1 and not use_time:
             raise ValueError("If batch_grid_size[0] > 1, use_time must be True.")
@@ -138,25 +134,11 @@ class CRUDataGenerator(DataGenerator):
         # Must keep location the same across batch as missing values vary.
         valid_location = False
         while not valid_location:
-            i = random.randint(
-                0,
-                len(self.data["lon"]) - 1 - self.lon_spacing * self.batch_grid_size[2],
-            )
-            lon_idx = list(
-                range(
-                    i, i + self.lon_spacing * self.batch_grid_size[1], self.lon_spacing
-                )
-            )
+            i = random.randint(0, len(self.data["lon"]) - 1 - self.batch_grid_size[2])
+            lon_idx = list(range(i, i + self.batch_grid_size[1]))
 
-            i = random.randint(
-                0,
-                len(self.data["lat"]) - 1 - self.lat_spacing * self.batch_grid_size[1],
-            )
-            lat_idx = list(
-                range(
-                    i, i + self.lat_spacing * self.batch_grid_size[2], self.lat_spacing
-                )
-            )
+            i = random.randint(0, len(self.data["lat"]) - 1 - self.batch_grid_size[1])
+            lat_idx = list(range(i, i + self.batch_grid_size[2]))
 
             # Get number of non-missing points.
             num_points = self._get_num_points(lat_idx=lat_idx, lon_idx=lon_idx)
@@ -166,16 +148,12 @@ class CRUDataGenerator(DataGenerator):
 
         time_idx: List[List] = []
         for _ in range(batch_size):
+            # i = random.randint(0, len(self.data["time"]) - 1 - self.batch_grid_size[0])
+            # time_idx.append(list(range(i, i + self.batch_grid_size[0])))
             i = random.randint(
                 0, len(self.data["time"]) - 1 - self.t_spacing * self.batch_grid_size[0]
             )
-            time_idx.append(
-                list(
-                    range(
-                        i, i + self.t_spacing * self.batch_grid_size[0], self.t_spacing
-                    )
-                )
-            )
+            time_idx.append(list(range(i, i + self.batch_grid_size[0], self.t_spacing)))
 
         idx = [(time_idx[i], lat_idx, lon_idx) for i in range(len(time_idx))]
         return idx
@@ -246,14 +224,13 @@ class CRUDataGenerator(DataGenerator):
 
         if not self.use_time:
             x = x[..., 1:]
-            x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
-        elif self.renormalise_time:
-            x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
+
+        x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
+
+        if self.renormalise_time and not self.use_time:
             t_mean = x[..., 0].mean(dim=0)
             t_std = x[..., 0].std(dim=0)
             x[..., 0] = (x[..., 0] - t_mean) / t_std
-        else:
-            x = (x[~y_mask.flatten()] - self.x_mean) / self.x_std
 
         # Sample indices for context / target.
         shuffled_idx = np.arange(len(y))
