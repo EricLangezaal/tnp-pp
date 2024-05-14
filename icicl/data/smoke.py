@@ -1,13 +1,23 @@
 import itertools
 import os
 import random
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+import einops
 import h5py
 import numpy as np
 import torch
 
 from icicl.data.base import Batch, DataGenerator
+
+
+@dataclass
+class GriddedBatchWithInputs(Batch):
+    x_grid: torch.Tensor
+    y_grid: torch.Tensor
+    mc_grid: torch.Tensor
+    mt_grid: torch.Tensor
 
 
 class SmokeGenerator(DataGenerator):
@@ -21,6 +31,7 @@ class SmokeGenerator(DataGenerator):
         min_num_trg: Optional[int] = None,
         max_num_trg: Optional[int] = None,
         renorm_batch: bool = False,
+        return_as_gridded: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -37,6 +48,7 @@ class SmokeGenerator(DataGenerator):
             self.max_num_trg = None
 
         self.renorm_batch = renorm_batch
+        self.return_as_gridded = return_as_gridded
         self.dataset, self.spatial_range = self.load_data(data_dir, split)
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
@@ -95,6 +107,9 @@ class SmokeGenerator(DataGenerator):
         x_list, xc_list, xt_list = [], [], []
         y_list, yc_list, yt_list = [], [], []
 
+        if self.return_as_gridded:
+            x_grid_list, y_grid_list, mc_grid_list, mt_grid_list = [], [], [], []
+
         for dataset_idx, batch_grid in zip(dataset_idxs, batch_grids):
             batch_grid_product = np.array(list(itertools.product(*batch_grid)))
             y = self.dataset[dataset_idx][
@@ -114,12 +129,57 @@ class SmokeGenerator(DataGenerator):
             # Now randomly select context and target points.
             shuffled_idx = list(range(len(x)))
             random.shuffle(shuffled_idx)
+
+            mc_idx = shuffled_idx[:num_ctx]
+            mt_idx = shuffled_idx[num_ctx : (num_ctx + num_trg)]
+
+            # Keep in order.
+            mc_idx.sort()
+            mt_idx.sort()
+
+            if self.return_as_gridded:
+                mc_grid_flat = torch.zeros(len(shuffled_idx), dtype=torch.bool)
+                mc_grid_flat[mc_idx] = True
+                mt_grid_flat = torch.zeros(len(shuffled_idx), dtype=torch.bool)
+                mt_grid_flat[mt_idx] = True
+
+                # Reshape into grid.
+                x_grid = einops.rearrange(
+                    x,
+                    "(n1 n2) d -> n1 n2 d",
+                    n1=len(batch_grid[0]),
+                    n2=len(batch_grid[1]),
+                )
+                y_grid = einops.rearrange(
+                    y,
+                    "(n1 n2) d -> n1 n2 d",
+                    n1=len(batch_grid[0]),
+                    n2=len(batch_grid[1]),
+                )
+                mc_grid = einops.rearrange(
+                    mc_grid_flat,
+                    "(n1 n2) -> n1 n2",
+                    n1=len(batch_grid[0]),
+                    n2=len(batch_grid[1]),
+                )
+                mt_grid = einops.rearrange(
+                    mt_grid_flat,
+                    "(n1 n2) -> n1 n2",
+                    n1=len(batch_grid[0]),
+                    n2=len(batch_grid[1]),
+                )
+
+                x_grid_list.append(x_grid)
+                y_grid_list.append(y_grid)
+                mc_grid_list.append(mc_grid)
+                mt_grid_list.append(mt_grid)
+
             x_list.append(x)
             y_list.append(y)
-            xc_list.append(x[shuffled_idx[:num_ctx]])
-            yc_list.append(y[shuffled_idx[:num_ctx]])
-            xt_list.append(x[shuffled_idx[num_ctx : (num_ctx + num_trg)]])
-            yt_list.append(y[shuffled_idx[num_ctx : (num_ctx + num_trg)]])
+            xc_list.append(x[mc_idx])
+            yc_list.append(y[mc_idx])
+            xt_list.append(x[mt_idx])
+            yt_list.append(y[mt_idx])
 
         x = torch.stack(x_list)
         y = torch.stack(y_list)
@@ -127,6 +187,25 @@ class SmokeGenerator(DataGenerator):
         yc = torch.stack(yc_list)
         xt = torch.stack(xt_list)
         yt = torch.stack(yt_list)
+
+        if self.return_as_gridded:
+            x_grid = torch.stack(x_grid_list)
+            y_grid = torch.stack(y_grid_list)
+            mc_grid = torch.stack(mc_grid_list)
+            mt_grid = torch.stack(mt_grid_list)
+
+            return GriddedBatchWithInputs(
+                x=x,
+                y=y,
+                xc=xc,
+                yc=yc,
+                xt=xt,
+                yt=yt,
+                x_grid=x_grid,
+                y_grid=y_grid,
+                mc_grid=mc_grid,
+                mt_grid=mt_grid,
+            )
 
         return Batch(
             x=x,
