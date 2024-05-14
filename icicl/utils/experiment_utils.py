@@ -17,10 +17,11 @@ from tqdm.auto import tqdm
 import wandb
 from icicl.data.base import Batch, DataGenerator
 from icicl.data.image import GriddedImageBatch
+from icicl.data.smoke import GriddedBatchWithInputs
 from icicl.data.synthetic import SyntheticBatch
 from icicl.data.on_off_grid import OOTGBatch
 from icicl.models.base import ConditionalNeuralProcess, NeuralProcess, OOTGConditionalNeuralProcess
-from icicl.models.convcnp import GriddedConvCNP
+from icicl.models.convcnp import GriddedConvCNP, GriddedConvCNPWithInputs
 from icicl.utils.batch import compress_batch_dimensions
 from icicl.utils.initialisation import weights_init
 
@@ -134,6 +135,11 @@ def np_loss_fn(
     elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
+    elif isinstance(model, GriddedConvCNPWithInputs):
+        assert isinstance(batch, GriddedBatchWithInputs)
+        pred_dist = model(
+            mc=batch.mc_grid, y=batch.y_grid, x=batch.x_grid, mt=batch.mt_grid
+        )
     elif isinstance(model, ConditionalNeuralProcess):
         pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
     elif isinstance(model, NeuralProcess):
@@ -165,6 +171,11 @@ def np_pred_fn(
     elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
         pred_dist = model(mc=batch.mc_grid, y=batch.y_grid, mt=batch.mt_grid)
+    elif isinstance(model, GriddedConvCNPWithInputs):
+        assert isinstance(batch, GriddedBatchWithInputs)
+        pred_dist = model(
+            mc=batch.mc_grid, y=batch.y_grid, x=batch.x_grid, mt=batch.mt_grid
+        )
     elif isinstance(model, ConditionalNeuralProcess):
         pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
     elif isinstance(model, NeuralProcess):
