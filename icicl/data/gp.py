@@ -9,6 +9,10 @@ from tqdm import tqdm
 import gpytorch
 import torch
 import torch.distributions as td
+import pdb
+
+from linear_operator import to_linear_operator
+from linear_operator.operators import KroneckerProductLinearOperator
 
 from icicl.networks.kernels import GibbsKernel
 
@@ -264,62 +268,51 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         return mean, std, gt_loglik      
     
     def __call_mult_dim(self, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor,yt: Optional[torch.Tensor] = None):
-        target_len = xt.shape[-2]
-
-        likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=self.kernel.num_tasks)
+        likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=self.kernel.num_tasks, has_task_noise=False)
+        likelihood.noise = self.noise_std ** 2
 
         model = MultitaskGPModel(xc, yc, self.kernel, likelihood)
-
-        # with torch.enable_grad():
-        #     model.train()
-        #     likelihood.train()
-        #     # Use the adam optimizer
-        #     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
-        #     # "Loss" for GPs - the marginal log likelihood
-        #     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-        #     for _ in tqdm(range(50)):
-        #         optimizer.zero_grad()
-        #         output = model(xc)
-        #         loss = -mll(output, yc)
-        #         loss.backward()
-        #         optimizer.step()
-
         model.eval()
-        outputDist = model(xt)
+        
+        outputDist = likelihood(model(xt))
 
         gt_loglik = None
         if yt is not None:
             # only first dimension of GP is related to targets since off grid
             gt_loglik = outputDist.log_prob(yt)[..., 0].sum(-1).to(xt.dtype)
 
-        return outputDist.loc[..., :target_len], outputDist.stddev[..., 0], gt_loglik
+        #self.kernel.data_covar_module.noise_std = torch.as_tensor(self.noise_std)
+        return outputDist.mean[..., 0], outputDist.stddev[..., 0], gt_loglik
     
 
     def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
         kernel = self.kernel.to(x).to(torch.float64)
 
-        # Set up covariance at input locations
-        with torch.no_grad():
-            kxx = kernel(x.to(torch.float64)).evaluate()
+        if isinstance(kernel, gpytorch.kernels.MultitaskKernel):
+            covar_i = kernel.task_covar_module.covar_matrix
+            covar_i = covar_i.repeat(*x.shape[:-2], 1, 1)
+            covar_x = to_linear_operator(kernel.data_covar_module.forward(x, x))
+            covar_x += torch.eye(covar_x.shape[-1], dtype=torch.float64) * self.noise_std
+            kxx = KroneckerProductLinearOperator(covar_x, covar_i).evaluate()
 
-        kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std**2.0
+            # noise has already been added by custom NoiseKernel
+            y = gpytorch.distributions.MultitaskMultivariateNormal(
+                mean=torch.zeros(x.shape[:-1] + (kernel.num_tasks,), dtype=torch.float64),
+                covariance_matrix=kxx
+            ).sample()
+        else:
+            with torch.no_grad():
+                kxx = kernel(x.to(torch.float64)).evaluate()
+            kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std ** 2.0
 
-        # Sample from GP with zero mean and covariance kxx.
-        if kxx.numel() > 0:
-            if isinstance(kernel, gpytorch.kernels.MultitaskKernel):
-                y = gpytorch.distributions.MultitaskMultivariateNormal(
-                    mean = torch.zeros(x.shape[:-1] + (kernel.num_tasks,), dtype=torch.float64),
-                    covariance_matrix=kxx,
-                ).sample()
-            else:
+            if kxx.numel() > 0:
                 py = td.MultivariateNormal(
                     loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
                     covariance_matrix=kxx,
                 )
                 y = py.sample().unsqueeze(-1)
-        else:
-            y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
+            else:
+                y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
 
         return y.to(torch.float32)
 
@@ -331,6 +324,7 @@ class MultitaskGPModel(gpytorch.models.ExactGP):
             gpytorch.means.ZeroMean(), num_tasks=kernel.num_tasks
         )
         self.covar_module = kernel
+        
 
     def forward(self, x):
         mean_x = self.mean_module(x)
