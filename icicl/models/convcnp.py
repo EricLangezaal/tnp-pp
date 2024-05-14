@@ -52,6 +52,27 @@ class GriddedConvCNPEncoder(nn.Module):
         return z_grid
 
 
+class GriddedConvCNPEncoderWithInputs(nn.Module):
+    def __init__(
+        self,
+        conv_net: nn.Module,
+        resizer: nn.Module,
+    ):
+        super().__init__()
+        self.conv_net = conv_net
+        self.resizer = resizer
+
+    def forward(
+        self, mc: torch.Tensor, y: torch.Tensor, x: torch.Tensor
+    ) -> torch.Tensor:
+        mc_ = einops.repeat(mc, "m n1 n2 -> m n1 n2 d", d=y.shape[-1])
+        yc = y * mc_
+        z_grid = torch.cat((yc, mc_), dim=-1)
+        z_grid = self.resizer(z_grid)
+        z_grid = self.conv_net(z_grid)
+        return z_grid
+
+
 class ConvCNPDecoder(nn.Module):
     def __init__(
         self,
@@ -124,3 +145,23 @@ class GriddedConvCNP(nn.Module):
         self, mc: torch.Tensor, y: torch.Tensor, mt: torch.Tensor
     ) -> torch.distributions.Distribution:
         return self.likelihood(self.decoder(self.encoder(mc, y), mt))
+
+
+class GriddedConvCNPWithInputs(nn.Module):
+    def __init__(
+        self,
+        encoder: GriddedConvCNPEncoderWithInputs,
+        decoder: GriddedConvCNPDecoder,
+        likelihood: nn.Module,
+    ):
+        super().__init__()
+
+        self.encoder = encoder
+        self.decoder = decoder
+        self.likelihood = likelihood
+
+    @check_shapes("mc: [m, ...]", "y: [m, ..., dy]", "mt: [m, ...]")
+    def forward(
+        self, mc: torch.Tensor, y: torch.Tensor, x: torch.Tensor, mt: torch.Tensor
+    ) -> torch.distributions.Distribution:
+        return self.likelihood(self.decoder(self.encoder(mc, y, x), mt))
