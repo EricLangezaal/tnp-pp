@@ -1,3 +1,5 @@
+# File inspired from 'efficient-tnpd-synthetic-1d.yml'
+
 generators:
   train:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
@@ -6,6 +8,7 @@ generators:
     points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 16000
     batch_size: 16
+    deterministic: ${params.deterministic}
   val:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
@@ -13,6 +16,7 @@ generators:
     points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 4096
     batch_size: 16
+    deterministic: ${params.deterministic}
     
   off_grid_generator_train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
@@ -48,72 +52,44 @@ generators:
     batch_size: ${generators.val.batch_size}
 
 model:
-  _target_: icicl.models.lbanp.LBANP
-  encoder: ${lbanp_encoder}
-  decoder: ${lbanp_decoder}
+  _target_: icicl.models.tnp.TNPD
+  encoder: ${tnpd_encoder}
+  decoder: ${tnpd_decoder}
   likelihood: ${likelihood}
 
-lbanp_encoder:
-  _target_: icicl.models.lbanp.LBANPEncoder
-  perceiver_encoder: ${perceiver_encoder}
+tnpd_encoder:
+  _target_: icicl.models.tnp.EfficientTNPDEncoder
+  transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
-# perceiver_encoder:
-#   _target_: icicl.networks.transformer.PerceiverEncoder
-#   num_latents: 16
-#   mhsa_layer: ${mhsa_layer}
-#   mhca_layer: ${mhca_ctoq_layer}
-#   num_layers: 5
+transformer_encoder:
+  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  num_layers: ${params.num_layers}
 
-perceiver_encoder:
-  _target_: icicl.networks.transformer.ISetTransformerEncoder
-  num_latents: 8
-  mhca_ctoq_layer: ${mhca_ctoq_layer}
-  mhca_qtoc_layer: ${mhca_ctoq_layer}
-  num_layers: 5
-
-mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
-  embed_dim: ${params.embed_dim}
-  num_heads: ${params.num_heads}
-  head_dim: ${params.head_dim}
-  feedforward_dim: ${params.embed_dim}
-
-mhca_ctoq_layer:
+mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'${params.dim} + 2'} # unmodified, since on and off the grid are just after each other
+  in_dim: ${eval:'2 + ${params.dim}'} # 3 since it was 2 before and now stack output for on & off the grid
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
 
-lbanp_decoder:
-  _target_: icicl.models.lbanp.LBANPDecoder
-  perceiver_decoder: ${perceiver_decoder}
+tnpd_decoder:
+  _target_: icicl.models.tnp.TNPDDecoder
   z_decoder: ${z_decoder}
-
-perceiver_decoder:
-  _target_: icicl.networks.transformer.PerceiverDecoder
-  mhca_layer: ${mhca_qtot_layer}
-  num_layers: 1
-
-mhca_qtot_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
-  embed_dim: ${params.embed_dim}
-  num_heads: ${params.num_heads}
-  head_dim: ${params.head_dim}
-  feedforward_dim: ${params.embed_dim}
 
 z_decoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.embed_dim}
-  out_dim: 2
+  out_dim: 2 # 1 for std and 1 for means
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -121,21 +97,28 @@ likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
 
 optimiser:
-  _target_: torch.optim.Adam
+  _target_: torch.optim.AdamW
   _partial_: True
-  lr: 3e-4
+  lr: 5.0e-4
 
 params:
+  epochs: 200
+  deterministic: False # makes it generate whole dataset up front and re-use over epochs
+
   dim: 1
-  gp_output_dim: 1
-  points_per_unit: 4
-  epochs: 50
-  embed_dim: 64
+  gp_output_dim: 2
+  points_per_unit: 8 # low such that num_ontg doesn't explode
+
+  embed_dim: 128
   num_heads: 8
-  head_dim: 8
+  head_dim: 16
+  norm_first: True
+  num_layers: 5
 
 
 misc:
   project: tnp-on-off-grid
-  name: lbanp_baseline
+  name: plain_tnp
+  gradient_clip_val: 0.5
+  plot_interval: 10
   resume_from_checkpoint: null

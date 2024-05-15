@@ -8,7 +8,7 @@ generators:
     points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 16000
     batch_size: 16
-    deterministic: True # makes it generate whole dataset up front and re-use over epochs
+    deterministic: ${params.deterministic}
   val:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
@@ -16,7 +16,7 @@ generators:
     points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 4096
     batch_size: 16
-    deterministic: True # makes it generate whole dataset up front and re-use over epochs
+    deterministic: ${params.deterministic}
     
   off_grid_generator_train:
     _target_: icicl.data.gp.RandomScaleGPGenerator
@@ -95,7 +95,7 @@ tnpd_decoder:
 z_decoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.embed_dim}
-  out_dim: 2 # might just be 1 for std and 1 for means
+  out_dim: 2 # 1 for std and 1 for means
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -103,15 +103,18 @@ likelihood:
   _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
 
 optimiser:
-  _target_: torch.optim.Adam
+  _target_: torch.optim.AdamW
   _partial_: True
-  lr: 5e-4
+  lr: 5.0e-4
 
 params:
+  epochs: 200
+  deterministic: False # makes it generate whole dataset up front and re-use over epochs
+
   dim: 1
   gp_output_dim: 2
   points_per_unit: 8 # low such that num_ontg doesn't explode
-  epochs: 200
+
   embed_dim: 128
   num_heads: 8
   head_dim: 16
@@ -122,4 +125,6 @@ params:
 misc:
   project: tnp-on-off-grid
   name: conv_set_encoder_tnp
+  gradient_clip_val: 0.5
+  plot_interval: 10
   resume_from_checkpoint: null

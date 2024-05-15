@@ -269,7 +269,7 @@ def plot(
             if gt_mean is not None and gt_std is not None:
                 y_max = 0.25 + max(gt_mean[0, ...] + 2 * gt_std[0, ...])
                 y_min = -0.25 + min(gt_mean[0, ...] - 2 * gt_std[0, ...])
-                y_lim = (y_min, y_max)
+                y_lim = (y_min.cpu(), y_max.cpu())
                 plt.ylim(y_lim)
 
             plt.xticks(fontsize=24)

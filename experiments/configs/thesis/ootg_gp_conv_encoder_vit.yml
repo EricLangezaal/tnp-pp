@@ -1,5 +1,7 @@
 # File inspired from 'efficient-tnpd-synthetic-1d.yml'
 
+# OUTDATED -> UPDATE BEFORE USE
+
 generators:
   train:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator

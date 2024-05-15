@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from icicl.data.base import Batch
+from icicl.data.on_off_grid import OOTGBatch
 from icicl.utils.experiment_utils import ModelCheckpointer, np_loss_fn, np_pred_fn
 
 
@@ -56,7 +57,7 @@ class LitWrapper(pl.LightningModule):
         loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
 
-        if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
+        if hasattr(batch, "gt_pred") and batch.gt_pred is not None and not isinstance(batch, OOTGBatch):
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt, batch=batch
             )
@@ -74,7 +75,7 @@ class LitWrapper(pl.LightningModule):
         loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
 
-        if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
+        if hasattr(batch, "gt_pred") and batch.gt_pred is not None and not isinstance(batch, OOTGBatch):
             _, _, gt_loglik = batch.gt_pred(
                 xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
             )

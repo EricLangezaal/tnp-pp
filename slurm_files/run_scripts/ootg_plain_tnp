@@ -10,11 +10,11 @@
 
 #! sbatch directives begin here ###############################
 #! Name of the job:
-#SBATCH -J lbanp_grid
+#SBATCH -J ootg_p_tnp
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
 #SBATCH -A MLMI-erl50-SL2-GPU
 
-#SBATCH --output=slurm_files/logs/lbanp_grid_%A.out
+#SBATCH --output=slurm_files/logs/ootg_plain_tnp_%A.out
 
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
@@ -25,7 +25,7 @@
 #! Note that the job submission script will enforce no more than 3 cpus per GPU.
 #SBATCH --gres=gpu:1
 #! How much wallclock time will be required?
-#SBATCH --time=03:00:00
+#SBATCH --time=5:00:00
 
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
@@ -58,7 +58,7 @@ workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to t
                              # in which sbatch is run.
 
 #! Your_python your_code, args
-CMD="python experiments/train.py --config experiments/configs/thesis/lbanp.yml --generator_config experiments/configs/thesis/on_off_grid_gp_synthetic.yml"
+CMD="python experiments/lightning_train.py --config experiments/configs/thesis/ootg_gp_plain_tnp.yml"
 
 ###############################################################
 ### You should not have to change anything below this line ####

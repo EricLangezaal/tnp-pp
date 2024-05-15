@@ -280,11 +280,15 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         likelihood.noise = self.noise_std ** 2
 
         # labelling technically doesn't matter, as long as off grid context and target have same label.
-        xc_labels = torch.concat((torch.zeros(batch.xc_off_grid.shape[-2], 1), torch.ones(batch.xc_on_grid.shape[-2], 1))).to(torch.long)
+        xc_labels = torch.concat((
+            torch.zeros(batch.xc_off_grid.shape[-2], 1),
+            torch.ones(batch.xc_on_grid.shape[-2], 1)),
+        ).to(xc.device).to(torch.long)
+
         model = MultitaskGPModel((xc, xc_labels), yc, self.kernel, likelihood, out_dim=self.out_dim)
-        model.eval()
+        model.to(xc.device).eval()
         
-        outputDist = likelihood(model(xt, torch.zeros(len(xt), 1, dtype=torch.long)))
+        outputDist = likelihood(model(xt, torch.zeros(len(xt), 1, dtype=torch.long, device=xc.device)))
 
         gt_loglik = None
         if yt is not None:
@@ -324,6 +328,7 @@ class MultitaskGPModel(gpytorch.models.ExactGP):
         super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
         self.covar_module = kernel
+        #self.covar_module.batch_shape = train_x[0].shape[:1]
         self.task_module = gpytorch.kernels.IndexKernel(num_tasks=out_dim)
 
     def forward(self, x, i):
