@@ -169,10 +169,7 @@ class GPGeneratorBase(ABC):
         
         if self.out_dim > 1:
             assert isinstance(gt_pred, GPGroundTruthPredictor)
-            multi_kernel = gpytorch.kernels.MultitaskKernel(
-                kernel, num_tasks=self.out_dim, rank=1
-            )
-            gt_pred = GPGroundTruthPredictor(multi_kernel, noise_std=self.noise_std)
+            gt_pred = GPGroundTruthPredictor(kernel=kernel, noise_std=self.noise_std, out_dim=self.out_dim)
 
         return gt_pred
 
@@ -181,6 +178,7 @@ class GPGenerator(GPGeneratorBase):
     def sample_outputs(
         self,
         x: torch.Tensor,
+        num_offtg: Optional[int] = None 
     ) -> Tuple[torch.Tensor, GroundTruthPredictor]:
         """Sample context and target outputs, given the inputs `x`.
 
@@ -195,7 +193,10 @@ class GPGenerator(GPGeneratorBase):
 
         # Set up GP kernel
         gt_pred = self.set_up_gp()
-        y = gt_pred.sample_outputs(x)
+        if num_offtg is not None:
+            y = gt_pred.sample_outputs(x, num_offtg=num_offtg)
+        else:
+            y = gt_pred.sample_outputs(x)
 
         return y.to(torch.float32), gt_pred
 
@@ -215,9 +216,10 @@ class RandomScaleGPGeneratorBimodalInput(GPGenerator, SyntheticGeneratorBimodalI
 
 
 class GPGroundTruthPredictor(GroundTruthPredictor):
-    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float):
+    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float, out_dim: int = 1):
         self.kernel = kernel
         self.noise_std = noise_std
+        self.out_dim = out_dim
 
     def __call__(
         self,
@@ -234,7 +236,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         xt = xt.to(torch.float64)
         num_ctx = xc.shape[-2]
 
-        if isinstance(self.kernel, gpytorch.kernels.MultitaskKernel):
+        if self.out_dim > 1:
             return self.__call_mult_dim(batch=batch, xc=xc, yc=yc, xt=xt, yt=yt)
 
         x = torch.cat((xc, xt), dim=-2)
@@ -279,7 +281,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
 
         # labelling technically doesn't matter, as long as off grid context and target have same label.
         xc_labels = torch.concat((torch.zeros(batch.xc_off_grid.shape[-2], 1), torch.ones(batch.xc_on_grid.shape[-2], 1))).to(torch.long)
-        model = MultitaskGPModel((xc, xc_labels), yc, self.kernel, likelihood)
+        model = MultitaskGPModel((xc, xc_labels), yc, self.kernel, likelihood, out_dim=self.out_dim)
         model.eval()
         
         outputDist = likelihood(model(xt, torch.zeros(len(xt), 1, dtype=torch.long)))
@@ -288,48 +290,41 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         if yt is not None:
             gt_loglik = outputDist.log_prob(yt.squeeze()).sum().to(xt.dtype)
 
-        #self.kernel.data_covar_module.noise_std = torch.as_tensor(self.noise_std)
         return outputDist.mean.unsqueeze(0), outputDist.stddev.unsqueeze(0), gt_loglik
     
 
-    def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
+    def sample_outputs(self, x: torch.Tensor, num_offtg: Optional[int] = None) -> torch.Tensor:
         kernel = self.kernel.to(x).to(torch.float64)
 
-        if isinstance(kernel, gpytorch.kernels.MultitaskKernel):
-            covar_i = kernel.task_covar_module.covar_matrix
-            covar_i = covar_i.repeat(*x.shape[:-2], 1, 1)
-            covar_x = to_linear_operator(kernel.data_covar_module.forward(x, x))
-            covar_x += torch.eye(covar_x.shape[-1], dtype=torch.float64) * self.noise_std
-            kxx = KroneckerProductLinearOperator(covar_x, covar_i).evaluate()
+        with torch.no_grad():
+            kxx = kernel(x.to(torch.float64)).evaluate()
 
-            # noise has already been added by custom NoiseKernel
-            y = gpytorch.distributions.MultitaskMultivariateNormal(
-                mean=torch.zeros(x.shape[:-1] + (kernel.num_tasks,), dtype=torch.float64),
-                covariance_matrix=kxx
-            ).sample()
-        else:
+        if self.out_dim > 1:
+            x_labels = torch.zeros(x.shape[-2], 1, dtype=torch.long)
+            x_labels[num_offtg:] = 1
             with torch.no_grad():
-                kxx = kernel(x.to(torch.float64)).evaluate()
-            kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std ** 2.0
-
-            if kxx.numel() > 0:
-                py = td.MultivariateNormal(
-                    loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
-                    covariance_matrix=kxx,
-                )
-                y = py.sample().unsqueeze(-1)
-            else:
-                y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
+                covar_i = gpytorch.kernels.IndexKernel(num_tasks=self.out_dim)(x_labels)
+                kxx = kxx.mul(covar_i).evaluate()
+        
+        kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std ** 2.0
+        if kxx.numel() > 0:
+            py = td.MultivariateNormal(
+                loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
+                covariance_matrix=kxx,
+            )
+            y = py.sample().unsqueeze(-1)
+        else:
+            y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
 
         return y.to(torch.float32)
 
 
 class MultitaskGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, kernel, likelihood):
+    def __init__(self, train_x, train_y, kernel, likelihood, out_dim):
         super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
-        self.covar_module = kernel.data_covar_module
-        self.task_module = gpytorch.kernels.IndexKernel(num_tasks=kernel.num_tasks)
+        self.covar_module = kernel
+        self.task_module = gpytorch.kernels.IndexKernel(num_tasks=out_dim)
 
     def forward(self, x, i):
         mean_x = self.mean_module(x)

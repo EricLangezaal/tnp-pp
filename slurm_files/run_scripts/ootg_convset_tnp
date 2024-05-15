@@ -25,7 +25,7 @@
 #! Note that the job submission script will enforce no more than 3 cpus per GPU.
 #SBATCH --gres=gpu:1
 #! How much wallclock time will be required?
-#SBATCH --time=4:00:00
+#SBATCH --time=3:00:00
 
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
@@ -50,6 +50,8 @@ mpi_tasks_per_node=$(echo "$SLURM_TASKS_PER_NODE" | sed -e  's/^\([0-9][0-9]*\).
 source /home/${USER}/.bashrc
 module load slurm
 conda activate tnp
+
+export TQDM_DISABLE=1
 
 #! Work directory (i.e. where the job will run):
 workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory

@@ -71,11 +71,11 @@ class SyntheticOOTGGenerator(DataGenerator):
         # (batch_shape, num_ctx + num_trg + num_ontg, xdim).
         x = torch.cat((offtg_x, ontg_x), dim=-2)
 
-        # (batch_shape, num_ctx + num_trg + num_ontg, GP_out_dim). GP_out_dim should be 2.
-        y, gt_pred = self.otg_generator.sample_outputs(x=x)
-        offtg_y = y[:, :offtg_x.shape[-2], :1]
-        # Use the other dimension if present, otherwise use same dimension
-        ontg_y = y[:, offtg_x.shape[-2]:, 1 if y.shape[-1] > 1 else 0].unsqueeze(-1)
+        # (batch_shape, num_ctx + num_trg + num_ontg, 1).
+        # can be sampled from two Hadamard correlated processes though!
+        y, gt_pred = self.otg_generator.sample_outputs(x=x, num_offtg=offtg_x.shape[-2])
+        offtg_y = y[:, :offtg_x.shape[-2], :]
+        ontg_y = y[:, offtg_x.shape[-2]:, :]
 
         offtg_xc = offtg_x[:, :num_ctx, :]
         offtg_yc = offtg_y[:, :num_ctx, :]

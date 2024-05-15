@@ -132,6 +132,7 @@ class SyntheticGenerator(DataGenerator, ABC):
     def sample_outputs(
         self,
         x: torch.Tensor,
+        num_offtg: Optional[int] = None
     ) -> Tuple[torch.Tensor, Optional[GroundTruthPredictor]]:
         """Sample context and target outputs, given the inputs `x`.
 
