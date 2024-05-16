@@ -89,6 +89,7 @@ def main():
         devices=1, #more?
         # strategy="ddp",
         gradient_clip_val=experiment.misc.gradient_clip_val,
+        enable_progress_bar=experiment.misc.progress_bars
     )
 
     trainer.fit(model=lit_model, train_dataloaders=gen_train, val_dataloaders=gen_val)

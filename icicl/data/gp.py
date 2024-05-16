@@ -274,7 +274,9 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         return mean, std, gt_loglik      
     
     def __call_mult_dim(self, batch: OOTGBatch, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor,yt: Optional[torch.Tensor] = None):
-        xc, yc, xt = xc.squeeze(), yc.squeeze(), xt.squeeze()
+        # targets have to have one dimension less for exact GP!
+        # can safely remove as generated data always had this as a 1-dimension anyway.
+        yc = yc.squeeze(-1)
 
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         likelihood.noise = self.noise_std ** 2
@@ -288,13 +290,13 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         model = MultitaskGPModel((xc, xc_labels), yc, self.kernel, likelihood, out_dim=self.out_dim)
         model.to(xc.device).eval()
         
-        outputDist = likelihood(model(xt, torch.zeros(len(xt), 1, dtype=torch.long, device=xc.device)))
+        outputDist = likelihood(model(xt, torch.zeros(xt.shape[-2], 1, dtype=torch.long, device=xc.device)))
 
         gt_loglik = None
         if yt is not None:
-            gt_loglik = outputDist.log_prob(yt.squeeze()).sum().to(xt.dtype)
+            gt_loglik = outputDist.log_prob(yt.squeeze(-1)).sum().to(xt.dtype)
 
-        return outputDist.mean.unsqueeze(0), outputDist.stddev.unsqueeze(0), gt_loglik
+        return outputDist.mean, outputDist.stddev, gt_loglik
     
 
     def sample_outputs(self, x: torch.Tensor, num_offtg: Optional[int] = None) -> torch.Tensor:
@@ -328,7 +330,7 @@ class MultitaskGPModel(gpytorch.models.ExactGP):
         super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
         self.covar_module = kernel
-        #self.covar_module.batch_shape = train_x[0].shape[:1]
+        #self.covar_module.batch_shape = train_y.shape[:1]
         self.task_module = gpytorch.kernels.IndexKernel(num_tasks=out_dim)
 
     def forward(self, x, i):

@@ -4,6 +4,7 @@ import argparse
 import os
 from collections import OrderedDict, defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from functools import partialmethod
 
 import einops
 import hiyapyco
@@ -299,6 +300,7 @@ def create_default_config() -> DictConfig:
             "override_config": False,
             "plot_ar_mode": False,
             "logging": True,
+            "progress_bars": True,
             "seed": 0,
             "plot_interval": 1,
             "lightning_eval": False,
@@ -408,6 +410,9 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     experiment = instantiate(config)
     pl.seed_everything(experiment.misc.seed)
 
+    # use tensor cores effectively
+    torch.set_float32_matmul_precision('high')
+
     if isinstance(experiment.model, nn.Module):
         if experiment.misc.resume_from_checkpoint:
             # Downloads to "./checkpoints/last.ckpt".
@@ -436,6 +441,9 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
             name=experiment.misc.name,
             config=config_dict,
         )
+
+    if not experiment.misc.progress_bars:
+        tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     checkpointer = ModelCheckpointer(logging=experiment.misc.logging)
 
