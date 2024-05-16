@@ -142,7 +142,10 @@ def np_loss_fn(
             mc=batch.mc_grid, y=batch.y_grid, x=batch.x_grid, mt=batch.mt_grid
         )
     elif isinstance(model, ConditionalNeuralProcess):
-        pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+        if isinstance(batch, OOTGBatch) and hasattr(model, "ignore_on_grid") and model.ignore_on_grid:
+            pred_dist = model(xc=batch.xc_off_grid, yc=batch.yc_off_grid, xt=batch.xt)
+        else:
+            pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
     elif isinstance(model, NeuralProcess):
         pred_dist = model(
             xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples
@@ -178,7 +181,10 @@ def np_pred_fn(
             mc=batch.mc_grid, y=batch.y_grid, x=batch.x_grid, mt=batch.mt_grid
         )
     elif isinstance(model, ConditionalNeuralProcess):
-        pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+        if isinstance(batch, OOTGBatch) and hasattr(model, "ignore_on_grid") and model.ignore_on_grid:
+            pred_dist = model(xc=batch.xc_off_grid, yc=batch.yc_off_grid, xt=batch.xt)
+        else:
+            pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
     elif isinstance(model, NeuralProcess):
         pred_dist = model(
             xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples

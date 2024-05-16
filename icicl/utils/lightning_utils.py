@@ -76,7 +76,7 @@ class LitWrapper(pl.LightningModule):
 
         if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
-                xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt
+                xc=batch.xc, yc=batch.yc, xt=batch.xt, yt=batch.yt, batch=batch
             )
             gt_loglik = gt_loglik.sum() / batch.yt[..., 0].numel()
             result["gt_loglik"] = gt_loglik.cpu()

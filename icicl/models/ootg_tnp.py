@@ -63,11 +63,13 @@ class OOTG_TNPDEncoder(EfficientTNPDEncoder):
             self, 
             *,
             grid_encoder: Union[OOTGSetConvEncoder],
+            ignore_on_grid: bool = False,
             **kwargs
     ):
         super().__init__(**kwargs)
         self.grid_encoder = grid_encoder
-
+        self.ignore_on_grid = ignore_on_grid
+        
     def forward(
         self,
         xc_off_grid: torch.Tensor,
@@ -77,6 +79,8 @@ class OOTG_TNPDEncoder(EfficientTNPDEncoder):
         xt: torch.Tensor
     ) -> torch.Tensor:
         xc, yc = self.grid_encoder(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)
+        if self.ignore_on_grid:
+            yc = yc[..., 1:]
 
         return super().forward(xc=xc, yc=yc, xt=xt)
     

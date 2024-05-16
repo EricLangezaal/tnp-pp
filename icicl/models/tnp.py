@@ -76,11 +76,13 @@ class EfficientTNPDEncoder(nn.Module):
         self,
         transformer_encoder: TNPDTransformerEncoder,
         xy_encoder: nn.Module,
+        **kwargs,
     ):
         super().__init__()
 
         self.transformer_encoder = transformer_encoder
         self.xy_encoder = xy_encoder
+        self.__dict__.update(kwargs)
 
     @check_shapes(
         "xc: [m, nc, dx]", "yc: [m, nc, dy]", "xt: [m, nt, dx]", "return: [m, n, dz]"

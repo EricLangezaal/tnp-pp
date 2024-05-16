@@ -59,6 +59,7 @@ model:
 
 tnpd_encoder:
   _target_: icicl.models.tnp.EfficientTNPDEncoder
+  ignore_on_grid: ${params.ignore_on_grid}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
@@ -104,6 +105,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
+  ignore_on_grid: True
 
   dim: 1
   gp_output_dim: 2
@@ -118,7 +120,7 @@ params:
 
 misc:
   project: tnp-on-off-grid
-  name: plain_tnp
+  name: ${eval:"'plain_tnp' + ('_offg_only' if ${params.ignore_on_grid} else '')"}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
