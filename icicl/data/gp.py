@@ -9,10 +9,7 @@ from tqdm import tqdm
 import gpytorch
 import torch
 import torch.distributions as td
-import pdb
-
-from linear_operator import to_linear_operator
-from linear_operator.operators import KroneckerProductLinearOperator
+import lightning.pytorch as pl
 
 from icicl.networks.kernels import GibbsKernel
 
@@ -53,6 +50,7 @@ class GPGeneratorBase(ABC):
         max_log10_lengthscale: float,
         noise_std: float,
         out_dim: int = 1,
+        index_kernel_rank: int = 1,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -66,6 +64,7 @@ class GPGeneratorBase(ABC):
         )
         self.noise_std = noise_std
         self.out_dim = out_dim
+        self.index_kernel_rank = index_kernel_rank
 
     def set_up_gp(self) -> GroundTruthPredictor:
         # Sample lengthscale
@@ -216,10 +215,11 @@ class RandomScaleGPGeneratorBimodalInput(GPGenerator, SyntheticGeneratorBimodalI
 
 
 class GPGroundTruthPredictor(GroundTruthPredictor):
-    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float, out_dim: int = 1):
+    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float, out_dim: int = 1, index_kernel_rank: int = 1):
         self.kernel = kernel
         self.noise_std = noise_std
         self.out_dim = out_dim
+        self.index_kernel_rank = index_kernel_rank
 
     def __call__(
         self,
@@ -274,10 +274,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         return mean, std, gt_loglik      
     
     def __call_mult_dim(self, batch: OOTGBatch, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor,yt: Optional[torch.Tensor] = None):
-        # targets have to have one dimension less for exact GP!
-        # can safely remove as generated data always had this as a 1-dimension anyway.
-        yc = yc.squeeze(-1)
-
+      
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         likelihood.noise = self.noise_std ** 2
 
@@ -287,14 +284,19 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
             torch.ones(batch.xc_on_grid.shape[-2], 1)),
         ).to(xc.device).to(torch.long)
 
-        model = MultitaskGPModel((xc, xc_labels), yc, self.kernel, likelihood, out_dim=self.out_dim)
+        index_kernel = gpytorch.kernels.IndexKernel(num_tasks=self.out_dim, rank=self.index_kernel_rank)
+        # targets have to have one dimension less for exact GP!
+        # can safely remove as generated data always had this as a 1-dimension anyway.
+        model = MultitaskGPModel((xc, xc_labels), yc.squeeze(-1), self.kernel, likelihood, index_kernel=index_kernel)
         model.to(xc.device).eval()
         
         outputDist = likelihood(model(xt, torch.zeros(xt.shape[-2], 1, dtype=torch.long, device=xc.device)))
 
         gt_loglik = None
         if yt is not None:
-            gt_loglik = outputDist.log_prob(yt.squeeze(-1)).sum().to(xt.dtype)
+            gt_loglik = td.Normal(loc=outputDist.mean, scale=outputDist.stddev).log_prob(yt.squeeze(-1)).sum(-1).to(xt.dtype)
+            # This makes Cholesky fail in off-the-grid-only case:
+            #gt_loglik = outputDist.log_prob(yt.squeeze(-1)).sum().to(xt.dtype)
 
         return outputDist.mean, outputDist.stddev, gt_loglik
     
@@ -309,7 +311,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
             x_labels = torch.zeros(x.shape[-2], 1, dtype=torch.long)
             x_labels[num_offtg:] = 1
             with torch.no_grad():
-                covar_i = gpytorch.kernels.IndexKernel(num_tasks=self.out_dim)(x_labels)
+                covar_i = gpytorch.kernels.IndexKernel(num_tasks=self.out_dim, rank=self.index_kernel_rank)(x_labels)
                 kxx = kxx.mul(covar_i).evaluate()
         
         kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std ** 2.0
@@ -326,12 +328,12 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
 
 
 class MultitaskGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, kernel, likelihood, out_dim):
+    def __init__(self, train_x, train_y, kernel, likelihood, index_kernel):
         super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
         self.covar_module = kernel
         #self.covar_module.batch_shape = train_y.shape[:1]
-        self.task_module = gpytorch.kernels.IndexKernel(num_tasks=out_dim)
+        self.task_module = index_kernel
 
     def forward(self, x, i):
         mean_x = self.mean_module(x)

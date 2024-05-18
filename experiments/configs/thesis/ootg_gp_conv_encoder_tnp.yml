@@ -26,6 +26,7 @@ generators:
     max_log10_lengthscale: 0.602
     noise_std: 0.2
     out_dim: ${params.gp_output_dim}
+    index_kernel_rank: ${params.index_kernel_rank}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -42,6 +43,7 @@ generators:
     max_log10_lengthscale: 0.602
     noise_std: 0.2
     out_dim: ${params.gp_output_dim}
+    index_kernel_rank: ${params.index_kernel_rank}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -115,6 +117,7 @@ params:
 
   dim: 1
   gp_output_dim: 2
+  index_kernel_rank: 1
   points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
@@ -127,7 +130,7 @@ params:
 
 misc:
   project: tnp-on-off-grid
-  name: ${eval:"'conv_set_encoder_tnp' + ('_offg_only' if ${params.ignore_on_grid} else '')"}
+  name: conv_set_encoder_tnp-NoGrid=${params.ignore_on_grid}-CorRank=${params.index_kernel_rank}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
