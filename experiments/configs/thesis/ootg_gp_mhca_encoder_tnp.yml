@@ -60,12 +60,24 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTGSetConvTNPDEncoder
-  ignore_on_grid: ${params.ignore_on_grid}
+  _target_: icicl.models.ootg_tnp.OOTG_MHCA_TNPDEncoder
   dim: ${params.dim}
-  init_lengthscale:  ${eval:'2 * 1 / ${params.points_per_unit}'}
+  grid_transformer:  ${grid_transformer}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
+
+grid_transformer:
+  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  mhca_layer: ${grid_layer}
+  num_layers: ${params.num_layers}
+
+grid_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder
@@ -82,7 +94,7 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + (not ${params.ignore_on_grid}) + ${params.dim}'} # 3 since it was 2 before and now stack output for on & off the grid
+  in_dim: ${eval:'2 + ${params.dim}'} # one from preprocessing, one from y
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
@@ -109,7 +121,6 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  ignore_on_grid: True
 
   dim: 1
   gp_output_dim: 2
@@ -123,10 +134,9 @@ params:
   num_layers: 5
 
 
-
 misc:
   project: tnp-on-off-grid
-  name: conv_set_encoder_tnp-NoGrid=${params.ignore_on_grid}-CorRank=${params.index_kernel_rank}
+  name: mhca_encoder_tnp-CorRank=${params.index_kernel_rank}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

@@ -56,8 +56,9 @@ class TNPDTransformerEncoder(nn.Module):
     def forward(
         self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
-        if mask is not None:
-            warnings.warn("mask is not currently being used.")
+        # TODO why was this not used?
+        #if mask is not None:
+        #    warnings.warn("mask is not currently being used.")
 
         for i, (mhsa_layer, mhca_layer) in enumerate(
             zip(self.mhsa_layers, self.mhca_layers)
@@ -70,7 +71,7 @@ class TNPDTransformerEncoder(nn.Module):
             if (not self.final_layer_cross_attention) or (
                 i == len(self.mhsa_layers) - 1
             ):
-                xt = mhca_layer(xt, xc)
+                xt = mhca_layer(xt, xc, mask=mask)
 
         return xt
 
