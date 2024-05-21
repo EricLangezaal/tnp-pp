@@ -49,8 +49,8 @@ class GPGeneratorBase(ABC):
         min_log10_lengthscale: float,
         max_log10_lengthscale: float,
         noise_std: float,
-        out_dim: int = 1,
-        index_kernel_rank: int = 1,
+        num_tasks: int = 1,
+        task_correlation: int = 1,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -63,8 +63,8 @@ class GPGeneratorBase(ABC):
             max_log10_lengthscale, dtype=torch.float64
         )
         self.noise_std = noise_std
-        self.out_dim = out_dim
-        self.index_kernel_rank = index_kernel_rank
+        self.num_tasks = num_tasks
+        self.task_correlation = task_correlation
 
     def set_up_gp(self) -> GroundTruthPredictor:
         # Sample lengthscale
@@ -166,9 +166,11 @@ class GPGeneratorBase(ABC):
         else:
             raise ValueError("Unknown kernel type.")
         
-        if self.out_dim > 1:
+        if self.num_tasks > 1:
             assert isinstance(gt_pred, GPGroundTruthPredictor)
-            gt_pred = GPGroundTruthPredictor(kernel=kernel, noise_std=self.noise_std, out_dim=self.out_dim)
+            gt_pred = MultitaskGPGroundThruthPredictor(
+                kernel=kernel, noise_std=self.noise_std, num_tasks=self.num_tasks, task_correlation=self.task_correlation
+            )
 
         return gt_pred
 
@@ -215,11 +217,9 @@ class RandomScaleGPGeneratorBimodalInput(GPGenerator, SyntheticGeneratorBimodalI
 
 
 class GPGroundTruthPredictor(GroundTruthPredictor):
-    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float, out_dim: int = 1, index_kernel_rank: int = 1):
+    def __init__(self, kernel: gpytorch.kernels.Kernel, noise_std: float):
         self.kernel = kernel
         self.noise_std = noise_std
-        self.out_dim = out_dim
-        self.index_kernel_rank = index_kernel_rank
 
     def __call__(
         self,
@@ -227,7 +227,6 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         yc: torch.Tensor,
         xt: torch.Tensor,
         yt: Optional[torch.Tensor] = None,
-        batch: SyntheticBatch = None
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         dtype = xc.dtype
 
@@ -235,9 +234,6 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         yc = yc.to(torch.float64)
         xt = xt.to(torch.float64)
         num_ctx = xc.shape[-2]
-
-        if self.out_dim > 1:
-            return self.__call_mult_dim(batch=batch, xc=xc, yc=yc, xt=xt, yt=yt)
 
         x = torch.cat((xc, xt), dim=-2)
         with torch.no_grad():
@@ -272,47 +268,12 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
         std = std.to(dtype)[:, :, None]
 
         return mean, std, gt_loglik      
-    
-    def __call_mult_dim(self, batch: OOTGBatch, xc: torch.Tensor, yc: torch.Tensor, xt: torch.Tensor,yt: Optional[torch.Tensor] = None):
-      
-        likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        likelihood.noise = self.noise_std ** 2
 
-        # labelling technically doesn't matter, as long as off grid context and target have same label.
-        xc_labels = torch.concat((
-            torch.zeros(batch.xc_off_grid.shape[-2], 1),
-            torch.ones(batch.xc_on_grid.shape[-2], 1)),
-        ).to(xc.device).to(torch.long)
-
-        index_kernel = gpytorch.kernels.IndexKernel(num_tasks=self.out_dim, rank=self.index_kernel_rank)
-        # targets have to have one dimension less for exact GP!
-        # can safely remove as generated data always had this as a 1-dimension anyway.
-        model = MultitaskGPModel((xc, xc_labels), yc.squeeze(-1), self.kernel, likelihood, index_kernel=index_kernel)
-        model.to(xc.device).eval()
-        
-        outputDist = likelihood(model(xt, torch.zeros(xt.shape[-2], 1, dtype=torch.long, device=xc.device)))
-
-        gt_loglik = None
-        if yt is not None:
-            gt_loglik = td.Normal(loc=outputDist.mean, scale=outputDist.stddev).log_prob(yt.squeeze(-1)).sum(-1).to(xt.dtype)
-            # This makes Cholesky fail in off-the-grid-only case:
-            #gt_loglik = outputDist.log_prob(yt.squeeze(-1)).sum().to(xt.dtype)
-
-        return outputDist.mean, outputDist.stddev, gt_loglik
-    
-
-    def sample_outputs(self, x: torch.Tensor, num_offtg: Optional[int] = None) -> torch.Tensor:
+    def sample_outputs(self, x: torch.Tensor) -> torch.Tensor:
         kernel = self.kernel.to(x).to(torch.float64)
 
         with torch.no_grad():
             kxx = kernel(x.to(torch.float64)).evaluate()
-
-        if self.out_dim > 1:
-            x_labels = torch.zeros(x.shape[-2], 1, dtype=torch.long)
-            x_labels[num_offtg:] = 1
-            with torch.no_grad():
-                covar_i = gpytorch.kernels.IndexKernel(num_tasks=self.out_dim, rank=self.index_kernel_rank)(x_labels)
-                kxx = kxx.mul(covar_i).evaluate()
         
         kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std ** 2.0
         if kxx.numel() > 0:
@@ -325,6 +286,81 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
             y = torch.zeros((*kxx.shape[:-1], 1), dtype=torch.float64)
 
         return y.to(torch.float32)
+    
+
+class MultitaskGPGroundThruthPredictor(GPGroundTruthPredictor):
+    def __init__(self, 
+                num_tasks: int = 2,
+                task_correlation: Union[float, Tuple[float]] = 0.75,
+                **kwargs
+        ):
+        super().__init__(**kwargs)
+        task_correlation = task_correlation if isinstance(task_correlation, tuple) else (task_correlation,)
+        assert len(task_correlation) == num_tasks - 1, "Please provide a correlation for each extra task."
+        self.num_tasks = num_tasks
+
+        index_kernel = gpytorch.kernels.IndexKernel(num_tasks=num_tasks, rank=1)
+        covar_diag = torch.tensor([1, *task_correlation]).repeat(*index_kernel.batch_shape, 1)
+        index_kernel.covar_factor = torch.nn.Parameter(covar_diag.unsqueeze(-1), requires_grad=False)
+        # necessary to invert the transform it applies:)
+        index_kernel._set_var(torch.nn.Parameter(torch.ones_like(covar_diag) - covar_diag ** 2, requires_grad=False))
+
+        self.index_kernel = index_kernel
+
+    def __call__(
+        self,
+        batch: OOTGBatch,
+        xc: torch.Tensor,
+        yc: torch.Tensor,
+        xt: torch.Tensor,
+        yt: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+        xc = xc.to(torch.float64)
+        yc = yc.to(torch.float64)
+        xt = xt.to(torch.float64)
+        
+        likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        likelihood.noise = self.noise_std ** 2
+
+        # labelling technically doesn't matter, as long as off grid context and target have same label.
+        xc_labels = torch.concat((
+            torch.zeros(batch.xc_off_grid.shape[-2], 1),
+            torch.ones(batch.xc_on_grid.shape[-2], 1)),
+        ).to(xc.device).to(torch.long)
+
+        # targets have to have one dimension less for exact GP!
+        # can safely remove as generated data always had this as a 1-dimension anyway.
+        model = MultitaskGPModel((xc, xc_labels), yc.squeeze(-1), self.kernel, likelihood, index_kernel=self.index_kernel)
+        model.to(xc.device).eval()
+        
+        outputDist = likelihood(model(xt, torch.zeros(xt.shape[-2], 1, dtype=torch.long, device=xc.device)))
+
+        gt_loglik = None
+        if yt is not None:
+            gt_loglik = td.Normal(loc=outputDist.mean, scale=outputDist.stddev).log_prob(yt.squeeze(-1)).sum(-1).to(xt.dtype)
+            # This makes Cholesky fail in off-the-grid-only case:
+            #gt_loglik = outputDist.log_prob(yt.squeeze(-1)).sum(-1).to(xt.dtype)
+        return outputDist.mean, outputDist.stddev, gt_loglik
+    
+    def sample_outputs(self, x: torch.Tensor, num_offtg: int) -> torch.Tensor:
+        kernel = self.kernel.to(x).to(torch.float64)
+
+        with torch.no_grad():
+            kxx = kernel(x.to(torch.float64)).evaluate()
+
+            x_labels = torch.zeros(x.shape[-2], 1, dtype=torch.long)
+            x_labels[num_offtg:] = 1
+            
+            covar_i = self.index_kernel(x_labels)
+            kxx = kxx.mul(covar_i).evaluate()
+        
+        kxx += torch.eye(kxx.shape[-1], dtype=torch.float64) * self.noise_std ** 2.0
+    
+        py = td.MultivariateNormal(
+            loc=torch.zeros(kxx.shape[:-1], dtype=torch.float64),
+            covariance_matrix=kxx,
+        )
+        return py.sample().unsqueeze(-1).to(torch.float32)
 
 
 class MultitaskGPModel(gpytorch.models.ExactGP):
@@ -332,7 +368,6 @@ class MultitaskGPModel(gpytorch.models.ExactGP):
         super(MultitaskGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
         self.covar_module = kernel
-        #self.covar_module.batch_shape = train_y.shape[:1]
         self.task_module = index_kernel
 
     def forward(self, x, i):

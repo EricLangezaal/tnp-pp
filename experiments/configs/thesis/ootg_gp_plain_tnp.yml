@@ -25,8 +25,8 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
-    out_dim: ${params.gp_output_dim}
-    index_kernel_rank: ${params.index_kernel_rank}
+    num_tasks: ${params.gp_num_tasks}
+    task_correlation: ${params.task_correlation}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -42,8 +42,8 @@ generators:
     min_log10_lengthscale: -0.602
     max_log10_lengthscale: 0.602
     noise_std: 0.2
-    out_dim: ${params.gp_output_dim}
-    index_kernel_rank: ${params.index_kernel_rank}
+    num_tasks: ${params.gp_num_tasks}
+    task_correlation: ${params.task_correlation}
     min_num_ctx: 1
     max_num_ctx: 64
     min_num_trg: 128
@@ -110,8 +110,8 @@ params:
   ignore_on_grid: True
 
   dim: 1
-  gp_output_dim: 2
-  index_kernel_rank: 1
+  gp_num_tasks: 2
+  task_correlation: 0.75
   points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
@@ -123,7 +123,7 @@ params:
 
 misc:
   project: tnp-on-off-grid
-  name: plain_tnp-NoGrid=${params.ignore_on_grid}-CorRank=${params.index_kernel_rank}
+  name: plain_tnp-NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

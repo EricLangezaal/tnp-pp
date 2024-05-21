@@ -48,8 +48,6 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
         **kwargs,
     ):
         super().__init__(**kwargs) 
-        print("dim", dim, type(dim))
-        print("init_lengthscale", init_lengthscale, type(init_lengthscale)) 
         init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=dtype)
         self.lengthscale_param = nn.Parameter(
             (init_lengthscale.clone().detach().exp() - 1).log(),
