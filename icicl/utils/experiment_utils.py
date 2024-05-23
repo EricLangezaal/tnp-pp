@@ -131,7 +131,8 @@ def np_loss_fn(
             yc_off_grid = batch.yc_off_grid, 
             xc_on_grid = batch.xc_on_grid,
             yc_on_grid = batch.yc_on_grid,
-            xt = batch.xt
+            xt = batch.xt,
+            ignore_on_grid = batch.ignore_on_grid,
         )
     elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
@@ -142,10 +143,7 @@ def np_loss_fn(
             mc=batch.mc_grid, y=batch.y_grid, x=batch.x_grid, mt=batch.mt_grid
         )
     elif isinstance(model, ConditionalNeuralProcess):
-        if isinstance(batch, OOTGBatch) and hasattr(model, "ignore_on_grid") and model.ignore_on_grid:
-            pred_dist = model(xc=batch.xc_off_grid, yc=batch.yc_off_grid, xt=batch.xt)
-        else:
-            pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+        pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
     elif isinstance(model, NeuralProcess):
         pred_dist = model(
             xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples
@@ -170,7 +168,8 @@ def np_pred_fn(
             yc_off_grid = batch.yc_off_grid, 
             xc_on_grid = batch.xc_on_grid,
             yc_on_grid = batch.yc_on_grid,
-            xt = batch.xt
+            xt = batch.xt,
+            ignore_on_grid = batch.ignore_on_grid,
         )
     elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
@@ -181,10 +180,7 @@ def np_pred_fn(
             mc=batch.mc_grid, y=batch.y_grid, x=batch.x_grid, mt=batch.mt_grid
         )
     elif isinstance(model, ConditionalNeuralProcess):
-        if isinstance(batch, OOTGBatch) and hasattr(model, "ignore_on_grid") and model.ignore_on_grid:
-            pred_dist = model(xc=batch.xc_off_grid, yc=batch.yc_off_grid, xt=batch.xt)
-        else:
-            pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
+        pred_dist = model(xc=batch.xc, yc=batch.yc, xt=batch.xt)
     elif isinstance(model, NeuralProcess):
         pred_dist = model(
             xc=batch.xc, yc=batch.yc, xt=batch.xt, num_samples=num_samples
@@ -253,7 +249,8 @@ def val_epoch(
                     yc_off_grid = batch.yc_off_grid, 
                     xc_on_grid = batch.xc_on_grid,
                     yc_on_grid = batch.yc_on_grid,
-                    xt = batch.xt
+                    xt = batch.xt,
+                    ignore_on_grid = batch.ignore_on_grid,
                 )
             elif isinstance(model, GriddedConvCNP):
                 assert isinstance(batch, GriddedImageBatch)

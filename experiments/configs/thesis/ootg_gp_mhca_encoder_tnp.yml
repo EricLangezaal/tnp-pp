@@ -6,6 +6,7 @@ generators:
     off_grid_generator: ${generators.off_grid_generator_train}
     grid_range: [[-3.0, 3.0]]
     points_per_unit: ${params.points_per_unit}
+    ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 16000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -14,6 +15,7 @@ generators:
     off_grid_generator: ${generators.off_grid_generator_val}
     grid_range: [[-3.0, 3.0]]
     points_per_unit: ${params.points_per_unit}
+    ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 4096
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -62,7 +64,7 @@ model:
 tnpd_encoder:
   _target_: icicl.models.ootg_tnp.OOTG_MHCA_TNPDEncoder
   dim: ${params.dim}
-  grid_transformer:  ${grid_transformer}
+  grid_transformer: ${grid_transformer}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
@@ -135,7 +137,7 @@ params:
 
 
 misc:
-  project: tnp-on-off-grid
+  project: mhca-encoder-tnp
   name: mhca_encoder_tnp-taskCor=${params.task_correlation}
   gradient_clip_val: 0.5
   plot_interval: 10

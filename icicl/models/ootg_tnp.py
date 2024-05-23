@@ -6,21 +6,11 @@ from torch import nn
 
 from .base import OOTGConditionalNeuralProcess
 from .tnp import EfficientTNPDEncoder, TNPDDecoder
-from ..networks.transformer import TNPDTransformerEncoder
+from ..networks.attention_layers import MultiHeadCrossAttentionLayer
 from ..utils.conv import compute_eq_weights, unflatten_grid, flatten_grid, convNd
 from ..utils.helpers import preprocess_observations
 
 class OOTG_TNPDEncoder(EfficientTNPDEncoder):
-
-    def __init__(
-            self,
-            *,
-            ignore_on_grid: bool = False,
-            **kwargs
-
-    ):
-        super().__init__(**kwargs)
-        self.ignore_on_grid = ignore_on_grid
 
     @abstractmethod
     def grid_encode(self, **kwargs) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
@@ -32,7 +22,8 @@ class OOTG_TNPDEncoder(EfficientTNPDEncoder):
             yc_off_grid: torch.Tensor,
             xc_on_grid: torch.Tensor,
             yc_on_grid: torch.Tensor,
-            xt: torch.Tensor
+            xt: torch.Tensor,
+            ignore_on_grid: bool = False,
     ): 
         raise NotImplementedError
 
@@ -91,10 +82,11 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
         yc_off_grid: torch.Tensor,
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor,
-        xt: torch.Tensor
+        xt: torch.Tensor,
+        ignore_on_grid: bool = False,
     ):
         xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)
-        if self.ignore_on_grid:
+        if ignore_on_grid:
             yc = yc[..., 1:]
         return EfficientTNPDEncoder.forward(self, xc=xc, yc=yc, xt=xt)
     
@@ -110,18 +102,18 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
     def __init__(
             self,
             *,
-            #embed_dim: int,
-            #grid_range: Tuple[Tuple[float, float], ...],
-            #points_per_unit: int,
-            grid_transformer: TNPDTransformerEncoder,
+            embed_dim: int,
+            grid_range: Tuple[Tuple[float, float], ...],
+            points_per_unit: int,
+            grid_mhca_layer: MultiHeadCrossAttentionLayer,
             **kwargs,
     ):
         super().__init__(**kwargs)
-        #grid_range = torch.as_tensor(grid_range)
-        #num_latents = points_per_unit * (grid_range[:, 1] - grid_range[:, 0]).prod()
-        #self.latents = nn.Parameter(torch.randn(num_latents, embed_dim)) # not used
+        grid_range = torch.as_tensor(grid_range)
+        num_latents = points_per_unit * (grid_range[:, 1] - grid_range[:, 0]).prod()
+        self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
 
-        self.grid_transformer = grid_transformer
+        self.grid_mhca_layer = grid_mhca_layer
 
     def grid_encode(self, zc_off_grid: torch.Tensor, zc_on_grid: torch.Tensor) -> torch.Tensor:
         B, U, E = zc_off_grid.shape # 'U'nstructured
@@ -136,9 +128,13 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
 
         mask = torch.zeros(B, S, U)
         mask[batch_idx, s_idx, u_idx] = 1
+
+        
+
+
         mask = mask.to(zc_off_grid.device).to(torch.bool)
 
-        zc = self.grid_transformer(zc_off_grid, zc_on_grid, mask=mask)
+        zc = self.grid_mhca_layer(zc_off_grid, zc_on_grid, mask=mask)
         # shape as zc_on_grid so (B, S, E)
         return zc
        
@@ -148,7 +144,8 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         yc_off_grid: torch.Tensor,
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor,
-        xt: torch.Tensor
+        xt: torch.Tensor,
+        ignore_on_grid: bool = False,
     ):
         yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
         yc_on_grid, _ = preprocess_observations(xt, yc_on_grid)
@@ -201,7 +198,8 @@ class OOTG_ViTEncoder(OOTGSetConvTNPDEncoder):
         yc_off_grid: torch.Tensor,
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor,
-        xt: torch.Tensor
+        xt: torch.Tensor,
+        ignore_on_grid: bool = False,
     ) -> torch.Tensor:
         # this will make yc's last dimension 2.
         xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)

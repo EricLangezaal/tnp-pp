@@ -14,6 +14,8 @@ class OOTGBatch(SyntheticBatch):
     xc_off_grid: torch.Tensor
     yc_off_grid: torch.Tensor
 
+    ignore_on_grid: bool = False
+
 
 class SyntheticOOTGGenerator(DataGenerator):
     def __init__(
@@ -22,6 +24,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         off_grid_generator: SyntheticGenerator,
         grid_range: Tuple[Tuple[float, float], ...], # so pair for each dimension
         points_per_unit: int,
+        ignore_on_grid: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -29,6 +32,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         self.otg_generator = off_grid_generator
         self.grid_range = torch.as_tensor(grid_range, dtype=torch.float)
         self.points_per_unit = torch.as_tensor(points_per_unit)
+        self.ignore_on_grid = ignore_on_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
         """
@@ -88,8 +92,8 @@ class SyntheticOOTGGenerator(DataGenerator):
         return OOTGBatch(
             x=x,
             y=y,
-            xc=xc,
-            yc=yc,
+            xc=offtg_xc if self.ignore_on_grid else xc,
+            yc=offtg_yc if self.ignore_on_grid else yc,
             xc_off_grid=offtg_xc,
             yc_off_grid=offtg_yc,
             xc_on_grid=ontg_x,
@@ -97,4 +101,5 @@ class SyntheticOOTGGenerator(DataGenerator):
             xt=xt,
             yt=yt,
             gt_pred=gt_pred,
+            ignore_on_grid=self.ignore_on_grid,
         )

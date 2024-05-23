@@ -123,6 +123,6 @@ params:
 
 
 misc:
-  project: tnp-on-off-grid
+  project: convset-encoder-tnp
   name: conv_set_encoder_vit
   resume_from_checkpoint: null
