@@ -3,11 +3,13 @@ from abc import abstractmethod
 
 import torch
 from torch import nn
+import einops
+import warnings
 
 from .base import OOTGConditionalNeuralProcess
 from .tnp import EfficientTNPDEncoder, TNPDDecoder
 from ..networks.attention_layers import MultiHeadCrossAttentionLayer
-from ..utils.conv import compute_eq_weights, unflatten_grid, flatten_grid, convNd
+from ..utils.conv import compute_eq_weights, make_grid, unflatten_grid, flatten_grid, convNd
 from ..utils.helpers import preprocess_observations
 
 class OOTG_TNPDEncoder(EfficientTNPDEncoder):
@@ -93,12 +95,8 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
 
 class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
     # TODO: implement ignore_on_grid -> otherwise move to subclass only
+    FAKE_TOKEN = -torch.inf
 
-    """
-    IDEA: zc_on_grid IS the start token
-    Do one massive attention between zc_off_grid and zc_on_grid 
-    with a mask that makes each on_grid point only look to closest off_grid points
-    """
     def __init__(
             self,
             *,
@@ -110,7 +108,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
     ):
         super().__init__(**kwargs)
         grid_range = torch.as_tensor(grid_range)
-        num_latents = points_per_unit * (grid_range[:, 1] - grid_range[:, 0]).prod()
+        num_latents = make_grid(grid_range[:, :1], grid_range[:, 1:2], points_per_unit, 0).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
 
         self.grid_mhca_layer = grid_mhca_layer
@@ -119,24 +117,45 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         B, U, E = zc_off_grid.shape # 'U'nstructured
         S = zc_on_grid.shape[-2] # 'S'tructured
 
-        u_expanded = zc_off_grid.repeat(S, 1, 1, 1).movedim(0, 1) # (B, S, U, E)
-        s_expanded = zc_on_grid.repeat(U, 1, 1, 1).movedim(0, 2) # (B, S, U, E)
+        s_expanded = zc_on_grid.repeat(U, 1, 1, 1).movedim(0, 1) # (B, U, S, E)
+        u_expanded = zc_off_grid.repeat(S, 1, 1, 1).movedim(0, 2) # (B, U, S, E)
         
-        u_idx = (u_expanded - s_expanded).abs().sum(dim=-1).argmin(dim=2).flatten()
-        batch_idx = torch.arange(B).repeat_interleave(S)
-        s_idx = torch.arange(S).repeat(B)
+        nearest_idx = (u_expanded - s_expanded).abs().sum(dim=-1).argmin(dim=2)
 
-        mask = torch.zeros(B, S, U)
-        mask[batch_idx, s_idx, u_idx] = 1
+        s_batch_idx = torch.arange(B).unsqueeze(-1).repeat(1, S)
+        u_batch_idx = torch.arange(B).unsqueeze(-1).repeat(1, U)
+        s_range_idx = torch.arange(S).repeat(B, 1)
+        u_range_idx = torch.arange(U).repeat(B, 1)
 
+        nearest_mask = torch.zeros(B, U, S, dtype=torch.int, device=zc_on_grid.device)
+        nearest_mask[u_batch_idx, u_range_idx, nearest_idx] = 1
+
+        # add one for the on the grid point
+        max_patch = nearest_mask.sum(dim=1).amax() + 1
+        # indexes show cumulative count (i.e. add one if element has occured before)
+        cumcount_idx = (nearest_mask.cumsum(dim=1) - 1)[u_batch_idx, u_range_idx, nearest_idx]
+
+        # create tensor with for each grid-token all nearest off-grid + itself in third dimension
+        joint_grid = torch.full((B, S, max_patch, E), self.FAKE_TOKEN, device=zc_on_grid.device)
+        joint_grid[u_batch_idx, nearest_idx, cumcount_idx] = zc_off_grid[u_batch_idx, torch.arange(U)]
+        joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
         
+        grid_stacked = einops.rearrange(joint_grid, "b s m e -> (b s) m e")
 
+        att_mask = torch.ones(B * S, max_patch, S, dtype=torch.bool, device=zc_on_grid.device)
+        # if fake token anywhere in embedding, ignore it
+        att_mask[grid_stacked.sum(-1) == self.FAKE_TOKEN, :] = False
 
-        mask = mask.to(zc_off_grid.device).to(torch.bool)
+        # set fake value to something which won't overfloat attention calculation
+        grid_stacked[grid_stacked == self.FAKE_TOKEN] = 0
 
-        zc = self.grid_mhca_layer(zc_off_grid, zc_on_grid, mask=mask)
-        # shape as zc_on_grid so (B, S, E)
-        return zc
+        latents = self.latents.repeat(grid_stacked.size(0), 1, 1).to(zc_on_grid.device)
+        zc = self.grid_mhca_layer(latents, grid_stacked, mask=att_mask.transpose(-1, -2))
+
+        # TODO return shape is now (B, S, S, E) what do we do?
+        zc = einops.rearrange(zc, "(b ignore) s e -> b ignore s e", b=B)
+        # temporary
+        return zc[:, 0]
        
     def forward( # picked apart to allow for embedding before gridding
         self,
@@ -147,6 +166,9 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         xt: torch.Tensor,
         ignore_on_grid: bool = False,
     ):
+        if ignore_on_grid:
+            warnings.warn("Ignoring on the grid data not yet implemented for MHCA TNPD Encoder!")
+
         yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
         yc_on_grid, _ = preprocess_observations(xt, yc_on_grid)
 

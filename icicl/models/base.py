@@ -36,9 +36,10 @@ class OOTGConditionalNeuralProcess(BaseNeuralProcess):
         yc_off_grid: torch.Tensor,
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor, 
-        xt: torch.Tensor
+        xt: torch.Tensor,
+        ignore_on_grid: bool = False,
     ) -> torch.distributions.Distribution:
-        return self.likelihood(self.decoder(self.encoder(xc_off_grid, yc_off_grid, xc_on_grid, yc_on_grid, xt), xt))
+        return self.likelihood(self.decoder(self.encoder(xc_off_grid, yc_off_grid, xc_on_grid, yc_on_grid, xt, ignore_on_grid), xt))
 
 
 class NeuralProcess(BaseNeuralProcess):

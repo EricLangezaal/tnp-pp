@@ -110,11 +110,11 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  ignore_on_grid: True
+  ignore_on_grid: False
 
   dim: 1
   gp_num_tasks: 2
-  task_correlation: 0.75
+  task_correlation: 0.85
   points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
