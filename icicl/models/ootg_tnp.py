@@ -34,14 +34,14 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
     def __init__(
         self,
         *,
-        dim: int,
+        dim_lengthscale: int,
         init_lengthscale: float,
         train_lengthscale: bool = True,
         dtype: torch.dtype = torch.float32,
         **kwargs,
     ):
         super().__init__(**kwargs) 
-        init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=dtype)
+        init_lengthscale = torch.as_tensor(dim_lengthscale * [init_lengthscale], dtype=dtype)
         self.lengthscale_param = nn.Parameter(
             (init_lengthscale.clone().detach().exp() - 1).log(),
             requires_grad=train_lengthscale,
@@ -184,7 +184,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         return self.transformer_encoder(zc, zt)
     
     
-class OOTG_ViTEncoder(OOTGSetConvTNPDEncoder):
+class OOTG_ViTEncoder(OOTG_TNPDEncoder):
     """
     Implements a very basic ViT encoding without positional embeddings
 
@@ -213,7 +213,9 @@ class OOTG_ViTEncoder(OOTGSetConvTNPDEncoder):
         # move 'channels' (i.e embed_dim) to end again
         z = z.movedim(1, -1)
         return flatten_grid(z)
+    
 
+class OOTGSetConvViTEncoder(OOTGSetConvTNPDEncoder, OOTG_ViTEncoder):
     def forward(
         self,
         xc_off_grid: torch.Tensor,
@@ -225,6 +227,8 @@ class OOTG_ViTEncoder(OOTGSetConvTNPDEncoder):
     ) -> torch.Tensor:
         # this will make yc's last dimension 2.
         xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)
+        if ignore_on_grid:
+            yc = yc[..., 1:]
         # this makes yc's last dimension 3.
         yc, yt = preprocess_observations(xt, yc) # 
         zc = torch.cat((xc, yc), dim=-1)
@@ -236,7 +240,13 @@ class OOTG_ViTEncoder(OOTGSetConvTNPDEncoder):
         zt = self.xy_encoder(zt)
 
         return self.transformer_encoder(zc, zt)
-
+    
+    
+class OOTG_MHCA_ViTEncoder(OOTG_MHCA_TNPDEncoder, OOTG_ViTEncoder):
+    def grid_encode(self, zc_off_grid: torch.Tensor, zc_on_grid: torch.Tensor) -> torch.Tensor:
+        zc = OOTG_MHCA_TNPDEncoder.grid_encode(zc_off_grid, zc_on_grid)
+        zc = OOTG_ViTEncoder.coarsen_grid(zc)
+        return zc
 
 
 class OOTG_TNPD(OOTGConditionalNeuralProcess):

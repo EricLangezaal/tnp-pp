@@ -63,8 +63,8 @@ model:
 
 tnpd_encoder:
   _target_: icicl.models.ootg_tnp.OOTGSetConvTNPDEncoder
-  dim: ${params.dim}
-  init_lengthscale:  ${eval:'2 * 1 / ${params.points_per_unit}'}
+  dim_lengthscale: ${params.dim}
+  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
