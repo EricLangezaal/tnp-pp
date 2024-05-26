@@ -272,6 +272,7 @@ def val_epoch(
                 yc=batch.yc,
                 xt=batch.xt,
                 yt=batch.yt,
+                batch=batch,
             )
             gt_loglik = gt_loglik.sum() / batch.yt[..., 0].numel()
 
