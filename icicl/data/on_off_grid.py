@@ -103,3 +103,42 @@ class SyntheticOOTGGenerator(DataGenerator):
             gt_pred=gt_pred,
             ignore_on_grid=self.ignore_on_grid,
         )
+
+    
+class RandomOOTGGenerator(DataGenerator):
+
+    def __init__(self, *, num_off_grid_context: int, num_on_grid_context: int, num_targets: int, dim: int =1, **kwargs):
+        super().__init__(**kwargs)
+
+        self.num_off_grid_context = num_off_grid_context
+        self.num_on_grid_context = num_on_grid_context
+        self.num_targets = num_targets
+        self.dim = dim
+
+    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
+        if batch_shape is None:
+            batch_shape = torch.Size((self.batch_size,))
+
+        batch = self.sample_batch(num_ctx=self.num_off_grid_context, num_trg=self.num_targets, batch_shape=batch_shape)
+        return batch
+
+    def sample_batch(self, num_ctx: int, num_trg: int, batch_shape: torch.Size) -> OOTGBatch:
+
+        x_off_grid = torch.randn(*batch_shape, num_ctx + num_trg, self.dim)
+        y_off_grid = torch.randn_like(x_off_grid)
+        x_on_grid = torch.randn(*batch_shape, self.num_on_grid_context, self.dim)
+        y_on_grid = torch.randn_like(x_on_grid)
+
+        return OOTGBatch(
+            x=torch.cat((x_off_grid, x_on_grid), dim=-2),
+            y=torch.cat((y_off_grid, y_on_grid), dim=-2),
+            xc=torch.cat((x_off_grid[:, :num_ctx, :], x_on_grid), dim=-2),
+            yc=torch.cat((y_off_grid[:, :num_ctx, :], y_on_grid), dim=-2),
+            xc_off_grid=x_off_grid[:, :num_ctx, :],
+            yc_off_grid=y_off_grid[:, :num_ctx, :],
+            xc_on_grid=x_on_grid,
+            yc_on_grid=y_on_grid,
+            xt=x_off_grid[:, num_ctx:, :],
+            yt=y_off_grid[:, num_ctx:, :],
+            gt_pred=None,
+        )
