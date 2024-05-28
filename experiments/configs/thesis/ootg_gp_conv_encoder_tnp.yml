@@ -5,7 +5,7 @@ generators:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_train}
     grid_range: [[-3.0, 3.0]]
-    points_per_unit: ${params.points_per_unit}
+    points_per_unit: ${params.grid_points_per_unit}
     ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 16000
     batch_size: 16
@@ -14,7 +14,7 @@ generators:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
     grid_range: [[-3.0, 3.0]]
-    points_per_unit: ${params.points_per_unit}
+    points_per_unit: ${params.grid_points_per_unit}
     ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 4096
     batch_size: 16
@@ -115,8 +115,10 @@ params:
   dim: 1
   gp_num_tasks: 2
   task_correlation: 0.85
-  points_per_unit: 8 # low such that num_ontg doesn't explode
+  grid_points_per_unit: 8 # low such that num_ontg doesn't explode
 
+  setconv_points_per_unit: 8
+  
   embed_dim: 128
   num_heads: 8
   head_dim: 16
