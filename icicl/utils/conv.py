@@ -166,7 +166,7 @@ def make_grid(
     # Take the maximum over the batch, in order to use the same number of
     # points across all tasks in the batch, to enable tensor batching
     num_points = torch.max(num_points, dim=0)[0]
-    # num_points = 2 ** torch.ceil(torch.log(num_points_old) / math.log(2.0))  # shape (dim,)
+    num_points = 2 ** torch.ceil(torch.log(num_points) / math.log(2.0))  # shape (dim,)
 
     # rescale ppu after making num_points power of two, such that grid actually abides by its range
     # points_per_unit = points_per_unit * num_points / num_points_old

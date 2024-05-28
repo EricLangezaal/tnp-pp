@@ -5,7 +5,7 @@ generators:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_train}
     grid_range: ${params.grid_range}
-    points_per_unit: ${params.grid_points_per_unit}
+    points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 16000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -13,7 +13,7 @@ generators:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
     grid_range: ${params.grid_range}
-    points_per_unit: ${params.grid_points_per_unit}
+    points_per_unit: ${params.points_per_unit}
     samples_per_epoch: 4096
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -63,7 +63,7 @@ tnpd_encoder:
   _target_: icicl.models.ootg_tnp.OOTG_MHCA_TNPDEncoder
   embed_dim: ${params.embed_dim}
   grid_range: ${params.grid_range}
-  points_per_unit: ${params.grid_points_per_unit}
+  points_per_unit: ${params.points_per_unit}
   grid_mhca_layer: ${grid_mhca_layer}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
@@ -121,9 +121,9 @@ params:
 
   dim: 1
   gp_num_tasks: 2
-  grid_range: [[-3.0, 3.0]]
+  grid_range: [[-4.0, 4.0]] # range * ppu needs to be power of 2
   task_correlation: 0.75
-  grid_points_per_unit: 8 # low such that num_ontg doesn't explode
+  points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
   num_heads: 8

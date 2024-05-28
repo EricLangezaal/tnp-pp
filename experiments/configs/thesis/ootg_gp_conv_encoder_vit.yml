@@ -1,13 +1,11 @@
 # File inspired from 'efficient-tnpd-synthetic-1d.yml'
 
-# OUTDATED -> UPDATE BEFORE USE
-
 generators:
   train:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_train}
-    grid_range: [[-3.0, 3.0]]
-    points_per_unit: ${params.grid_points_per_unit}
+    grid_range: [[-4.0, 4.0]] # range * ppu needs to be power of 2
+    points_per_unit: ${params.points_per_unit}
     ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 16000
     batch_size: 16
@@ -15,8 +13,8 @@ generators:
   val:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
-    grid_range: [[-3.0, 3.0]]
-    points_per_unit: ${params.grid_points_per_unit}
+    grid_range: [[-4.0, 4.0]]
+    points_per_unit: ${params.points_per_unit}
     ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 4096
     batch_size: 16
@@ -66,7 +64,7 @@ model:
 tnpd_encoder:
   _target_: icicl.models.ootg_tnp.OOTGSetConvViTEncoder
   dim_lengthscale: ${params.dim}
-  init_lengthscale: ${eval:'2 * 1 / ${params.setconv_points_per_unit}'}
+  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
   patch_size: ${params.patch_size}
   dim: ${params.dim}
   embed_dim: ${params.embed_dim}
@@ -120,9 +118,7 @@ params:
   dim: 1
   gp_num_tasks: 2
   task_correlation: 0.85
-  grid_points_per_unit: 8 # low such that num_ontg doesn't explode
-
-  setconv_points_per_unit: 8
+  points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
   num_heads: 8
