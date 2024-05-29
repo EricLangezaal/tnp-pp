@@ -95,7 +95,6 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
     
 
 class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
-    # TODO: implement ignore_on_grid -> otherwise move to subclass only
     FAKE_TOKEN = -torch.inf
 
     def __init__(
@@ -119,7 +118,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         "zc_off_grid: [b, u, e]", "zc_on_grid: [b, s, e]", 
         "return: [b, s, e]"
     )
-    def grid_encode(self, xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid) -> torch.Tensor:
+    def grid_encode(self, xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, ignore_on_grid = False) -> torch.Tensor:
         
         B, U, E = zc_off_grid.shape # 'U'nstructured
         S = zc_on_grid.shape[-2] # 'S'tructured
@@ -141,8 +140,8 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         nearest_mask = torch.zeros(B, U, S, dtype=torch.int, device=zc_on_grid.device)
         nearest_mask[u_batch_idx, u_range_idx, nearest_idx] = 1
 
-        # maximum nearest neigbours + add one for the on the grid point itself
-        max_patch = nearest_mask.sum(dim=1).amax() + 1
+        # maximum nearest neigbours + add one for the on the grid point itself if not ignoring grid
+        max_patch = nearest_mask.sum(dim=1).amax() + (not ignore_on_grid)
         # batched cumulative count (i.e. add one if element has occured before)
         # So [0, 0, 2, 0, 1, 2] -> [0, 1, 0, 2, 0, 1] along each batch
         cumcount_idx = (nearest_mask.cumsum(dim=1) - 1)[u_batch_idx, u_range_idx, nearest_idx]
@@ -151,8 +150,9 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         joint_grid = torch.full((B, S, max_patch, E), self.FAKE_TOKEN, device=zc_on_grid.device)
         # add nearest off the grid points to each on_the_grid point
         joint_grid[u_batch_idx, nearest_idx, cumcount_idx] = zc_off_grid[u_batch_idx, torch.arange(U)]
-        # add the on_the_grid points themselves at the end
-        joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
+        if not ignore_on_grid:
+            # add the on_the_grid points themselves at the end
+            joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
         
         grid_stacked = einops.rearrange(joint_grid, "b s m e -> (b s) m e")
 
@@ -179,9 +179,6 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         xt: torch.Tensor,
         ignore_on_grid: bool = False,
     ):
-        if ignore_on_grid:
-            warnings.warn("Ignoring on the grid data not yet implemented for MHCA TNPD Encoder!")
-
         yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
         yc_on_grid, _ = preprocess_observations(xt, yc_on_grid)
 
@@ -190,7 +187,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         zc_on_grid = torch.cat((xc_on_grid, yc_on_grid), dim=-1)
         zc_on_grid = self.xy_encoder(zc_on_grid)
 
-        zc = self.grid_encode(xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid)
+        zc = self.grid_encode(xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid, ignore_on_grid=ignore_on_grid)
 
         zt = torch.cat((xt, yt), dim=-1)
         zt = self.xy_encoder(zt)
@@ -257,8 +254,8 @@ class OOTGSetConvViTEncoder(OOTGSetConvTNPDEncoder, OOTG_ViTEncoder):
     
     
 class OOTG_MHCA_ViTEncoder(OOTG_MHCA_TNPDEncoder, OOTG_ViTEncoder):
-    def grid_encode(self, zc_off_grid: torch.Tensor, zc_on_grid: torch.Tensor) -> torch.Tensor:
-        zc = OOTG_MHCA_TNPDEncoder.grid_encode(zc_off_grid, zc_on_grid)
+    def grid_encode(self, **kwargs) -> torch.Tensor:
+        zc = OOTG_MHCA_TNPDEncoder.grid_encode(**kwargs)
         zc = OOTG_ViTEncoder.coarsen_grid(zc)
         return zc
 
