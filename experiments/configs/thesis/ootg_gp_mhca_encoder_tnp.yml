@@ -120,7 +120,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  ignore_on_grid: True
+  ignore_on_grid: False
 
   dim: 1
   gp_num_tasks: 2
