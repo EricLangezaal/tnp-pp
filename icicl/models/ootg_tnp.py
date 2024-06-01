@@ -111,6 +111,8 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         num_latents = make_grid(grid_range[:, :1], grid_range[:, 1:2], points_per_unit, 0).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
 
+        self.fake_embedding = nn.Parameter(torch.randn(embed_dim))
+
         self.grid_mhca_layer = grid_mhca_layer
 
     @check_shapes(
@@ -140,8 +142,8 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         nearest_mask = torch.zeros(B, U, S, dtype=torch.int, device=zc_on_grid.device)
         nearest_mask[u_batch_idx, u_range_idx, nearest_idx] = 1
 
-        # maximum nearest neigbours + add one for the on the grid point itself if not ignoring grid
-        max_patch = nearest_mask.sum(dim=1).amax() + (not ignore_on_grid)
+        # maximum nearest neigbours + add one for the on the grid point itself (or the placeholder)
+        max_patch = nearest_mask.sum(dim=1).amax() + 1
         # batched cumulative count (i.e. add one if element has occured before)
         # So [0, 0, 2, 0, 1, 2] -> [0, 1, 0, 2, 0, 1] along each batch
         cumcount_idx = (nearest_mask.cumsum(dim=1) - 1)[u_batch_idx, u_range_idx, nearest_idx]
@@ -150,9 +152,13 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         joint_grid = torch.full((B, S, max_patch, E), self.FAKE_TOKEN, device=zc_on_grid.device)
         # add nearest off the grid points to each on_the_grid point
         joint_grid[u_batch_idx, nearest_idx, cumcount_idx] = zc_off_grid[u_batch_idx, torch.arange(U)]
-        if not ignore_on_grid:
+        if ignore_on_grid:
+            # add learned 'mask out' embedding at the end. Done instead of masking out in att_mask,
+            # since that could potentially make it mask out whole input which crashes attention
+            joint_grid[s_batch_idx, s_range_idx, -1] = self.fake_embedding
+        else:
             # add the on_the_grid points themselves at the end
-            joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
+             joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
         
         grid_stacked = einops.rearrange(joint_grid, "b s m e -> (b s) m e")
 
