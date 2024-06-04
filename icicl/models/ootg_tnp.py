@@ -111,7 +111,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         num_latents = make_grid(grid_range[:, :1], grid_range[:, 1:2], points_per_unit, 0).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
 
-        self.fake_embedding = nn.Parameter(torch.randn(embed_dim))
+        self.fake_embedding = torch.randn(1) #nn.Parameter(torch.randn(embed_dim))
 
         self.grid_mhca_layer = grid_mhca_layer
 
@@ -155,7 +155,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         if ignore_on_grid:
             # add learned 'mask out' embedding at the end. Done instead of masking out in att_mask,
             # since that could potentially make it mask out whole input which crashes attention
-            joint_grid[s_batch_idx, s_range_idx, -1] = self.fake_embedding
+            joint_grid[s_batch_idx, s_range_idx, -1] = self.fake_embedding.to(zc_on_grid.device)
         else:
             # add the on_the_grid points themselves at the end
              joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
@@ -186,6 +186,8 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         ignore_on_grid: bool = False,
     ):
         yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
+        if ignore_on_grid:
+            yc_on_grid = self.fake_embedding.to(yc_on_grid.device).repeat(yc_on_grid.shape)
         yc_on_grid, _ = preprocess_observations(xt, yc_on_grid)
 
         zc_off_grid = torch.cat((xc_off_grid, yc_off_grid), dim=-1)
@@ -193,7 +195,8 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         zc_on_grid = torch.cat((xc_on_grid, yc_on_grid), dim=-1)
         zc_on_grid = self.xy_encoder(zc_on_grid)
 
-        zc = self.grid_encode(xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid, ignore_on_grid=ignore_on_grid)
+        # TODO change false to listen again
+        zc = self.grid_encode(xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid, ignore_on_grid=False)
 
         zt = torch.cat((xt, yt), dim=-1)
         zt = self.xy_encoder(zt)
