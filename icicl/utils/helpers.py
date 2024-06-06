@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import torch
 from check_shapes import check_shapes
@@ -8,9 +8,10 @@ from check_shapes import check_shapes
 def preprocess_observations(
     xt: torch.Tensor,
     yc: torch.Tensor,
+    context_val: Optional[int] = 0,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     yt = torch.zeros(xt.shape[:-1] + yc.shape[-1:]).to(yc)
-    yc = torch.cat((yc, torch.zeros(yc.shape[:-1] + (1,)).to(yc)), dim=-1)
+    yc = torch.cat((yc, context_val*torch.ones(yc.shape[:-1] + (1,)).to(yc)), dim=-1)
     yt = torch.cat((yt, torch.ones(yt.shape[:-1] + (1,)).to(yt)), dim=-1)
 
     return yc, yt

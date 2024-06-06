@@ -158,7 +158,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
             joint_grid[s_batch_idx, s_range_idx, -1] = self.fake_embedding.to(zc_on_grid.device)
         else:
             # add the on_the_grid points themselves at the end
-             joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
+            joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
         
         grid_stacked = einops.rearrange(joint_grid, "b s m e -> (b s) m e")
 
@@ -188,7 +188,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
         if ignore_on_grid:
             yc_on_grid = self.fake_embedding.to(yc_on_grid.device).repeat(yc_on_grid.shape)
-        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid)
+        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, context_val=2)
 
         zc_off_grid = torch.cat((xc_off_grid, yc_off_grid), dim=-1)
         zc_off_grid = self.xy_encoder(zc_off_grid)
