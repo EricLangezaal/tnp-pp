@@ -62,7 +62,7 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTGSetConvViTEncoder
+  _target_: icicl.models.ootg_vit.OOTGSetConvViTEncoder
   dim_lengthscale: ${params.dim}
   init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
   patch_size: ${params.patch_size}

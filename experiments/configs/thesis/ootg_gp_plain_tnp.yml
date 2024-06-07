@@ -56,13 +56,13 @@ generators:
     batch_size: ${generators.val.batch_size}
 
 model:
-  _target_: icicl.models.tnp.TNPD
+  _target_: icicl.models.ootg_tnp.OOTG_TNPD
   encoder: ${tnpd_encoder}
   decoder: ${tnpd_decoder}
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.tnp.EfficientTNPDEncoder
+  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
@@ -108,11 +108,11 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  ignore_on_grid: True
+  ignore_on_grid: False
 
   dim: 1
   gp_num_tasks: 2
-  task_correlation: 0.5
+  task_correlation: 0.85
   points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
@@ -124,7 +124,7 @@ params:
 
 misc:
   project: plain-tnp
-  name: plain_tnp-NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}
+  name: plain_tnp-NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
