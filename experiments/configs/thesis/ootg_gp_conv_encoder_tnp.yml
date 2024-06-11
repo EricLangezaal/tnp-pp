@@ -4,7 +4,7 @@ generators:
   train:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_train}
-    grid_range: [[-4.0, 4.0]] # range * ppu is scaled to be power of 2 anyway
+    grid_range: ${params.data_range}
     points_per_unit: ${params.points_per_unit}
     ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 16000
@@ -13,10 +13,10 @@ generators:
   val:
     _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
-    grid_range: [[-4.0, 4.0]] # range * ppu is scaled to be power of 2 anyway
+    grid_range: ${params.data_range}
     points_per_unit: ${params.points_per_unit}
     ignore_on_grid: ${params.ignore_on_grid}
-    samples_per_epoch: 4096
+    samples_per_epoch: 4000
     batch_size: 16
     deterministic: ${params.deterministic}
     
@@ -34,7 +34,7 @@ generators:
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    target_range: ${params.data_range}
     samples_per_epoch: ${generators.train.samples_per_epoch}
     batch_size: ${generators.train.batch_size}
   off_grid_generator_val:
@@ -51,7 +51,7 @@ generators:
     min_num_trg: 128
     max_num_trg: 128
     context_range: [[-2.0, 2.0]]
-    target_range: [[-3.0, 3.0]]
+    target_range: ${params.data_range}
     samples_per_epoch: ${generators.val.samples_per_epoch}
     batch_size: ${generators.val.batch_size}
 
@@ -113,8 +113,9 @@ params:
   ignore_on_grid: False
 
   dim: 1
+  data_range: [[-4.0, 4.0]]  # range * ppu is scaled to be power of 2 anyway, so make power of 2!
   gp_num_tasks: 2
-  task_correlation: 0.85
+  task_correlation: 0.8
   points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
