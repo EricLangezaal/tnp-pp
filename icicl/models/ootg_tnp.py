@@ -1,5 +1,4 @@
-from typing import Tuple, Union, Optional
-from abc import abstractmethod
+from typing import Tuple
 
 import torch
 from torch import nn
@@ -9,39 +8,52 @@ from check_shapes import check_shapes
 from .base import OOTGConditionalNeuralProcess
 from .tnp import EfficientTNPDEncoder, TNPDDecoder
 from ..networks.attention_layers import MultiHeadCrossAttentionLayer
-from ..utils.conv import compute_eq_weights, make_grid, unflatten_grid, flatten_grid, convNd
+from ..utils.conv import compute_eq_weights, make_grid
 from ..utils.helpers import preprocess_observations
 
 
 class OOTG_TNPDEncoder(EfficientTNPDEncoder):
 
-    @abstractmethod
-    def grid_encode(self, **kwargs) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        raise NotImplementedError
+    def grid_encode(
+        self, 
+        xc_off_grid: torch.Tensor, 
+        xc_on_grid: torch.Tensor, 
+        zc_off_grid: torch.Tensor, 
+        zc_on_grid: torch.Tensor, 
+        ignore_on_grid: bool,
+    ) -> torch.Tensor:
+        if ignore_on_grid:
+            return zc_off_grid
+        
+        zc = torch.cat((zc_off_grid, zc_on_grid), dim=-2)
+        return zc
     
     def forward(
-            self, 
-            xc_off_grid: torch.Tensor,
-            yc_off_grid: torch.Tensor,
-            xc_on_grid: torch.Tensor,
-            yc_on_grid: torch.Tensor,
-            xt: torch.Tensor,
-            ignore_on_grid: bool = False,
+        self, 
+        xc_off_grid: torch.Tensor,
+        yc_off_grid: torch.Tensor,
+        xc_on_grid: torch.Tensor,
+        yc_on_grid: torch.Tensor,
+        xt: torch.Tensor,
+        ignore_on_grid: bool = False,
     ) -> torch.Tensor:
-        yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
-        xc, yc = xc_off_grid, yc_off_grid
-        if not ignore_on_grid:
-            yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, context_val=2)
-            xc = torch.cat((xc, xc_on_grid), dim=-2)
-            yc = torch.cat((yc, yc_on_grid), dim=-2)
+        yc_off_grid, yt = preprocess_observations(xt, yc_off_grid, on_grid=False)
+        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, on_grid=True)
 
-        zc = torch.cat((xc, yc), dim=-1)
+        zc_off_grid = torch.cat((xc_off_grid, yc_off_grid), dim=-1)
+        zc_off_grid = self.xy_encoder(zc_off_grid)
+        zc_on_grid = torch.cat((xc_on_grid, yc_on_grid), dim=-1)
+        zc_on_grid = self.xy_encoder(zc_on_grid)
+
+        zc = self.grid_encode(
+            xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, 
+            zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid,
+            ignore_on_grid=ignore_on_grid
+        )
+        
         zt = torch.cat((xt, yt), dim=-1)
-        zc = self.xy_encoder(zc)
         zt = self.xy_encoder(zt)
-
-        zt = self.transformer_encoder(zc, zt)
-        return zt
+        return self.transformer_encoder(zc, zt)
 
 
 class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
@@ -68,32 +80,33 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
         )
     
     def grid_encode(
-            self, 
-            xc_off_grid: torch.Tensor, 
-            yc_off_grid: torch.Tensor, 
-            xc_on_grid: torch.Tensor, 
-            yc_on_grid: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, 
+        xc_off_grid: torch.Tensor, 
+        xc_on_grid: torch.Tensor, 
+        zc_off_grid: torch.Tensor, 
+        zc_on_grid: torch.Tensor, 
+        ignore_on_grid: bool
+    ) -> torch.Tensor:
         """
-        Take a combination of on and the grid context data and merge those,
+        Take a combination of the embedded on and the grid context data and merge those,
         by putting the off the grid data onto the same grid as the on-the grid,
         and then stacking the two.
 
         Returns:
-           Tuple of merged xc and yc: both on a grid.
+           zc: both modalities embedded and on a grid OR off the grid only, depending on ignore_on_grid
         """
         
         weights = compute_eq_weights(xc_on_grid, xc_off_grid, lengthscales=self.lengthscale)
-        yc_off_grid_gridded = weights @ yc_off_grid
+        zc = weights @ zc_off_grid
         
-        # shape (batch_size, num_ontg, xdim)
-        xc = xc_on_grid
-        # shape (batch_size, num_ontg, 2)
-        yc = torch.cat((yc_on_grid, yc_off_grid_gridded), dim=-1)
-        return xc, yc
-    
+        if not ignore_on_grid:
+            # shape (batch_size, num_ontg, 2 * (1/2 embed_dim)) since MLP's out dim is halved in config in this case
+            zc = torch.cat((zc, zc_on_grid), dim=-1)
+
+        return zc
+
     def forward(
-        self,
+        self, 
         xc_off_grid: torch.Tensor,
         yc_off_grid: torch.Tensor,
         xc_on_grid: torch.Tensor,
@@ -101,10 +114,26 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
         xt: torch.Tensor,
         ignore_on_grid: bool = False,
     ) -> torch.Tensor:
-        xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)
-        if ignore_on_grid:
-            yc = yc[..., 1:]
-        return EfficientTNPDEncoder.forward(self, xc=xc, yc=yc, xt=xt)
+        yc_off_grid, yt = preprocess_observations(xt, yc_off_grid, on_grid=False)
+        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, on_grid=True)
+
+        zc_off_grid = torch.cat((xc_off_grid, yc_off_grid), dim=-1)
+        zc_off_grid = self.xy_encoder(zc_off_grid)
+        zc_on_grid = torch.cat((xc_on_grid, yc_on_grid), dim=-1)
+        zc_on_grid = self.xy_encoder(zc_on_grid)
+
+        zc = self.grid_encode(
+            xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, 
+            zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid,
+            ignore_on_grid=ignore_on_grid
+        )
+        
+        zt = torch.cat((xt, yt), dim=-1)
+        zt = self.xy_encoder(zt)
+        if not ignore_on_grid:
+            zt = zt.repeat_interleave(2, dim=-1)
+            
+        return self.transformer_encoder(zc, zt)   
     
 
 class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
@@ -133,7 +162,14 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         "zc_off_grid: [b, u, e]", "zc_on_grid: [b, s, e]", 
         "return: [b, s, e]"
     )
-    def grid_encode(self, xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, ignore_on_grid = False) -> torch.Tensor:
+    def grid_encode(
+            self, 
+            xc_off_grid: torch.Tensor, 
+            xc_on_grid: torch.Tensor, 
+            zc_off_grid: torch.Tensor, 
+            zc_on_grid: torch.Tensor, 
+            ignore_on_grid: bool
+    ) -> torch.Tensor:
         
         B, U, E = zc_off_grid.shape # 'U'nstructured
         S = zc_on_grid.shape[-2] # 'S'tructured
@@ -188,31 +224,6 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         # reshape output to match on_the_grid exactly again
         zc = einops.rearrange(zc, "(b s) 1 e -> b s e", b=B)
         return zc
-       
-    def forward( # picked apart to allow for embedding before gridding
-        self,
-        xc_off_grid: torch.Tensor,
-        yc_off_grid: torch.Tensor,
-        xc_on_grid: torch.Tensor,
-        yc_on_grid: torch.Tensor,
-        xt: torch.Tensor,
-        ignore_on_grid: bool = False,
-    ) -> torch.Tensor:
-        yc_off_grid, yt = preprocess_observations(xt, yc_off_grid)
-        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, context_val=2)
-
-        zc_off_grid = torch.cat((xc_off_grid, yc_off_grid), dim=-1)
-        zc_off_grid = self.xy_encoder(zc_off_grid)
-        zc_on_grid = torch.cat((xc_on_grid, yc_on_grid), dim=-1)
-        zc_on_grid = self.xy_encoder(zc_on_grid)
-
-        zc = self.grid_encode(xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, 
-                              zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid, 
-                              ignore_on_grid=ignore_on_grid)
-
-        zt = torch.cat((xt, yt), dim=-1)
-        zt = self.xy_encoder(zt)
-        return self.transformer_encoder(zc, zt)
     
 
 class OOTG_TNPD(OOTGConditionalNeuralProcess):

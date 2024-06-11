@@ -81,7 +81,7 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + ${params.dim}'} # 3 since it was 2 before and now stack output for on & off the grid
+  in_dim: ${eval:'3 + ${params.dim}'} # 2 flag dimensions (preprocess) and y_dim=1 so add 3
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}

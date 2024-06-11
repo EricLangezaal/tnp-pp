@@ -93,7 +93,7 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + ${params.dim}'} # one from preprocessing, one from y
+  in_dim: ${eval:'3 + ${params.dim}'} # two from preprocessing, one from y
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
