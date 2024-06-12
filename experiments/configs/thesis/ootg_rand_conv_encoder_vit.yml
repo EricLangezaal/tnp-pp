@@ -18,7 +18,7 @@ generators:
     num_on_grid_context: 3200
     num_targets: 32
     dim: ${params.dim}
-    samples_per_epoch: 4096
+    samples_per_epoch: 4000
     batch_size: 16
     deterministic: ${params.deterministic}
     
@@ -53,7 +53,7 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + (not ${params.ignore_on_grid}) + ${params.dim}'} # 3 since it was 2 before and now stack output for on & off the grid
+  in_dim: ${eval:'3 + ${params.dim}'} # 2 flag dimensions (preprocessing) and ydim=1
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
@@ -83,8 +83,6 @@ params:
   ignore_on_grid: False
 
   dim: 1
-  gp_num_tasks: 2
-  task_correlation: 0.85
   points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128

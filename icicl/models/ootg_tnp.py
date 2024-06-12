@@ -97,43 +97,12 @@ class OOTGSetConvTNPDEncoder(OOTG_TNPDEncoder):
         """
         
         weights = compute_eq_weights(xc_on_grid, xc_off_grid, lengthscales=self.lengthscale)
+        # shape (batch_size, num_ontg, embed_dim)
         zc = weights @ zc_off_grid
         
         if not ignore_on_grid:
-            # shape (batch_size, num_ontg, 2 * (1/2 embed_dim)) since MLP's out dim is halved in config in this case
-            zc = torch.cat((zc, zc_on_grid), dim=-1)
-
+            zc += zc_on_grid
         return zc
-
-    def forward(
-        self, 
-        xc_off_grid: torch.Tensor,
-        yc_off_grid: torch.Tensor,
-        xc_on_grid: torch.Tensor,
-        yc_on_grid: torch.Tensor,
-        xt: torch.Tensor,
-        ignore_on_grid: bool = False,
-    ) -> torch.Tensor:
-        yc_off_grid, yt = preprocess_observations(xt, yc_off_grid, on_grid=False)
-        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, on_grid=True)
-
-        zc_off_grid = torch.cat((xc_off_grid, yc_off_grid), dim=-1)
-        zc_off_grid = self.xy_encoder(zc_off_grid)
-        zc_on_grid = torch.cat((xc_on_grid, yc_on_grid), dim=-1)
-        zc_on_grid = self.xy_encoder(zc_on_grid)
-
-        zc = self.grid_encode(
-            xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, 
-            zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid,
-            ignore_on_grid=ignore_on_grid
-        )
-        
-        zt = torch.cat((xt, yt), dim=-1)
-        zt = self.xy_encoder(zt)
-        if not ignore_on_grid:
-            zt = zt.repeat_interleave(2, dim=-1)
-            
-        return self.transformer_encoder(zc, zt)   
     
 
 class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
