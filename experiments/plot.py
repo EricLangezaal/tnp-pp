@@ -54,7 +54,7 @@ def plot(
                 indexing='ij'
             ),
             axis=-1,
-        ).view(-1, dim).unsqueeze(0)
+        ).view(-1, dim).unsqueeze(0).to(batches[0].xc)
 
     for i in range(num_fig):
         batch = batches[i]
