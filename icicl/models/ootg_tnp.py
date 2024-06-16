@@ -8,7 +8,7 @@ from check_shapes import check_shapes
 from .base import OOTGConditionalNeuralProcess
 from .tnp import EfficientTNPDEncoder, TNPDDecoder
 from ..networks.attention_layers import MultiHeadCrossAttentionLayer
-from ..utils.conv import compute_eq_weights, make_grid
+from ..utils.conv import compute_eq_weights, make_grid, flatten_grid
 from ..utils.helpers import preprocess_observations
 
 
@@ -119,7 +119,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
     ):
         super().__init__(**kwargs)
         grid_range = torch.as_tensor(grid_range)
-        num_latents = make_grid(grid_range[:, :1], grid_range[:, 1:2], points_per_unit, 0).size(-2)
+        num_latents = flatten_grid(make_grid(grid_range[:, :1], grid_range[:, 1:2], points_per_unit, 0)).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
 
         self.fake_embedding = nn.Parameter(torch.randn(embed_dim))

@@ -210,7 +210,8 @@ def flatten_grid(grid: torch.Tensor) -> torch.Tensor:
     """
     return torch.reshape(grid, shape=(grid.shape[0], -1, grid.shape[-1]))
 
-def unflatten_grid(grid: torch.Tensor, dim=None) -> torch.Tensor:
+
+def unflatten_grid(grid: torch.Tensor, grid_shape=None) -> torch.Tensor:
     """Return grid to its original shape:
     (batch_size, n1, n2, ..., ndim, dim)
 
@@ -220,17 +221,19 @@ def unflatten_grid(grid: torch.Tensor, dim=None) -> torch.Tensor:
     Returns:
         Tensor of shape (batch_size, n1, n2, ..., ndim, dim)
     """
-    if dim is None:
-        dim = grid.shape[-1]
-    num_points = int(grid.shape[-2] ** (1 / dim))
+    if grid_shape is None:
+        num_points = int(grid.shape[-2] ** (1 / grid.shape[-1]))
+        grid_shape = (num_points, ) * grid.shape[-1]
     
-    return grid.reshape(list(grid.shape[:-2]) + [num_points] * dim + [grid.shape[-1]])
+    return grid.reshape(grid.shape[:-2] + grid_shape + grid.shape[-1:])
+
 
 def convNd(n: int, **kwargs) -> nn.Module:
     try:
         return (nn.Conv1d, nn.Conv2d, nn.Conv3d)[n - 1](**kwargs)
     except:
         raise NotImplementedError
+    
 
 def compute_eq_weights(
     x1: torch.Tensor,
