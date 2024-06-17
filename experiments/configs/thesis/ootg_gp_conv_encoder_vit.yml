@@ -65,11 +65,12 @@ tnpd_encoder:
   _target_: icicl.models.ootg_vit.OOTGSetConvViTEncoder
   dim_lengthscale: ${params.dim}
   init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
-  patch_size: ${params.patch_size}
-  dim: ${params.dim}
-  embed_dim: ${params.embed_dim}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
+  grid_range: ${params.data_range}
+  points_per_unit: ${params.points_per_unit}
+  patch_size: ${params.patch_size}
+  embed_dim: ${params.embed_dim}
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder

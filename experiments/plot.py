@@ -122,7 +122,7 @@ def plot(
             )
 
         else:
-            fig = plt.figure(figsize=figsize)
+            fig = plt.figure(figsize=(figsize[0] + 2, figsize[1]))
             ax = fig.add_subplot(projection='3d')
 
             ax.scatter(
@@ -226,7 +226,7 @@ def plot(
         elif savefig:
             if not os.path.isdir(f"fig/{name}"):
                 os.makedirs(f"fig/{name}")
-            plt.savefig(fname, bbox_inches="tight")
+            fig.savefig(fname)
         else:
             plt.show()
         plt.close()

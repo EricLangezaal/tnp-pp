@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import math
+from typing import Tuple, Optional
 
 from .initialisation import weights_init
 
@@ -196,6 +197,21 @@ def make_grid(
     grid = x_mid + grid[None, ...] / points_per_unit
 
     return grid
+
+
+def make_grid_from_range(
+        grid_range: Tuple[Tuple[float, float], ...], 
+        points_per_unit: int,
+        batch_shape: Optional[torch.Size] = (1,),
+) -> torch.Tensor:
+    
+    grid_range = torch.as_tensor(grid_range, dtype=torch.float)
+    return make_grid(
+            xmin = grid_range[:, 0].repeat(*batch_shape, 1), 
+            xmax = grid_range[:, 1].repeat(*batch_shape, 1), 
+            points_per_unit = points_per_unit, 
+            margin = 0
+    )
 
 
 def flatten_grid(grid: torch.Tensor) -> torch.Tensor:

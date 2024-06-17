@@ -3,10 +3,10 @@ from torch import nn
 from abc import ABC
 from typing import Tuple
 
-from ..utils.conv import make_grid, unflatten_grid, flatten_grid, convNd
+from ..utils.conv import make_grid_from_range, unflatten_grid, flatten_grid, convNd
 from ..models.ootg_tnp import OOTG_TNPDEncoder, OOTGSetConvTNPDEncoder, OOTG_MHCA_TNPDEncoder
 
-class OOTG_ViTEncoder(nn.Module, ABC):
+class OOTG_ViTEncoder(OOTG_TNPDEncoder, ABC):
     """
     Implements a very basic ViT encoding without positional embeddings
 
@@ -24,7 +24,7 @@ class OOTG_ViTEncoder(nn.Module, ABC):
             **kwargs
     ):
         super().__init__(**kwargs)
-        self.grid_shape = make_grid(grid_range[:, :1], grid_range[:, 1:2], points_per_unit, 0).shape[1:-1]
+        self.grid_shape = make_grid_from_range(grid_range, points_per_unit).shape[1:-1]
         self.patcher = convNd(n=len(self.grid_shape), in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size)        
 
     def coarsen_grid(self, z: torch.Tensor) -> torch.Tensor:

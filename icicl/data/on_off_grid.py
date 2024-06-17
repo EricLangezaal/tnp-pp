@@ -4,7 +4,7 @@ import torch
 
 from .base import DataGenerator
 from .synthetic import SyntheticGenerator, SyntheticBatch
-from ..utils.conv import make_grid, flatten_grid
+from ..utils.conv import make_grid_from_range, flatten_grid
 
 @dataclass
 class OOTGBatch(SyntheticBatch):
@@ -65,11 +65,7 @@ class SyntheticOOTGGenerator(DataGenerator):
             num_trg=num_trg,
             batch_shape=batch_shape
         )
-        ontg_x = make_grid(
-            xmin = self.grid_range[:, 0].repeat(*batch_shape, 1), 
-            xmax = self.grid_range[:, 1].repeat(*batch_shape, 1), 
-            points_per_unit = self.points_per_unit, 
-            margin = 0)
+        ontg_x = make_grid_from_range(self.grid_range, self.points_per_unit, batch_shape=batch_shape)
         ontg_x = flatten_grid(ontg_x) # shape (batch, num_ontg, xdim)
 
         # (batch_shape, num_ctx + num_trg + num_ontg, xdim).
