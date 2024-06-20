@@ -4,7 +4,7 @@ import torch
 from check_shapes import check_shapes
 
 
-@check_shapes("xt: [m, nt, dx]", "yc: [m, nc, dy]")
+@check_shapes("xt: [m, nt, dx]", "yc: [m, ..., dy]")
 def preprocess_observations(
     xt: torch.Tensor,
     yc: torch.Tensor,

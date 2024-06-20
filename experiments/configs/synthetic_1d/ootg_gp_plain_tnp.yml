@@ -63,8 +63,12 @@ model:
 
 tnpd_encoder:
   _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
+  grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
+
+grid_encoder:
+  _target_: icicl.networks.grid_encoders.IdentityGridEncoder
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder

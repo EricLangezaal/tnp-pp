@@ -1,5 +1,7 @@
 # File inspired from 'efficient-tnpd-synthetic-1d.yml'
 
+# OUTDATED -> UPDATE BEFORE USE
+
 generators:
   train:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
@@ -27,11 +29,18 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTGSetConvTNPDEncoder
-  dim_lengthscale: ${params.dim}
-  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
+  _target_: icicl.models.ootg_vit.OOTG_ViTEncoder
+  grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
+  dim: ${params.dim}
+  patch_size: ${params.patch_size}
+  embed_dim: ${params.embed_dim}
+
+grid_encoder:
+  _target_: icicl.networks.grid_encoders.SetConvGridEncoder
+  dim: ${params.dim}
+  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder
@@ -77,14 +86,17 @@ params:
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
   ignore_on_grid: False
 
-  dim: 1
-  points_per_unit: 8 # low such that num_ontg doesn't explode
+  dim: 2
+  points_per_unit: 8 # only for setconv
 
   embed_dim: 128
   num_heads: 8
   head_dim: 16
   norm_first: True
   num_layers: 5
+
+  patch_size: 32
+
 
 misc:
   logging: False

@@ -1,142 +1,67 @@
-import itertools
-from typing import Tuple, Optional
+from typing import Optional
 import warnings
 
 from check_shapes import check_shapes
 import einops
-import numpy as np
+from torch import nn
 import torch
 
-from ..networks.attention_layers import MultiHeadSelfAttentionLayer
+from ..models.ootg_tnp import OOTG_TNPDEncoder
+from ..networks.grid_encoders import IdentityGridEncoder
+from ..networks.attention_layers import MultiHeadCrossAttentionLayer
+from ..networks.swin_attention import SWINAttentionLayer
+from ..networks.transformer import _get_clones
+from ..utils.grids import unflatten_grid, flatten_grid
 
 
-class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
+class SWINTransformerEncoder(nn.Module):
     def __init__(
         self,
-        *,
-        window_sizes: Tuple[int],
-        shift_sizes: Optional[Tuple[int]] = None,
-        **kwargs,
+        num_layers: int,
+        mhca_layer: MultiHeadCrossAttentionLayer,
+        swin_layer: SWINAttentionLayer,
     ):
-        super().__init__(**kwargs)
-        self.window_sizes = torch.as_tensor((window_sizes,)).flatten()
+        super().__init__()
 
-        if shift_sizes is not None:
-            self.shift_sizes = torch.as_tensor(shift_sizes)
-        else:
-            self.shfit_sizes = self.window_sizes // 2
+        self.mhca_layers = _get_clones(mhca_layer, num_layers)
+        self.swin_layers = _get_clones(swin_layer, num_layers)
 
-    @check_shapes("x: [m, ..., d]", "mask: [m, ...]", "return: [m, ..., d]")
+    @check_shapes(
+        "xc: [m, ..., d]", "xt: [m, nt, d]", "mask: [m, nt, nc]", "return: [m, nt, d]"
+    )
     def forward(
-        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+        self, xc: torch.Tensor, xt: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         if mask is not None:
-            warnings.warn(
-                "Swin Attention needs to construct its own mask, specified mask will not be used."
-            )
+            warnings.warn("mask is not currently being used.")
 
-        grid_shape = torch.as_tensor(x.shape[1:-1], dtype=int)
+        grid_shape = xc.shape[1:-1]      
 
-        # First no shift.
-        x = window_partition(x, self.window_sizes)
-        x = super().forward(x)
-        x = window_reverse(x, self.window_sizes, grid_shape)
+        for swin_layer, mhca_layer in zip(self.swin_layers, self.mhca_layers):
+            xc = swin_layer(xc)
 
-        # Now shift.
-        shifted_x = torch.roll(
-            x,
-            shifts=(-self.shift_sizes).tolist(),
-            dims=list(range(1, len(self.shift_sizes) + 1)),
-        )
-        shifted_x = window_partition(shifted_x, self.window_sizes)
+            # Flatten xc before cross-attending.
+            xc = flatten_grid(xc)
+            xt = mhca_layer(xt, xc)
+            xc = unflatten_grid(xc, grid_shape)
 
-        # Compute attention mask for shifted windows.
-        mask = swin_attention_mask(
-            self.window_sizes, self.shift_sizes, grid_shape, x.shape[0]
-        )
+        return xt
+    
 
-        shifted_x = super().forward(shifted_x, mask=mask)
-        shifted_x = window_reverse(shifted_x, self.window_sizes, grid_shape)
+class OOTG_SwinEncoder(OOTG_TNPDEncoder):
 
-        # Unshift.
-        x = torch.roll(
-            shifted_x,
-            shifts=(self.shift_sizes).tolist(),
-            dims=list(range(1, len(self.shift_sizes) + 1)),
-        )
-        return x
+    def __init__(
+            self,
+            **kwargs,
+    ):
+        super().__init__(**kwargs)
+        assert isinstance(self.transformer_encoder, SWINTransformerEncoder)
+        assert not isinstance(self.grid_encoder, IdentityGridEncoder)
 
-
-@check_shapes(
-    "x: [m, ..., d]",
-    "return: [m, nw, dw, d]",
-)
-def window_partition(x: torch.Tensor, window_sizes: torch.Tensor):
-    grid_shape = x.shape[1:-1]
-
-    n_strings, d_strings = [f"n{i}" for i in range(len(grid_shape))], [
-        f"d{i}" for i in range(len(grid_shape))
-    ]
-    paired = " ".join([f"({n} {d})" for n, d in zip(n_strings, d_strings)])
-    reshape_pattern = (
-        f"b {paired} e -> (b {' '.join(n_strings)}) ({' '.join(d_strings)}) e"
-    )
-    reshape_vars = dict(zip(d_strings, window_sizes))
-
-    return einops.rearrange(x, reshape_pattern, **reshape_vars)
-
-
-@check_shapes(
-    "x: [m, nw, dw, d]",
-    "return: [m, ..., d]",
-)
-def window_reverse(
-    x: torch.Tensor, window_sizes: torch.Tensor, grid_shape: torch.Tensor
-):
-    num_windows = grid_shape // window_sizes
-    n_strings, d_strings = [f"n{i}" for i in range(len(grid_shape))], [
-        f"d{i}" for i in range(len(grid_shape))
-    ]
-    paired = " ".join([f"({n} {d})" for n, d in zip(n_strings, d_strings)])
-    unreshape_pattern = (
-        f"(b {' '.join(n_strings)}) ({' '.join(d_strings)}) e -> b {paired} e"
-    )
-    window_size_vars = dict(zip(d_strings, window_sizes))
-    num_windows_vars = dict(zip(n_strings, num_windows))
-
-    return einops.rearrange(x, unreshape_pattern, ** window_size_vars | num_windows_vars)
-
-
-def swin_attention_mask(
-    window_sizes: torch.Tensor,
-    shift_sizes: torch.Tensor,
-    grid_shape: torch.Tensor,
-    num_batches: int,
-):
-    img_mask = torch.ones((num_batches, *grid_shape, 1))
-
-    slices = [
-        (
-            slice(0, -window_sizes[i]),
-            slice(-window_sizes[i], -shift_sizes[i]),
-            slice(-shift_sizes[i], None),
-        )
-        for i in range(len(grid_shape))
-    ]
-
-    cnt = 0
-    for slices_ in itertools.product(*slices):
-        slices_ = [slice(None), *slices_, slice(None)]
-        img_mask[slices_] = cnt
-        cnt += 1
-
-    # (num_batches * num_windows, tokens_per_window)
-    mask_windows = window_partition(img_mask, window_sizes).squeeze(-1)
-
-    # (num_batches * num_windows, tokens_per_window, tokens_per_window).
-    attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-    attn_mask = attn_mask.masked_fill(attn_mask != 0, -np.inf).masked_fill(
-        attn_mask == 0, float(0.0)
-    )
-
-    return attn_mask
+    @check_shapes("z: [b, ..., e]", "return: [b, ..., e]")
+    def prepare_context_tokens(
+            self, 
+            z: torch.Tensor
+    ) -> torch.Tensor:
+        # do not flatten here, as SWIN wants a grid
+        return z

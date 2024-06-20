@@ -1,12 +1,14 @@
 import torch
 from torch import nn
-from abc import ABC
-from typing import Tuple
+from check_shapes import check_shapes
 
-from ..utils.conv import make_grid_from_range, unflatten_grid, flatten_grid, convNd
-from ..models.ootg_tnp import OOTG_TNPDEncoder, OOTGSetConvTNPDEncoder, OOTG_MHCA_TNPDEncoder
+from ..networks.grid_encoders import IdentityGridEncoder
+from ..utils.conv import convNd
+from ..utils.grids import flatten_grid
+from ..models.ootg_tnp import OOTG_TNPDEncoder
 
-class OOTG_ViTEncoder(OOTG_TNPDEncoder, ABC):
+
+class OOTG_ViTEncoder(OOTG_TNPDEncoder):
     """
     Implements a very basic ViT encoding without positional embeddings
 
@@ -17,37 +19,26 @@ class OOTG_ViTEncoder(OOTG_TNPDEncoder, ABC):
     def __init__(
             self,
             *,
-            grid_range: Tuple[Tuple[float, float], ...],
-            points_per_unit: int,
+            dim: int,
             patch_size: int,
             embed_dim: int,
             **kwargs
     ):
         super().__init__(**kwargs)
-        self.grid_shape = make_grid_from_range(grid_range, points_per_unit).shape[1:-1]
-        self.patcher = convNd(n=len(self.grid_shape), in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size)        
+        assert not isinstance(self.grid_encoder, IdentityGridEncoder)
+        self.dim = dim
+        self.patcher = convNd(n=dim, in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size)   
 
-    def coarsen_grid(self, z: torch.Tensor) -> torch.Tensor:
-        # z will be of shape (batch, num_on_grid, embed_dim)
-        z = unflatten_grid(z, grid_shape=self.grid_shape)
-        # move 'channels' (i.e embed_dim) right after batch
+    @check_shapes("z: [b, ..., e]", "return: [b, n, e]")
+    def prepare_context_tokens(
+            self, 
+            z: torch.Tensor
+    ) -> torch.Tensor:
+        assert z.ndim - 2 == self.dim, f"Embedded context should match grid shape, expected {self.dim} grid, got {z.ndim - 2} grid."
+        # move 'channels' (i.e embed_dim) right after batch so shape is now (b, e, n1, n2, ..., ndim)
         z = z.movedim(-1, 1)
         z = self.patcher(z)
-        # move 'channels' (i.e embed_dim) to end again
+        # move 'channels' (i.e embed_dim) to end again for shape  (b, n1, n2, ..., ndim, e)
         z = z.movedim(1, -1)
 
-        return flatten_grid(z)
-    
-
-class OOTGSetConvViTEncoder(OOTGSetConvTNPDEncoder, OOTG_ViTEncoder):
-    def grid_encode(self, **kwargs) -> torch.Tensor:
-        zc = super().grid_encode(**kwargs)
-        zc = super().coarsen_grid(zc)
-        return zc
-    
-    
-class OOTG_MHCA_ViTEncoder(OOTG_MHCA_TNPDEncoder, OOTG_ViTEncoder):
-    def grid_encode(self, **kwargs) -> torch.Tensor:
-        zc = super().grid_encode(**kwargs)
-        zc = super().coarsen_grid(zc)
-        return zc
+        return flatten_grid(z) 

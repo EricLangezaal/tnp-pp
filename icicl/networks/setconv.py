@@ -6,7 +6,8 @@ import torch
 from check_shapes import check_shapes
 from torch import nn
 
-from ..utils.conv import flatten_grid, make_adaptive_grid, make_grid, compute_eq_weights
+from ..utils.conv import compute_eq_weights
+from ..utils.grids import make_grid, flatten_grid, make_adaptive_grid
 
 
 class SetConvEncoder(nn.Module):

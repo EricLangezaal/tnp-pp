@@ -56,7 +56,8 @@ workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to t
                              # in which sbatch is run.
 
 #! Your_python your_code, args
-CMD="python experiments/lightning_train.py --config experiments/configs/thesis/ootg_gp_mhca_encoder_tnp.yml misc.progress_bars=False params.task_correlation=0.5"
+DIMENSION=2
+CMD="python experiments/lightning_train.py --config experiments/configs/synthetic_${DIMENSION}d/ootg_gp_mhca_encoder_tnp.yml misc.progress_bars=False"
 
 ###############################################################
 ### You should not have to change anything below this line ####
