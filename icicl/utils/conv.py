@@ -164,13 +164,10 @@ def make_grid(
         (0.5 * (xmax - xmin) + margin) * points_per_unit
     )  # shape (batch_size, dim)
 
-    # Take the maximum over the batch, in order to use the same number of
+    # Take the maximum over the batch, in order to use the same numbe`r of
     # points across all tasks in the batch, to enable tensor batching
     num_points = torch.max(num_points, dim=0)[0]
     num_points = 2 ** torch.ceil(torch.log(num_points) / math.log(2.0))  # shape (dim,)
-
-    # rescale ppu after making num_points power of two, such that grid actually abides by its range
-    # points_per_unit = points_per_unit * num_points / num_points_old
 
     # Compute midpoints of each dimension, multiply integer grid by the grid
     # spacing and add midpoint to obtain dimension-wise grids
@@ -180,7 +177,7 @@ def make_grid(
     grid = torch.stack(
         torch.meshgrid(
             *[
-                torch.arange(-num_points[i], num_points[i] + 1, dtype=xmin.dtype)
+                torch.linspace(-num_points[i], num_points[i], steps=num_points[0].to(int) * 2, dtype=xmin.dtype)
                 for i in range(dim)
             ],
             indexing='ij'
@@ -214,7 +211,9 @@ def make_grid_from_range(
     )
 
 
-def flatten_grid(grid: torch.Tensor) -> torch.Tensor:
+def flatten_grid(
+        grid: torch.Tensor
+) -> torch.Tensor:
     """Flatten the grid tensor to a tensor of shape
     (batch_size, num_grid_points, dim).
 
@@ -227,7 +226,10 @@ def flatten_grid(grid: torch.Tensor) -> torch.Tensor:
     return torch.reshape(grid, shape=(grid.shape[0], -1, grid.shape[-1]))
 
 
-def unflatten_grid(grid: torch.Tensor, grid_shape=None) -> torch.Tensor:
+def unflatten_grid(
+        data: torch.Tensor, 
+        grid_shape: Optional[torch.Tensor] = None
+) -> torch.Tensor:
     """Return grid to its original shape:
     (batch_size, n1, n2, ..., ndim, dim)
 
@@ -238,10 +240,10 @@ def unflatten_grid(grid: torch.Tensor, grid_shape=None) -> torch.Tensor:
         Tensor of shape (batch_size, n1, n2, ..., ndim, dim)
     """
     if grid_shape is None:
-        num_points = int(grid.shape[-2] ** (1 / grid.shape[-1]))
-        grid_shape = (num_points, ) * grid.shape[-1]
+        num_points = int(data.shape[-2] ** (1 / data.shape[-1]))
+        grid_shape = (num_points, ) * data.shape[-1]
     
-    return grid.reshape(grid.shape[:-2] + grid_shape + grid.shape[-1:])
+    return data.reshape(data.shape[:-2] + grid_shape + data.shape[-1:])
 
 
 def convNd(n: int, **kwargs) -> nn.Module:

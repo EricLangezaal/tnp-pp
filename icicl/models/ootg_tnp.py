@@ -125,6 +125,7 @@ class OOTG_MHCA_TNPDEncoder(OOTG_TNPDEncoder):
         self.fake_embedding = nn.Parameter(torch.randn(embed_dim))
 
         self.grid_mhca_layer = grid_mhca_layer
+        assert grid_mhca_layer.embed_dim == embed_dim, "embed_dim must match."
 
     @check_shapes(
         "xc_off_grid: [b, u, dx]", "xc_on_grid: [b, s, dx]", 
