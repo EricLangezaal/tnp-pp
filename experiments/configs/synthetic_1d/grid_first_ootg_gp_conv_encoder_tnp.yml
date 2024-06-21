@@ -1,4 +1,4 @@
-# This is 2d!'
+# File inspired from 'efficient-tnpd-synthetic-1d.yml'
 
 generators:
   train:
@@ -33,7 +33,7 @@ generators:
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
-    context_range: [[-2.0, 2.0], [-2.0, 2.0]]
+    context_range: [[-2.0, 2.0]]
     target_range: ${params.data_range}
     samples_per_epoch: ${generators.train.samples_per_epoch}
     batch_size: ${generators.train.batch_size}
@@ -50,7 +50,7 @@ generators:
     max_num_ctx: 64
     min_num_trg: 128
     max_num_trg: 128
-    context_range: [[-2.0, 2.0], [-2.0, 2.0]]
+    context_range: [[-2.0, 2.0]]
     target_range: ${params.data_range}
     samples_per_epoch: ${generators.val.samples_per_epoch}
     batch_size: ${generators.val.batch_size}
@@ -62,13 +62,11 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
-  grid_encoder: ${grid_encoder}
+  _target_: icicl.models.ootg_grid_first_setconv_tnp.OOTGSetConvTNPDEncoder
+  dim: ${params.dim}
+  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-
-grid_encoder:
-  _target_: icicl.networks.grid_encoders.IdentityGridEncoder
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder
@@ -85,7 +83,7 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'3 + ${params.dim}'} # 2 flag dimensions (preprocess) and y_dim=1 so add 3
+  in_dim: ${eval:'2 + (not ${params.ignore_on_grid}) + ${params.dim}'} # preprocess adds 1 flag dims here, ydim=1 and if gridding a second ydim=1 is added
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
@@ -114,11 +112,11 @@ params:
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
   ignore_on_grid: False
 
-  dim: 2
-  data_range: [[-4.0, 4.0], [-4.0, 4.0]]
+  dim: 1
+  data_range: [[-4.0, 4.0]]  # range * ppu is scaled to be power of 2 anyway, so make power of 2!
   gp_num_tasks: 2
   task_correlation: 0.8
-  points_per_unit: 1 # 1 here gives 64 datapoints already.
+  points_per_unit: 8 # low such that num_ontg doesn't explode
 
   embed_dim: 128
   num_heads: 8
@@ -127,9 +125,10 @@ params:
   num_layers: 5
 
 
+
 misc:
-  project: tnp-2d-data
-  name: plain_tnp-NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}
+  project: convset-encoder-tnp
+  name: conv_set_encoder_tnp-NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}-GRID_FIRST
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
