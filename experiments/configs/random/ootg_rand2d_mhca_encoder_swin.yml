@@ -15,7 +15,7 @@ generators:
   val:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
     num_off_grid_context: ${params.num_off_the_grid}
-    num_on_grid_per_dim: ${params.patch_size} # smallest possible
+    num_on_grid_per_dim: ${eval:'${params.window_sizes}[0]'}
     num_targets: ${params.num_off_the_grid}
     dim: ${params.dim}
     samples_per_epoch: 4000
@@ -29,23 +29,38 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_vit.OOTG_ViTEncoder
+  _target_: icicl.models.ootg_swin.OOTG_SwinEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-  dim: ${params.dim}
-  patch_size: ${params.patch_size}
-  embed_dim: ${params.embed_dim}
 
-grid_encoder:
-  _target_: icicl.networks.grid_encoders.SetConvGridEncoder
-  dim: ${params.dim}
-  init_lengthscale: ${eval:'2 * 1 / 8'}
+grid_encoder: 
+  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
+  embed_dim: ${params.embed_dim}
+  mhca_layer: ${grid_mhca_layer}
+
+grid_mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.models.ootg_swin.SWINTransformerEncoder
   mhca_layer: ${mhca_layer}
+  swin_layer: ${swin_layer}
   num_layers: ${params.num_layers}
+
+swin_layer:
+  _target_: icicl.networks.swin_attention.SWINAttentionLayer
+  window_sizes: ${params.window_sizes}
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -96,7 +111,7 @@ params:
   norm_first: True
   num_layers: 5
 
-  patch_size: 20
+  window_sizes: [20, 20] # check that on_grid_per_dim properly divisible by this!
 
 
 misc:

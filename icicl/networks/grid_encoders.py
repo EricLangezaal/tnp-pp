@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 import torch
 from torch import nn
@@ -95,13 +95,16 @@ class PseudoTokenGridEncoder(nn.Module):
             self,
             *,
             embed_dim: int,
-            grid_range: Tuple[Tuple[float, float], ...],
-            points_per_unit: int,
             mhca_layer: Union[MultiHeadCrossAttentionLayer, MultiHeadCrossAttention],
+            grid_range: Optional[Tuple[Tuple[float, float], ...]] = None,
+            points_per_unit: Optional[int] = None,
             **kwargs,
     ):
         super().__init__(**kwargs)
-        num_latents = flatten_grid(make_grid_from_range(grid_range, points_per_unit)).size(-2)
+        if grid_range is None or points_per_unit is None:
+            num_latents = 1
+        else:
+            num_latents = flatten_grid(make_grid_from_range(grid_range, points_per_unit)).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
 
         self.fake_embedding = nn.Parameter(torch.randn(embed_dim))
@@ -170,8 +173,12 @@ class PseudoTokenGridEncoder(nn.Module):
         # set fake value to something which won't overflow/NaN attention calculation
         grid_stacked[grid_stacked == self.FAKE_TOKEN] = 0
 
-        # repeat latents of shape (S, E) to (B * S, 1, E)
-        latents = self.latents.repeat(B, 1).unsqueeze(1).to(zc_on_grid.device)
+        # make latents of shape (?, E) to (B * S, 1, E)
+        if self.latents.shape[0] == 1:
+            latents = einops.repeat(self.latents, "1 e -> (b s) 1 e", b=B, s=S)
+        else:
+            latents = einops.repeat(self.latents, "s e -> (b s) 1 e", b=B)
+
         zc = self.mhca_layer(latents, grid_stacked, mask=att_mask)
         # reshape output to match on_the_grid exactly again
         zc = einops.rearrange(zc, "(b s) 1 e -> b s e", b=B)

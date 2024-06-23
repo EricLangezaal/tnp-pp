@@ -19,6 +19,7 @@ class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
         **kwargs,
     ):
         super().__init__(**kwargs)
+        self.mask = torch.empty(0) # dummy will be overwritten
         self.window_sizes = torch.as_tensor(window_sizes)
 
         if shift_sizes is not None:
@@ -38,7 +39,6 @@ class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
         num_batches = x.shape[0]
         grid_shape = torch.as_tensor(x.shape[1:-1], dtype=int)
 
-        # TODO: check window sizes divide grid.
         assert torch.all(grid_shape % self.window_sizes == 0), "grid must be divisible by window size"
 
         # First no shift.
@@ -57,14 +57,15 @@ class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
         )
         shifted_x = window_partition(shifted_x, self.window_sizes)
 
-        # Compute attention mask for shifted windows.
-        mask = swin_attention_mask(
-            self.window_sizes,
-            self.shift_sizes,
-            grid_shape,
-        )
+        if self.mask.shape[0] != (grid_shape // self.window_sizes).prod():
+            # Compute attention mask for shifted windows.
+            self.mask = swin_attention_mask(
+                self.window_sizes,
+                self.shift_sizes,
+                grid_shape,
+            ).to(x)
         # Combine batch dimensions for efficient computation.
-        mask = einops.repeat(mask, "nw ws1 ws2 -> (m nw) ws1 ws2", m=num_batches)
+        mask = einops.repeat(self.mask, "nw ws1 ws2 -> (m nw) ws1 ws2", m=num_batches)
 
         shifted_x = einops.rearrange(shifted_x, "m nw ws d -> (m nw) ws d")
         shifted_x = super().forward(shifted_x, mask=mask)

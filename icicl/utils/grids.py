@@ -124,7 +124,7 @@ def flatten_grid(
 
 def unflatten_grid(
         data: torch.Tensor, 
-        grid_shape: Optional[torch.Tensor] = None
+        grid_shape: Optional[Tuple[int]] = None
 ) -> torch.Tensor:
     """Return grid to its original shape:
     (batch_size, n1, n2, ..., ndim, dim)

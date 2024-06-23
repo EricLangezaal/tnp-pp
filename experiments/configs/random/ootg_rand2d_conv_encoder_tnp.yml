@@ -3,18 +3,18 @@
 generators:
   train:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
-    num_off_grid_context: 32
-    num_on_grid_context: 10000
-    num_targets: 32
+    num_off_grid_context: ${params.num_off_the_grid}
+    num_on_grid_per_dim: ${params.on_grid_per_dim}
+    num_targets: ${params.num_off_the_grid}
     dim: ${params.dim}
     samples_per_epoch: 16000
     batch_size: 16
     deterministic: ${params.deterministic}
   val:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
-    num_off_grid_context: 32
-    num_on_grid_context: 3200
-    num_targets: 32
+    num_off_grid_context: ${params.num_off_the_grid}
+    num_on_grid_per_dim: 2
+    num_targets: ${params.num_off_the_grid}
     dim: ${params.dim}
     samples_per_epoch: 4000
     batch_size: 16
@@ -35,7 +35,7 @@ tnpd_encoder:
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
   dim: ${params.dim}
-  init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
+  init_lengthscale: ${eval:'2 * 1 / 8'}
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder
@@ -82,7 +82,8 @@ params:
   ignore_on_grid: False
 
   dim: 2
-  points_per_unit: 8 # only for setconv
+  on_grid_per_dim: 100 # (so 10k)
+  num_off_the_grid: 32
 
   embed_dim: 128
   num_heads: 8

@@ -396,7 +396,6 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
     # Initialise experiment, make path.
     config, config_dict = extract_config(raw_config, config_changes)
-    print(config_dict)
 
     # Get run and potentially override config before instantiation.
     if config.misc.resume_from_checkpoint is not None:
@@ -416,6 +415,10 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
     # use tensor cores effectively
     torch.set_float32_matmul_precision('high')
+    # TODO this stops PTEncoder crashing but hurts performance, why required??
+    torch.backends.cuda.enable_mem_efficient_sdp(False)
+    torch.backends.cuda.enable_flash_sdp(False)
+    torch.backends.cuda.enable_math_sdp(True)
 
     if isinstance(experiment.model, nn.Module):
         if experiment.misc.resume_from_checkpoint:

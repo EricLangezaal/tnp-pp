@@ -37,10 +37,18 @@ tnpd_encoder:
   patch_size: ${params.patch_size}
   embed_dim: ${params.embed_dim}
 
-grid_encoder:
-  _target_: icicl.networks.grid_encoders.SetConvGridEncoder
-  dim: ${params.dim}
-  init_lengthscale: ${eval:'2 * 1 / 8'}
+grid_encoder: 
+  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
+  embed_dim: ${params.embed_dim}
+  mhca_layer: ${grid_mhca_layer}
+
+grid_mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
 
 transformer_encoder:
   _target_: icicl.networks.transformer.TNPDTransformerEncoder
