@@ -98,11 +98,13 @@ class PseudoTokenGridEncoder(nn.Module):
             mhca_layer: Union[MultiHeadCrossAttentionLayer, MultiHeadCrossAttention],
             grid_range: Optional[Tuple[Tuple[float, float], ...]] = None,
             points_per_unit: Optional[int] = None,
+            num_latents: Optional[int] = None,
             **kwargs,
     ):
         super().__init__(**kwargs)
         if grid_range is None or points_per_unit is None:
-            num_latents = 1
+            assert isinstance(num_latents, int)
+            num_latents = num_latents
         else:
             num_latents = flatten_grid(make_grid_from_range(grid_range, points_per_unit)).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
@@ -175,7 +177,8 @@ class PseudoTokenGridEncoder(nn.Module):
 
         # make latents of shape (?, E) to (B * S, 1, E)
         if self.latents.shape[0] == 1:
-            latents = einops.repeat(self.latents, "1 e -> (b s) 1 e", b=B, s=S)
+            latents = self.latents.expand((B * S, E)).unsqueeze(-2)
+            #latents = einops.repeat(self.latents, "1 e -> (b s) 1 e", b=B, s=S)
         else:
             latents = einops.repeat(self.latents, "s e -> (b s) 1 e", b=B)
 

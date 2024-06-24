@@ -148,7 +148,7 @@ params:
   norm_first: True
   num_layers: 5
 
-  window_sizes: [8, 8]
+  window_sizes: [4, 4]
 
 
 misc:

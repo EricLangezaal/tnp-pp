@@ -15,7 +15,7 @@ generators:
   val:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
     num_off_grid_context: ${params.num_off_the_grid}
-    num_on_grid_per_dim: ${eval:'${params.window_sizes}[0]'}
+    num_on_grid_per_dim: ${params.on_grid_per_dim}
     num_targets: ${params.num_off_the_grid}
     dim: ${params.dim}
     samples_per_epoch: 4000
@@ -37,6 +37,7 @@ tnpd_encoder:
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
   embed_dim: ${params.embed_dim}
+  num_latents: 10000
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:

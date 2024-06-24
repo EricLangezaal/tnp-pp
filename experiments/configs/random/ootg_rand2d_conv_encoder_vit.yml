@@ -96,7 +96,7 @@ params:
   norm_first: True
   num_layers: 5
 
-  patch_size: 20
+  patch_size: 5
 
 
 misc:
