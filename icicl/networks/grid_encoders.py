@@ -2,6 +2,7 @@ from typing import Tuple, Union, Optional
 
 import torch
 from torch import nn
+from torch.nn.attention import SDPBackend, sdpa_kernel
 import einops
 from check_shapes import check_shapes
 
@@ -54,7 +55,6 @@ class SetConvGridEncoder(nn.Module):
             self.lengthscale_param
         )
     
-    # TODO can it work without flattening?
     @check_shapes(
         "xc_off_grid: [b, n, dx]", "xc_on_grid: [b, ..., dx]", "zc_off_grid: [b, n, dz]", "zc_on_grid: [b, ..., dz]"
     )
@@ -181,8 +181,10 @@ class PseudoTokenGridEncoder(nn.Module):
             #latents = einops.repeat(self.latents, "1 e -> (b s) 1 e", b=B, s=S)
         else:
             latents = einops.repeat(self.latents, "s e -> (b s) 1 e", b=B)
-
-        zc = self.mhca_layer(latents, grid_stacked, mask=att_mask)
+        
+        # TODO this definitely hurts perfomance, but Cuda crashes otherwise at 10000 grid points
+        with sdpa_kernel(SDPBackend.MATH):    
+           zc = self.mhca_layer(latents, grid_stacked, mask=att_mask)
         # reshape output to match on_the_grid exactly again
         zc = einops.rearrange(zc, "(b s) 1 e -> b s e", b=B)
 

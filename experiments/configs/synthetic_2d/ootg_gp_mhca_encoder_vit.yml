@@ -145,7 +145,7 @@ params:
 
 
 misc:
-  project: swin-2d-data
+  project: tnp-2d-data
   name: mhca_encoder-vit-NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}
   gradient_clip_val: 0.5
   plot_interval: 10
