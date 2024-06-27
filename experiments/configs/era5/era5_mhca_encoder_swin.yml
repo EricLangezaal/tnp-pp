@@ -1,0 +1,136 @@
+generators:
+  train:
+    _target_: icicl.data.era5.OOTGEra5DataGenerator
+    data_dir: ./data/era5/
+    fnames:
+      - jan_2019_2m_temperature.nc
+    data_vars: ["t2m"]
+    min_pc: 0.0001
+    max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    min_num_total: 100
+    t_spacing: 6
+    use_time: True
+    return_as_gridded: True
+    samples_per_epoch: 16_000
+    batch_size: 16
+  val:
+    _target_: icicl.data.era5.OOTGEra5DataGenerator
+    data_dir: ./data/era5/
+    fnames:
+      - jan_2019_2m_temperature.nc
+    data_vars: ["t2m"]
+    min_pc: 0.0001
+    max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    min_num_total: 100
+    t_spacing: 6
+    use_time: True
+    return_as_gridded: True
+    samples_per_epoch: 4_000
+    batch_size: 16
+
+model:
+  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  encoder: ${tnpd_encoder}
+  decoder: ${tnpd_decoder}
+  likelihood: ${likelihood}
+
+tnpd_encoder:
+  _target_: icicl.models.ootg_swin.OOTG_SwinEncoder
+  grid_encoder: ${grid_encoder}
+  transformer_encoder: ${transformer_encoder}
+  xy_encoder: ${xy_encoder}
+
+grid_encoder: 
+  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
+  num_latents: ${eval:'${params.batch_grid_size}[1] // ${params.coarsen_factors}[1] * ${params.batch_grid_size}[2] // ${params.coarsen_factors}[2]'}
+  embed_dim: ${params.embed_dim}
+  mhca_layer: ${grid_mhca_layer}
+
+grid_mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+transformer_encoder:
+  _target_: icicl.models.ootg_swin.SWINTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  swin_layer: ${swin_layer}
+  num_layers: ${params.num_layers}
+
+swin_layer:
+  _target_: icicl.networks.swin_attention.SWINAttentionLayer
+  window_sizes: ${params.window_sizes}
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+xy_encoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${eval:'3 + ${params.dim}'} # two from preprocessing, one from y
+  out_dim: ${params.embed_dim}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+tnpd_decoder:
+  _target_: icicl.models.tnp.TNPDDecoder
+  z_decoder: ${z_decoder}
+
+z_decoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.embed_dim}
+  out_dim: 2 # 1 for std and 1 for means
+  num_layers: 2
+  width: ${params.embed_dim}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.AdamW
+  _partial_: True
+  lr: 5.0e-4
+
+params:
+  epochs: 200
+  ignore_on_grid: False
+
+  dim: 3
+  batch_grid_size: [1, 512, 512]
+  coarsen_factors: [1, 8, 8] # so 64^2 grid points
+  num_targets: 200
+
+  embed_dim: 128
+  num_heads: 8
+  head_dim: 16
+  norm_first: True
+  num_layers: 5
+
+  window_sizes: [1, 8, 8]
+
+
+misc:
+  project: era5-tnp
+  logging: False # TODO remove
+  name: mhca_encoder-swin-NoGrid=${params.ignore_on_grid}
+  gradient_clip_val: 0.5
+  plot_interval: 10
+  resume_from_checkpoint: null

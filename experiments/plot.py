@@ -2,6 +2,7 @@ import copy
 import os
 from typing import Callable, List, Tuple, Union
 
+import warnings
 import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -41,7 +42,8 @@ def plot(
     # Get dimension of input data
     dim = batches[0].xc.shape[-1]
     if dim not in [1,2]:
-        raise NotImplementedError
+        warnings.warn("Plotting only supported for 1D and 2D data.")
+        return
     
     if dim == 1:
         x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim).to(

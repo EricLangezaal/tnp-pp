@@ -104,7 +104,6 @@ class PseudoTokenGridEncoder(nn.Module):
         super().__init__(**kwargs)
         if grid_range is None or points_per_unit is None:
             assert isinstance(num_latents, int)
-            num_latents = num_latents
         else:
             num_latents = flatten_grid(make_grid_from_range(grid_range, points_per_unit)).size(-2)
         self.latents = nn.Parameter(torch.randn(num_latents, embed_dim))
@@ -182,7 +181,8 @@ class PseudoTokenGridEncoder(nn.Module):
         else:
             latents = einops.repeat(self.latents, "s e -> (b s) 1 e", b=B)
         
-        # TODO this definitely hurts perfomance, but Cuda crashes otherwise at 10000 grid points
+        # cannot use flash attention on our hardware, Mem efficient can't scale.
+        # doesn't actually seem to hurt performance compared to mem efficient.
         with sdpa_kernel(SDPBackend.MATH):    
            zc = self.mhca_layer(latents, grid_stacked, mask=att_mask)
         # reshape output to match on_the_grid exactly again

@@ -101,9 +101,9 @@ sympy==1.12
 threadpoolctl==3.2.0
 tomli==2.0.1
 tomlkit==0.12.1
-torch==2.1.0
+torch==2.3.1
 torchmetrics==1.2.0
-torchvision==0.16.0
+torchvision==0.18.1
 tqdm==4.66.1
 traitlets==5.11.2
 typeguard==2.13.3
@@ -121,3 +121,4 @@ HiYaPyCo==0.5.5
 cartopy==0.23.0
 h5py==3.11.0
 xarray==2024.3.0
+cdsapi==0.7.0

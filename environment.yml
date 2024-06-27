@@ -17,7 +17,6 @@ dependencies:
   - wheel=0.41.2
   - xz=5.4.2
   - zlib=1.2.13
-  - pip
   - pip:
     - antlr4-python3-runtime==4.9.3
     - appdirs==1.4.4
@@ -76,8 +75,8 @@ dependencies:
     - threadpoolctl==3.2.0
     - tomli==2.0.1
     - tomlkit==0.12.1
-    - torch==2.1.0
-    - torchvision==0.16.0
+    - torch==2.3.1
+    - torchvision==0.18.1
     - tqdm==4.66.1
     - typeguard==2.13.3
     - typing-extensions==4.8.0
@@ -87,4 +86,5 @@ dependencies:
     - cartopy==0.23.0
     - h5py==3.11.0
     - xarray==2024.3.0
+    - cdsapi==0.7.0
 prefix: /opt/homebrew/Caskroom/miniconda/base/envs/tnp
