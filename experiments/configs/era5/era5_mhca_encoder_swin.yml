@@ -12,7 +12,7 @@ generators:
     max_nt: ${params.num_targets}
     min_num_total: 100
     t_spacing: 6
-    use_time: True
+    use_time: False
     return_as_gridded: True
     samples_per_epoch: 16_000
     batch_size: 16
@@ -29,7 +29,7 @@ generators:
     max_nt: ${params.num_targets}
     min_num_total: 100
     t_spacing: 6
-    use_time: True
+    use_time: False
     return_as_gridded: True
     samples_per_epoch: 4_000
     batch_size: 16
@@ -48,7 +48,7 @@ tnpd_encoder:
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  num_latents: ${eval:'${params.batch_grid_size}[1] // ${params.coarsen_factors}[1] * ${params.batch_grid_size}[2] // ${params.coarsen_factors}[2]'}
+  num_latents: ${eval:'${params.batch_grid_size}[1] // ${params.coarsen_factors}[0] * ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1]'}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
 
@@ -85,7 +85,7 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'3 + ${params.dim}'} # two from preprocessing, one from y
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.x_dim}'} # two from preprocessing
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
@@ -113,9 +113,10 @@ params:
   epochs: 200
   ignore_on_grid: False
 
-  dim: 3
-  batch_grid_size: [1, 512, 512]
-  coarsen_factors: [1, 8, 8] # so 64^2 grid points
+  x_dim: 3
+  y_dim: 2
+  batch_grid_size: [1, 720, 1440], # time, lat, lon. Exact 0.25° grid this way.
+  coarsen_factors: [12, 24] # so 60^2 grid points
   num_targets: 200
 
   embed_dim: 128
@@ -124,7 +125,7 @@ params:
   norm_first: True
   num_layers: 5
 
-  window_sizes: [1, 8, 8]
+  window_sizes: [8, 8]
 
 
 misc:

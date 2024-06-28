@@ -105,15 +105,7 @@ def to_multiple(x: torch.Tensor, multiple: int):
     if x % multiple == 0:
         return x
     return x + multiple - x % multiple
-
-
-def convNd(n: int, **kwargs) -> nn.Module:
-    try:
-        return (nn.Conv1d, nn.Conv2d, nn.Conv3d)[n - 1](**kwargs)
-    except:
-        raise NotImplementedError
     
-
 def compute_eq_weights(
     x1: torch.Tensor,
     x2: torch.Tensor,

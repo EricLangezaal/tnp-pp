@@ -4,14 +4,14 @@ import random
 from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 import xarray as xr
 from .base import Batch, DataGenerator
 from .on_off_grid import OOTGBatch
-from ..utils.grids import flatten_grid
+from ..utils.grids import flatten_grid, func_AvgPoolNd
 
 
 @dataclass
@@ -30,8 +30,8 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         *,
         data_dir: str,
         fnames: List[str],
-        lat_range: Tuple[float, float] = (-89.75, 89.75),
-        lon_range: Tuple[float, float] = (-179.75, 179.75),
+        lat_range: Tuple[float, float] = (-90.0, 90.0),
+        lon_range: Tuple[float, float] = (0.0 ,360.0),
         ref_date: str = "2000-01-01",
         data_vars: Tuple[str] = ("Tair",),
         **kwargs,
@@ -54,11 +54,11 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         dataset = dataset.assign_coords(time=hours)
 
         # Apply specified lat/lon ranges.
-        lon_idx = (dataset["longitude"][:] <= lon_range[1]) & (
-            dataset["longitude"][:] >= lon_range[0]
-        )
         lat_idx = (dataset["latitude"][:] <= lat_range[1]) & (
             dataset["latitude"][:] >= lat_range[0]
+        )
+        lon_idx = (dataset["longitude"][:] <= lon_range[1]) & (
+            dataset["longitude"][:] >= lon_range[0]
         )
 
         self.lat_range = lat_range
@@ -79,7 +79,7 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         *,
         min_pc: float,
         max_pc: float,
-        batch_grid_size: Tuple[int, int, int],
+        batch_grid_size: Tuple[int, int, int], #time, lat, lon
         max_nt: Optional[int] = None,
         min_num_total: int = 1,
         x_mean: Optional[Tuple[float, ...]] = None,
@@ -138,12 +138,6 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         # Get batch.
         batch = self.sample_batch(pc=pc, idxs=idxs)
         return batch
-
-    """
-    TODO if you want to use the whole lat/lon range at 0.25°, 
-    you would need batch_shape (..,718, 1438) but then calculating the i fails,
-    since 1438 > len(data["lon"]) = 720
-    """
     
     def sample_idx(self, batch_size: int) -> List[Tuple[List, List, List]]:
         """Samples indices used to sample dataframe.
@@ -158,11 +152,11 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         # Must keep location the same across batch as missing values vary.
         valid_location = False
         while not valid_location:
-            i = random.randint(0, len(self.data["lon"]) - 1 - self.batch_grid_size[2])
-            lon_idx = list(range(i, i + self.batch_grid_size[1]))
+            i = random.randint(0, len(self.data["lat"]) - self.batch_grid_size[1])
+            lat_idx = list(range(i, i + self.batch_grid_size[1]))
 
-            i = random.randint(0, len(self.data["lat"]) - 1 - self.batch_grid_size[1])
-            lat_idx = list(range(i, i + self.batch_grid_size[2]))
+            i = random.randint(0, len(self.data["lon"]) - self.batch_grid_size[2])
+            lon_idx = list(range(i, i + self.batch_grid_size[2]))
 
             # Get number of non-missing points.
             num_points = self._get_num_points(lat_idx=lat_idx, lon_idx=lon_idx)
@@ -208,7 +202,8 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
                         torch.as_tensor(self.data[k][idx[i]].data, dtype=torch.float)
                         for i, k in enumerate(self.all_input_vars)
                         if k in self.input_vars
-                    ]
+                    ],
+                    indexing="ij",
                 ),
                 dim=-1,
             )
@@ -333,11 +328,15 @@ class OOTGEra5DataGenerator(ERA5DataGenerator):
     def __init__(
             self,
             *,
-            coarsen_factors: Tuple[int, int, int],
+            coarsen_factors: Union[Tuple[int, int], Tuple[int, int, int]],
             **kwargs,
     ):
         super().__init__(**kwargs)
-        assert len(coarsen_factors) == len(self.batch_grid_size), "please specify a coarsing for each grid dimension"
+
+
+        assert len(coarsen_factors) + (not self.use_time) == len(self.batch_grid_size),  (
+            "please specify a coarsing for each grid dimension"
+        )
         self.coarsen_factors = tuple(coarsen_factors)
 
     def sample_batch(self, pc: float, idxs: List[Tuple[List]]) -> OOTGBatch:
@@ -368,12 +367,14 @@ class OOTGEra5DataGenerator(ERA5DataGenerator):
            gt_pred=None
         )
 
-def coarsen_grid(grid: torch.Tensor, coarsen_factors: Tuple[int, int, int]) -> torch.Tensor:
+def coarsen_grid(grid: torch.Tensor, coarsen_factors: Union[Tuple[int, int], Tuple[int, int, int]]) -> torch.Tensor:
     grid = grid.movedim(-1, 1) # move data dim to channel location
-    coarse_grid = torch.nn.functional.avg_pool3d(
-        grid, 
-        kernel_size=coarsen_factors,
-        stride=coarsen_factors,
+
+    coarse_grid = func_AvgPoolNd(
+        n=grid.ndim - 2, 
+        input=grid,
+        kernel_size=coarsen_factors, 
+        stride=coarsen_factors
     )
     coarse_grid = coarse_grid.movedim(1, -1) # move embed dim back to the end
     return coarse_grid

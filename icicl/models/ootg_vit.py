@@ -3,8 +3,7 @@ from torch import nn
 from check_shapes import check_shapes
 
 from ..networks.grid_encoders import IdentityGridEncoder
-from ..utils.conv import convNd
-from ..utils.grids import flatten_grid
+from ..utils.grids import flatten_grid, convNdModule
 from ..models.ootg_tnp import OOTG_TNPDEncoder
 
 
@@ -27,7 +26,7 @@ class OOTG_ViTEncoder(OOTG_TNPDEncoder):
         super().__init__(**kwargs)
         assert not isinstance(self.grid_encoder, IdentityGridEncoder)
         self.dim = dim
-        self.patcher = convNd(n=dim, in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size)   
+        self.patcher = convNdModule(n=dim, in_channels=embed_dim, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size)   
 
     @check_shapes("z: [b, ..., e]", "return: [b, n, e]")
     def prepare_context_tokens(

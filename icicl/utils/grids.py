@@ -2,6 +2,8 @@ from typing import Tuple, Optional
 import math
 
 import torch
+from torch import nn
+import torch.nn.functional as F
 
 def make_adaptive_grid(
     x: torch.Tensor,
@@ -140,3 +142,17 @@ def unflatten_grid(
         grid_shape = (num_points, ) * data.shape[-1]
     
     return data.reshape(data.shape[:-2] + grid_shape + data.shape[-1:])
+
+
+def convNdModule(n: int, **kwargs) -> nn.Module:
+    try:
+        return (nn.Conv1d, nn.Conv2d, nn.Conv3d)[n - 1](**kwargs)
+    except:
+        raise NotImplementedError
+    
+def func_AvgPoolNd(n: int, **kwargs) -> torch.Tensor:
+    try:
+        return (F.avg_pool1d, F.avg_pool2d, F.avg_pool3d)[n - 1](**kwargs)
+    except:
+        raise NotImplementedError
+
