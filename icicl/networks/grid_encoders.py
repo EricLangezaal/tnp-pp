@@ -136,11 +136,9 @@ class PseudoTokenGridEncoder(nn.Module):
             (xc_off_grid[..., None, :] - xc_on_grid[:, None, ...]).abs().sum(dim=-1).argmin(dim=2)
         )
 
-        # shape (B, U) or (B, S) respectively
+        # shape (B, U)
         # _batch_ first repeats batch number then increments, range first increments then repeats
-        s_batch_idx = torch.arange(B).unsqueeze(-1).repeat(1, S)
         u_batch_idx = torch.arange(B).unsqueeze(-1).repeat(1, U)
-        s_range_idx = torch.arange(S).repeat(B, 1)
         u_range_idx = torch.arange(U).repeat(B, 1)
 
         # construct temporary mask that links each off-grid point to its closest on_grid point
@@ -154,19 +152,22 @@ class PseudoTokenGridEncoder(nn.Module):
         cumcount_idx = (nearest_mask.cumsum(dim=1) - 1)[u_batch_idx, u_range_idx, nearest_idx]
 
         # create tensor with for each grid-token all nearest off-grid + itself in third axis
-        joint_grid = torch.full((B, S, max_patch, E), self.FAKE_TOKEN, device=zc_on_grid.device)
+        grid_stacked = torch.full((B * S, max_patch, E), self.FAKE_TOKEN, device=zc_on_grid.device)
         # add nearest off the grid points to each on_the_grid point
-        joint_grid[u_batch_idx, nearest_idx, cumcount_idx] = zc_off_grid[u_batch_idx, torch.arange(U)]
+        idx_shifter = torch.arange(0, B * S, S).repeat_interleave(U)
+        grid_stacked[nearest_idx.flatten() + idx_shifter, cumcount_idx.flatten()] = (
+             zc_off_grid[u_batch_idx.flatten(), u_range_idx.flatten()]
+        )
         if ignore_on_grid:
             # add learned 'mask out' embedding at the end. Done instead of masking out in att_mask,
             # since that could potentially make it mask out whole input which crashes attention
-            joint_grid[s_batch_idx, s_range_idx, -1] = self.fake_embedding
+            grid_stacked[torch.arange(B * S), -1] = self.fake_embedding
         else:
             # add the on_the_grid points themselves at the end
-            joint_grid[s_batch_idx, s_range_idx, -1] = zc_on_grid[s_batch_idx, torch.arange(S)]
-        
-        grid_stacked = einops.rearrange(joint_grid, "b s m e -> (b s) m e")
-
+            s_batch_idx = torch.arange(B).repeat_interleave(S)
+            s_range_idx = torch.arange(S).repeat(B)
+            grid_stacked[torch.arange(B * S), -1] = zc_on_grid[s_batch_idx, s_range_idx]
+    
         att_mask = torch.ones(B * S, 1, max_patch, dtype=torch.bool, device=zc_on_grid.device)
         # if fake token anywhere (sum with infinities stays infinity) in embedding, ignore it
         att_mask[(grid_stacked.sum(-1) == self.FAKE_TOKEN).unsqueeze(1)] = False
