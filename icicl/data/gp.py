@@ -240,7 +240,7 @@ class GPGroundTruthPredictor(GroundTruthPredictor):
             kxx = self.kernel.to(x.device)(x).evaluate()
 
         kxx += (
-            torch.eye(x.shape[-2], dtype=torch.float64).to(x.device)
+            torch.eye(x.shape[-2], dtype=torch.float64, device=x.device)
             * self.noise_std**2.0
         )
 
@@ -325,9 +325,9 @@ class MultitaskGPGroundThruthPredictor(GPGroundTruthPredictor):
         # labelling technically doesn't matter, as long as off grid context and target have same label.
         num_off_grid = batch.xc_off_grid.shape[-2]
         xc_labels = torch.concat((
-            torch.zeros(num_off_grid, 1),
-            torch.ones(xc.shape[-2] - num_off_grid, 1)), # to work when ignore_on_grid=True
-        ).to(xc.device).to(torch.long)
+            torch.zeros(num_off_grid, 1, dtype=torch.long, device=xc.device),
+            torch.ones(xc.shape[-2] - num_off_grid, 1, dtype=torch.long, device=xc.device)), # to work when ignore_on_grid=True
+        )
 
         # targets have to have one dimension less for exact GP!
         # can safely remove as generated data always had this as a 1-dimension anyway.

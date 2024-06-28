@@ -14,8 +14,9 @@ class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
     def __init__(
         self,
         *,
-        window_sizes: Tuple[int],
-        shift_sizes: Optional[Tuple[int]] = None,
+        window_sizes: Tuple[int, ...],
+        shift_sizes: Optional[Tuple[int, ...]] = None,
+        roll_dims: Optional[Tuple[int, ...]] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -26,6 +27,8 @@ class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
             self.shift_sizes = torch.as_tensor(shift_sizes)
         else:
             self.shift_sizes = self.window_sizes // 2
+        
+        self.roll_dims = roll_dims
 
     @check_shapes("x: [m, ..., d]", "mask: [m, ...]", "return: [m, ..., d]")
     def forward(
@@ -63,7 +66,9 @@ class SWINAttentionLayer(MultiHeadSelfAttentionLayer):
                 self.window_sizes,
                 self.shift_sizes,
                 grid_shape,
-            ).to(x)
+                roll_dims=self.roll_dims,
+                device=x.device,
+            )
         # Combine batch dimensions for efficient computation.
         mask = einops.repeat(self.mask, "nw ws1 ws2 -> (m nw) ws1 ws2", m=num_batches)
 
@@ -125,8 +130,10 @@ def swin_attention_mask(
     window_sizes: torch.Tensor,
     shift_sizes: torch.Tensor,
     grid_shape: torch.Tensor,
+    roll_dims: Optional[Tuple[int, ...]] = None,
+    device: str = "cpu",
 ):
-    img_mask = torch.ones((1, *grid_shape, 1))
+    img_mask = torch.ones((1, *grid_shape, 1), device=device)
 
     slices = [
         (
@@ -136,6 +143,13 @@ def swin_attention_mask(
         )
         for i in range(len(grid_shape))
     ]
+
+    if roll_dims is not None:
+        for dim in roll_dims:
+            slices[dim] = (
+                slice(0, -window_sizes[dim]),
+                slice(-window_sizes[dim], None),
+            )
 
     cnt = 0
     for slices_ in itertools.product(*slices):
