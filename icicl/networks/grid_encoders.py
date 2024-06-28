@@ -99,9 +99,8 @@ class PseudoTokenGridEncoder(nn.Module):
             grid_range: Optional[Tuple[Tuple[float, float], ...]] = None,
             points_per_unit: Optional[int] = None,
             num_latents: Optional[int] = None,
-            **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__()
         if grid_range is None or points_per_unit is None:
             assert isinstance(num_latents, int)
         else:
@@ -122,19 +121,31 @@ class PseudoTokenGridEncoder(nn.Module):
             zc_on_grid: torch.Tensor, 
             ignore_on_grid: bool
     ) -> torch.Tensor:
-        grid_shape = xc_on_grid.shape[1:-1]
+        grid_shape = torch.as_tensor(xc_on_grid.shape[1:-1], device=xc_on_grid.device)
         xc_on_grid = flatten_grid(xc_on_grid)
         zc_on_grid = flatten_grid(zc_on_grid)
 
         B, U, E = zc_off_grid.shape # 'U'nstructured
         S = zc_on_grid.shape[-2] # 'S'tructured
 
-        # TODO: there's a way of doing this which is linear, not quadratic.
-        # Index of closest grid point to each point.
-        # shape (B, U): for each off_grid, tell me index of closest on_grid in same batch
-        nearest_idx = (
-            (xc_off_grid[..., None, :] - xc_on_grid[:, None, ...]).abs().sum(dim=-1).argmin(dim=2)
+        # Quick calculation of nearest grid neighbour.
+        x_grid_min = xc_on_grid.amin(dim=(0, 1))
+        x_grid_max = xc_on_grid.amax(dim=(0, 1))
+        x_grid_spacing = (x_grid_max - x_grid_min) / (grid_shape - 1)
+
+        nearest_multi_idx = (xc_off_grid - x_grid_min + x_grid_spacing / 2) // x_grid_spacing
+        nearest_multi_idx = torch.max(
+            torch.min(nearest_multi_idx, grid_shape - 1), torch.zeros_like(grid_shape)
         )
+        strides = torch.flip(
+            torch.cumprod(
+                torch.cat((torch.ones((1,), device=grid_shape.device), grid_shape), dim=0),
+                dim=0,
+            )[:-1],
+            dims=(0,),
+        )
+        # (batch_size, U).
+        nearest_idx = (nearest_multi_idx * strides).sum(dim=-1).type(torch.int)
 
         # shape (B, U)
         # _batch_ first repeats batch number then increments, range first increments then repeats
@@ -153,11 +164,13 @@ class PseudoTokenGridEncoder(nn.Module):
 
         # create tensor with for each grid-token all nearest off-grid + itself in third axis
         grid_stacked = torch.full((B * S, max_patch, E), self.FAKE_TOKEN, device=zc_on_grid.device)
+
         # add nearest off the grid points to each on_the_grid point
         idx_shifter = torch.arange(0, B * S, S).repeat_interleave(U)
         grid_stacked[nearest_idx.flatten() + idx_shifter, cumcount_idx.flatten()] = (
              zc_off_grid[u_batch_idx.flatten(), u_range_idx.flatten()]
         )
+        
         if ignore_on_grid:
             # add learned 'mask out' embedding at the end. Done instead of masking out in att_mask,
             # since that could potentially make it mask out whole input which crashes attention
@@ -190,6 +203,4 @@ class PseudoTokenGridEncoder(nn.Module):
         zc = einops.rearrange(zc, "(b s) 1 e -> b s e", b=B)
 
         # return zc in original shape (b, ..., e)
-        return unflatten_grid(zc, grid_shape)
-    
-
+        return unflatten_grid(zc, tuple(grid_shape.tolist()))
