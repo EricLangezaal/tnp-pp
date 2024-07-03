@@ -25,10 +25,10 @@ def test_pt_grid_encoder(dim:int = 1, emb_dim=128):
     with torch.no_grad():
         layer = MultiHeadCrossAttentionLayer(embed_dim=emb_dim, num_heads=8, head_dim=16, feedforward_dim=emb_dim)
 
-        encoder = PseudoTokenGridEncoder(embed_dim=emb_dim, mhca_layer=layer,num_latents=8 ** dim)
+        encoder = PseudoTokenGridEncoder(embed_dim=emb_dim, mhca_layer=layer,grid_range=[[-1,1]]* dim, points_per_unit= 8 // 2)
 
-        out_current = encoder(x_off_grid, x_on_grid, z_off_grid, z_on_grid, ignore_on_grid=False)
-        out_old = old_pt_grid_encoder(layer, encoder.latents, x_off_grid, x_on_grid, z_off_grid, z_on_grid)
+        _, out_current = encoder(x_off_grid, x_on_grid, z_off_grid, z_on_grid, ignore_on_grid=False)
+        out_old = old_pt_grid_encoder(layer, encoder.latents.view(-1, emb_dim), x_off_grid, x_on_grid, z_off_grid, z_on_grid)
 
     assert torch.equal(out_current, out_old)
 
