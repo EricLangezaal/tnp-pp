@@ -24,7 +24,6 @@ from icicl.data.on_off_grid import OOTGBatch
 from icicl.models.base import ConditionalNeuralProcess, NeuralProcess, OOTGConditionalNeuralProcess
 from icicl.models.convcnp import GriddedConvCNP, GriddedConvCNPWithInputs
 from icicl.utils.batch import compress_batch_dimensions
-from icicl.utils.initialisation import weights_init
 
 
 class ModelCheckpointer:
@@ -321,6 +320,7 @@ def create_default_config() -> DictConfig:
                 "_target_": "icicl.utils.experiment_utils.np_pred_fn",
                 "_partial_": True,
             },
+            "num_workers": 1,
         }
     }
     return OmegaConf.create(default_config)
@@ -430,12 +430,8 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
                 torch.load(experiment.misc.resume_from_path, map_location="cpu"),
                 strict=True,
             )
-
-        else:
-            # Initialise model weights.
-            weights_init(experiment.model)
     else:
-        print("Did not initialise as not nn.Module.")
+        print("Did not initialise as nn.Module.")
 
     # Initialise wandb. Set logging: True if wandb logging needed.
     if experiment.misc.logging:

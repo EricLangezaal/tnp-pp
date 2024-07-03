@@ -1,6 +1,6 @@
 generators:
   train:
-    _target_: icicl.data.era5.OOTGEra5DataGenerator
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ./data/era5/
     fnames:
       - jan_2019_2m_temperature.nc
@@ -10,14 +10,13 @@ generators:
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
-    min_num_total: 100
-    t_spacing: 6
     use_time: False
     return_as_gridded: True
+    lazy_loading: True
     samples_per_epoch: 16_000
     batch_size: 16
   val:
-    _target_: icicl.data.era5.OOTGEra5DataGenerator
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ./data/era5/
     fnames:
       - jan_2019_2m_temperature.nc
@@ -27,11 +26,10 @@ generators:
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
-    min_num_total: 100
-    t_spacing: 6
     use_time: False
     return_as_gridded: True
-    samples_per_epoch: 4_000
+    lazy_loading: True
+    samples_per_epoch: 160
     batch_size: 16
 
 model:
@@ -130,9 +128,10 @@ params:
 
 
 misc:
-  project: era5-tnp
-  logging: False # TODO remove
+  project: era5-no-time-tnp
   name: mhca_encoder-swin-NoGrid=${params.ignore_on_grid}
+  num_workers: 0
   gradient_clip_val: 0.5
   plot_interval: 10
+  logging: False # TODO remove
   resume_from_checkpoint: null

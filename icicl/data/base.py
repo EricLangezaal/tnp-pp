@@ -51,7 +51,7 @@ class Batch:
         return self.__add__(b)
 
 
-class DataGenerator(ABC):
+class DataGenerator(torch.utils.data.IterableDataset, ABC):
     def __init__(
         self,
         *,
@@ -59,6 +59,7 @@ class DataGenerator(ABC):
         batch_size: int,
         deterministic: bool = False,
         deterministic_seed: int = 0,
+        **kwargs,
     ):
         """Base data generator, which can be used to derive other data generators,
         such as synthetic generators or real data generators.
@@ -67,6 +68,7 @@ class DataGenerator(ABC):
             samples_per_epoch: Number of samples per epoch.
             batch_size: Batch size.
         """
+        super().__init__(**kwargs)
 
         self.samples_per_epoch = samples_per_epoch
         self.batch_size = batch_size
@@ -74,7 +76,6 @@ class DataGenerator(ABC):
 
         # Set batch counter.
         self.batch_counter = 0
-
         self.deterministic = deterministic
         self.deterministic_seed = deterministic_seed
         self.batches = None

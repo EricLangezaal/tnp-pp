@@ -87,4 +87,5 @@ dependencies:
     - h5py==3.11.0
     - xarray==2024.3.0
     - cdsapi==0.7.0
+    - dask==2024.6.2
 prefix: /opt/homebrew/Caskroom/miniconda/base/envs/tnp

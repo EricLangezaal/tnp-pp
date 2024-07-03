@@ -1,4 +1,5 @@
 import lightning.pytorch as pl
+import torch
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
@@ -7,6 +8,7 @@ from plot_kolmogorov import plot_kolmogorov
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
+from icicl.utils.data import adjust_num_batches
 from icicl.utils.experiment_utils import initialize_experiment
 from icicl.utils.lightning_utils import LitWrapper
 
@@ -19,6 +21,19 @@ def main():
     gen_val = experiment.generators.val
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
+
+    train_loader = torch.utils.data.DataLoader(
+        gen_train,
+        num_workers=experiment.misc.num_workers,
+        batch_size=None,
+        worker_init_fn=adjust_num_batches,
+    )
+    val_loader = torch.utils.data.DataLoader(
+        gen_val,
+        num_workers=experiment.misc.num_workers,
+        batch_size=None,
+        worker_init_fn=adjust_num_batches,
+    )
 
     if isinstance(gen_val, ImageGenerator):
 
@@ -93,7 +108,9 @@ def main():
         accelerator="gpu",
     )
 
-    trainer.fit(model=lit_model, train_dataloaders=gen_train, val_dataloaders=gen_val)
+    trainer.fit(
+        model=lit_model, train_dataloaders=train_loader, val_dataloaders=val_loader
+    )
 
 
 if __name__ == "__main__":

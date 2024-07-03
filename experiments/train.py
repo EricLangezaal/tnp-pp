@@ -1,8 +1,11 @@
+import torch
+
 from plot import plot
 from plot_cru import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
+from icicl.utils.data import adjust_num_batches
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
@@ -23,12 +26,25 @@ def main():
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
 
+    train_loader = torch.utils.data.DataLoader(
+        gen_train,
+        num_workers=experiment.misc.num_workers,
+        batch_size=None,
+        worker_init_fn=adjust_num_batches,
+    )
+    val_loader = torch.utils.data.DataLoader(
+        gen_val,
+        num_workers=experiment.misc.num_workers,
+        batch_size=None,
+        worker_init_fn=adjust_num_batches,
+    )
+
     step = 0
     for epoch in range(epochs):
         model.train()
         step, train_result = train_epoch(
             model=model,
-            generator=gen_train,
+            generator=train_loader,
             optimiser=optimiser,
             step=step,
             loss_fn=experiment.misc.loss_fn,
@@ -40,7 +56,7 @@ def main():
             model=model, val_result=train_result, prefix="train_", update_last=True
         )
 
-        val_result, batches = val_epoch(model=model, generator=gen_val)
+        val_result, batches = val_epoch(model=model, generator=val_loader)
 
         evaluation_summary("val", val_result)
         checkpointer.update_best_and_last_checkpoint(
