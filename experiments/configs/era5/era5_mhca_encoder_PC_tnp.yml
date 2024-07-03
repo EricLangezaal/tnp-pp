@@ -1,3 +1,5 @@
+# So use MHCA Encoder to same grid, coarsen grid using patch embedding and no swin attention
+
 generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
@@ -46,8 +48,7 @@ tnpd_encoder:
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  grid_shape: [15, 30]
-  #grid_shape: ${eval:'[${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1]]'}
+  grid_shape: ${eval:'[${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1]]'}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
 
@@ -60,19 +61,15 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
-  swin_layer: ${swin_layer}
   num_layers: ${params.num_layers}
+  patch_encoder: ${patch_encoder}
 
-swin_layer:
-  _target_: icicl.networks.swin_attention.SWINAttentionLayer
-  window_sizes: ${params.window_sizes}
+patch_encoder:
+  _target_: icicl.networks.patch_encoders.PatchEncoder
   embed_dim: ${params.embed_dim}
-  num_heads: ${params.num_heads}
-  head_dim: ${params.head_dim}
-  feedforward_dim: ${params.embed_dim}
-  norm_first: ${params.norm_first}
+  patch_size: ${params.patch_size}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -115,7 +112,7 @@ params:
   x_dim: 2
   y_dim: 1
   batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
-  coarsen_factors: [12, 12] # so 60^2 grid points
+  coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 200
 
   embed_dim: 128
@@ -124,12 +121,12 @@ params:
   norm_first: True
   num_layers: 5
 
-  window_sizes: [5, 5]
+  patch_size: [4, 4]
 
 
 misc:
   project: era5-no-time
-  name: mhca_encoder-swin-BGS=${params.batch_grid_size}-CF=${params.coarsen_factors}-WS=${params.window_sizes}
+  name: mhca_encoder-PC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
   gradient_clip_val: 0.5
   plot_interval: 10
   logging: False # TODO remove
