@@ -20,7 +20,7 @@ class GriddedBatch(Batch):
     y_grid: torch.Tensor # grid of all data (batch, time, lat, lon, 1), time optional
 
     mc_grid: torch.Tensor # boolean mask for context points in that grid
-    mt_grid: torch.Tensor # boolean mask for context points in that grid
+    mt_grid: torch.Tensor # boolean mask for target points in that grid
     m_grid: torch.Tensor # boolean mask for both (if some data is unused I think?, can be all True)
 
 

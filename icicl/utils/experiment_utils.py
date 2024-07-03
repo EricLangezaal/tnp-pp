@@ -207,7 +207,7 @@ def train_epoch(
         loss.backward()
 
         if gradient_clip_val is not None:
-            nn.utils.clip_grad_norm(model.parameters(), gradient_clip_val)
+            nn.utils.clip_grad_norm_(model.parameters(), gradient_clip_val)
 
         optimiser.step()
 

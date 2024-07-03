@@ -29,18 +29,16 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_vit.OOTG_ViTEncoder
+  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-  dim: ${params.dim}
-  patch_size: ${params.patch_size}
-  embed_dim: ${params.embed_dim}
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
   embed_dim: ${params.embed_dim}
-  num_latents: 10000
+  grid_range: [[-1., 1.], [-1., 1.]]
+  points_per_unit: ${params.on_grid_per_dim}
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:
@@ -52,9 +50,15 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
+  patch_encoder: ${patch_encoder}
+
+patch_encoder:
+  _target_: icicl.networks.patch_encoders.PatchEncoder
+  embed_dim: ${params.embed_dim}
+  patch_size: ${params.patch_size}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -105,7 +109,7 @@ params:
   norm_first: True
   num_layers: 5
 
-  patch_size: 5
+  patch_size: [5, 5]
 
 
 misc:

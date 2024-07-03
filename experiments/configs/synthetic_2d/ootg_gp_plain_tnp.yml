@@ -71,7 +71,7 @@ grid_encoder:
   _target_: icicl.networks.grid_encoders.IdentityGridEncoder
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
 

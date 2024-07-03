@@ -29,7 +29,7 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_swin.OOTG_SwinEncoder
+  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
@@ -37,7 +37,8 @@ tnpd_encoder:
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
   embed_dim: ${params.embed_dim}
-  num_latents: 10000
+  grid_range: [[-1., 1.], [-1., 1.]]
+  points_per_unit: ${params.on_grid_per_dim}
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:
@@ -49,7 +50,7 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.models.ootg_swin.SWINTransformerEncoder
+  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
   mhca_layer: ${mhca_layer}
   swin_layer: ${swin_layer}
   num_layers: ${params.num_layers}

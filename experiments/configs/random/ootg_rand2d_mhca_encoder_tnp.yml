@@ -35,7 +35,8 @@ tnpd_encoder:
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
   embed_dim: ${params.embed_dim}
-  num_latents: 10000
+  grid_range: [[-1., 1.], [-1., 1.]]
+  points_per_unit: ${params.on_grid_per_dim}
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:
@@ -47,7 +48,7 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
 

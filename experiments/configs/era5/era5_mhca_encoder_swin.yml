@@ -41,14 +41,15 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_swin.OOTG_SwinEncoder
+  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  num_latents: ${eval:'${params.batch_grid_size}[1] // ${params.coarsen_factors}[0] * ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1]'}
+  grid_range: [[-1., 1.], [-1., 1.]]
+  points_per_unit: ${eval:'${params.batch_grid_size}[1] // ${params.coarsen_factors}[0]'} # TODO only works if coarsened grid is square
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
 
@@ -61,7 +62,7 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.models.ootg_swin.SWINTransformerEncoder
+  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
   mhca_layer: ${mhca_layer}
   swin_layer: ${swin_layer}
   num_layers: ${params.num_layers}
@@ -113,9 +114,9 @@ params:
   epochs: 200
   ignore_on_grid: False
 
-  x_dim: 3
-  y_dim: 2
-  batch_grid_size: [1, 720, 1440], # time, lat, lon. Exact 0.25° grid this way.
+  x_dim: 2
+  y_dim: 1
+  batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [12, 24] # so 60^2 grid points
   num_targets: 200
 

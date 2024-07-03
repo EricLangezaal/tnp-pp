@@ -62,7 +62,7 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_swin.OOTG_SwinEncoder
+  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
@@ -83,7 +83,7 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.models.ootg_swin.SWINTransformerEncoder
+  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
   mhca_layer: ${mhca_layer}
   swin_layer: ${swin_layer}
   num_layers: ${params.num_layers}

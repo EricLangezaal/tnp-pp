@@ -83,7 +83,7 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
 

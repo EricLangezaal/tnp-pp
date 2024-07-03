@@ -38,7 +38,7 @@ grid_encoder:
   init_lengthscale: ${eval:'2 * 1 / 8'}
 
 transformer_encoder:
-  _target_: icicl.networks.transformer.TNPDTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
 
