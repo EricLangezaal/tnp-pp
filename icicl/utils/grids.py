@@ -203,6 +203,19 @@ def nearest_gridded_neighbours(
     return nearest_idx
 
 
+def coarsen_grid(grid: torch.Tensor, coarsen_factors: Tuple[int, ...]) -> torch.Tensor:
+    grid = grid.movedim(-1, 1) # move data dim to channel location
+
+    coarse_grid = func_AvgPoolNd(
+        n=grid.ndim - 2, 
+        input=grid,
+        kernel_size=tuple(coarsen_factors), 
+        stride=tuple(coarsen_factors),
+    )
+    coarse_grid = coarse_grid.movedim(1, -1) # move embed dim back to the end
+    return coarse_grid
+
+
 def convNdModule(n: int, **kwargs) -> nn.Module:
     try:
         return (nn.Conv1d, nn.Conv2d, nn.Conv3d)[n - 1](**kwargs)

@@ -16,7 +16,7 @@ import xarray as xr
 
 from .base import Batch, DataGenerator
 from .on_off_grid import OOTGBatch
-from ..utils.grids import flatten_grid, func_AvgPoolNd
+from ..utils.grids import flatten_grid, coarsen_grid
 
 
 @dataclass
@@ -432,15 +432,3 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
 class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):
     # Confirmed this actually works.
     pass
-
-def coarsen_grid(grid: torch.Tensor, coarsen_factors: Union[Tuple[int, int], Tuple[int, int, int]]) -> torch.Tensor:
-    grid = grid.movedim(-1, 1) # move data dim to channel location
-
-    coarse_grid = func_AvgPoolNd(
-        n=grid.ndim - 2, 
-        input=grid,
-        kernel_size=coarsen_factors, 
-        stride=coarsen_factors
-    )
-    coarse_grid = coarse_grid.movedim(1, -1) # move embed dim back to the end
-    return coarse_grid

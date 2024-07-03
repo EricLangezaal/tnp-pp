@@ -9,7 +9,7 @@ from check_shapes import check_shapes
 from ..networks.attention_layers import MultiHeadCrossAttentionLayer
 from ..networks.attention import MultiHeadCrossAttention
 from ..utils.conv import compute_eq_weights
-from ..utils.grids import unflatten_grid, flatten_grid, make_grid_from_range, nearest_gridded_neighbours
+from ..utils.grids import unflatten_grid, flatten_grid, make_grid_from_range, nearest_gridded_neighbours, coarsen_grid
 
 class IdentityGridEncoder(nn.Module):
 
@@ -40,8 +40,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
         *,
         dim: int,
         init_lengthscale: float,
-        grid_range: Optional[Tuple[Tuple[float, float], ...]] = None,
-        points_per_dim: Optional[int] = None,
+        grid_shape: Optional[Tuple[int, ...]] = None,
     ):
         super().__init__() 
         init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=torch.float32)
@@ -49,10 +48,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
             (init_lengthscale.clone().detach().exp() - 1).log(),
             requires_grad=True,
         )
-        self.grid = None
-        if grid_range is not None:
-            assert isinstance(points_per_dim, int)
-            self.grid = make_grid_from_range(grid_range, points_per_dim)
+        self.grid_shape = None if grid_shape is None else torch.as_tensor(grid_shape)
 
     @property
     def lengthscale(self):
@@ -73,13 +69,19 @@ class SetConvGridEncoder(IdentityGridEncoder):
         ignore_on_grid: bool
     ) -> torch.Tensor:
         
-        if self.grid is None:
+        if self.grid_shape is None:
             x_grid = xc_on_grid
             z_grid = setconv_to_grid(xc_off_grid, zc_off_grid, x_grid, self.lengthscale,
                                        zc_on_grid if not ignore_on_grid else None)
         else:
             xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, ignore_on_grid)
-            x_grid = self.grid.expand(xc.shape[0], *self.grid.shape)
+
+            grid_shape = torch.as_tensor(xc_on_grid.shape[1:-1])
+            assert torch.all(grid_shape % self.grid_shape == 0), (
+                "cannot properly coarsen incoming grid to match pseudo-grid."
+                )
+            x_grid = coarsen_grid(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
+
             z_grid = setconv_to_grid(xc, zc, x_grid, self.lengthscale)
         return x_grid, z_grid
     
@@ -124,12 +126,20 @@ class PseudoTokenGridEncoder(nn.Module):
             *,
             embed_dim: int,
             mhca_layer: Union[MultiHeadCrossAttentionLayer, MultiHeadCrossAttention],
-            grid_range: Tuple[Tuple[float, float], ...],
-            points_per_unit: int,
+            grid_shape: Optional[Tuple[int, ...]] = None, 
+            grid_range: Optional[Tuple[Tuple[float, float], ...]] = None,
+            points_per_unit: Optional[int] = None,
     ):
         super().__init__()
-        self.grid = make_grid_from_range(grid_range, points_per_unit)
-        self.latents = nn.Parameter(torch.randn(*self.grid.shape[:-1], embed_dim))
+        self.grid_shape = grid_shape
+        if self.grid_shape is None:
+            assert grid_range is not None and points_per_unit is not None, (
+                "either specify a grid_shape or a grid_range and points_per_unit."
+            )
+            self.grid_shape = make_grid_from_range(grid_range, points_per_unit).shape[:-1]
+
+        self.latents = nn.Parameter(torch.randn(*self.grid_shape, embed_dim))
+        self.grid_shape = torch.as_tensor(self.grid_shape)
 
         self.fake_embedding = nn.Parameter(torch.randn(embed_dim))
         self.mhca_layer = mhca_layer
@@ -146,10 +156,10 @@ class PseudoTokenGridEncoder(nn.Module):
             zc_on_grid: torch.Tensor, 
             ignore_on_grid: bool
     ) -> torch.Tensor:
-        grid_shape = xc_on_grid.shape[1:-1]
+        grid_shape = torch.as_tensor(xc_on_grid.shape[1:-1])
         latents = self.latents.expand(xc_on_grid.shape[0], *self.latents.shape)
 
-        if grid_shape == self.grid.shape[:-1]:
+        if torch.equal(grid_shape, self.grid_shape):
             # do not coarsen grid.
             z_grid = mhca_to_grid(
                 x=xc_off_grid, 
@@ -166,7 +176,11 @@ class PseudoTokenGridEncoder(nn.Module):
             # coarsen grid by having smaller pseudogrid for neighbour mhca
             xc = torch.cat((xc_off_grid, flatten_grid(xc_on_grid)), dim=-2)
             zc = torch.cat((zc_off_grid, flatten_grid(zc_on_grid)), dim=-2)
-            x_grid = self.grid.expand(xc.shape[0], *self.grid.shape)
+
+            assert torch.all(grid_shape % self.grid_shape == 0), (
+                "cannot properly coarsen incoming grid to match pseudo-grid."
+                )
+            x_grid = coarsen_grid(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
             z_grid = mhca_to_grid(
                 x=xc, 
                 z=zc, 
