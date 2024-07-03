@@ -165,7 +165,7 @@ def unflatten_grid(
 def nearest_gridded_neighbours(
     x: torch.Tensor, x_grid: torch.Tensor, k: int = 1
 ) -> torch.Tensor:
-    grid_shape = torch.as_tensor(x_grid.shape[1:-1])
+    grid_shape = torch.as_tensor(x_grid.shape[1:-1]).to(x.device)
     x_grid_flat = flatten_grid(x_grid)
 
     # Quick calculation of nearest grid neighbour.
