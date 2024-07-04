@@ -1,7 +1,7 @@
 import lightning.pytorch as pl
 import torch
 from plot import plot
-from experiments.plot_globe import plot_globe
+from plot_globe import plot_globe
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 

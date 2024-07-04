@@ -194,7 +194,8 @@ def nearest_gridded_neighbours(
                 ),
                 repeat=dim_x,
             )
-        )
+        ),
+        device=x.device,
     ).float()
 
     # Reshape and expand the base grid

@@ -4,7 +4,7 @@ generators:
   train:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
     num_off_grid_context: ${params.num_off_the_grid}
-    num_on_grid_per_dim: ${params.on_grid_per_dim}
+    grid_shape: ${params.grid_shape}
     num_targets: ${params.num_off_the_grid}
     dim: ${params.dim}
     samples_per_epoch: 16000
@@ -13,7 +13,7 @@ generators:
   val:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
     num_off_grid_context: ${params.num_off_the_grid}
-    num_on_grid_per_dim: 2
+    grid_shape: ${params.grid_shape}
     num_targets: ${params.num_off_the_grid}
     dim: ${params.dim}
     samples_per_epoch: 4000
@@ -82,7 +82,7 @@ params:
   ignore_on_grid: False
 
   dim: 2
-  on_grid_per_dim: 100 # (so 10k)
+  grid_shape: [120, 240]
   num_off_the_grid: 32
 
   embed_dim: 128
