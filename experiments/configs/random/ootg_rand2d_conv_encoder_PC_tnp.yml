@@ -33,6 +33,7 @@ tnpd_encoder:
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
+  patch_encoder: ${patch_encoder}
 
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
@@ -43,7 +44,6 @@ transformer_encoder:
   _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
-  patch_encoder: ${patch_encoder}
 
 patch_encoder:
   _target_: icicl.networks.patch_encoders.PatchEncoder

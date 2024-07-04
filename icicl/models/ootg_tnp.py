@@ -21,6 +21,7 @@ class OOTG_TNPDEncoder(nn.Module):
             xy_encoder: nn.Module,
             x_encoder: nn.Module = nn.Identity(),
             y_encoder: nn.Module = nn.Identity(),
+            patch_encoder: nn.Module = nn.Identity(),
     ):
         super().__init__()
 
@@ -32,6 +33,8 @@ class OOTG_TNPDEncoder(nn.Module):
         self.xy_encoder = xy_encoder
         self.x_encoder = x_encoder
         self.y_encoder = y_encoder
+
+        self.patch_encoder = patch_encoder
 
     @check_shapes(
         "xc_off_grid: [b, n, dx]", "yc_off_grid: [b, n, dy]", "xc_on_grid: [b, ..., dx]", "yc_on_grid: [b, ..., dy]", "xt: [b, nt, dx]"
@@ -69,6 +72,8 @@ class OOTG_TNPDEncoder(nn.Module):
         # merge ON grid context x and y and encode it
         zc_on_grid = torch.cat((xc_grid_encoded, yc_grid_encoded), dim=-1)
         zc_on_grid = self.xy_encoder(zc_on_grid)
+        # TODO remove again?
+        zc_on_grid = self.patch_encoder(zc_on_grid)
 
         # merge OFF grid TARGET x and y and encode it
         zt = torch.cat((xt_encoded, yt_encoded), dim=-1)
