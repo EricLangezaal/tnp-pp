@@ -5,17 +5,19 @@ generators:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ~/rds/hpc-work/data/era5/
     fnames:
-      - jan_2019_2m_temperature.nc
+      - 2019_2m_temperature.nc
     data_vars: ["t2m"]
     min_pc: 0.0001
     max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
+    y_mean: [279.0644808446564] # calculated previously
+    y_std: [21.169963472302797]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
     return_grid: True
     lazy_loading: False
-    samples_per_epoch: 160
+    samples_per_epoch: 16_000
     batch_size: 16
     deterministic: ${params.deterministic}
   val:
@@ -36,7 +38,7 @@ generators:
     batch_size: 16
     deterministic: ${params.deterministic}
     
- model:
+model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD
   encoder: ${tnpd_encoder}
   decoder: ${tnpd_decoder}
@@ -51,7 +53,7 @@ tnpd_encoder:
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  grid_shape: ${eval:'[${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1]]'}
+  grid_shape: [30, 60] # (720 / 6 / 4, 1440 / 6 / 4)
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
 

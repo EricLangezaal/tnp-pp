@@ -438,17 +438,17 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
         yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
         
-        xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
-        yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
+        #xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
+        #yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
         # NOTE: order here is different from synthetic.
-        x = torch.cat((xc, batch.xt), dim=-2)
-        y = torch.cat((yc, batch.yt), dim=-2)
+        #x = torch.cat((xc, batch.xt), dim=-2)
+        #y = torch.cat((yc, batch.yt), dim=-2)
 
         return OOTGBatch(
-           x=x,
-           y=y,
-           xc=xc,
-           yc=yc,
+           x=None, # can safely set these to None, might save memory.
+           y=None,
+           xc=None,
+           yc=None,
            xt=batch.xt,
            yt=batch.yt,
            xc_on_grid=xc_on_grid,
