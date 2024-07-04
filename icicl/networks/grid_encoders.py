@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, Callable
 
 import torch
 from torch import nn
@@ -41,6 +41,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
         dim: int,
         init_lengthscale: float,
         grid_shape: Optional[Tuple[int, ...]] = None,
+        coarsen_fn: Callable = coarsen_grid,
     ):
         super().__init__() 
         init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=torch.float32)
@@ -49,6 +50,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
             requires_grad=True,
         )
         self.grid_shape = None if grid_shape is None else torch.as_tensor(grid_shape)
+        self.coarsen_fn = coarsen_fn
 
     @property
     def lengthscale(self):
@@ -80,7 +82,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
             assert torch.all(grid_shape % self.grid_shape == 0), (
                 "cannot properly coarsen incoming grid to match pseudo-grid."
                 )
-            x_grid = coarsen_grid(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
+            x_grid = self.coarsen_fn(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
 
             z_grid = setconv_to_grid(xc, zc, x_grid, self.lengthscale)
         return x_grid, z_grid
@@ -129,6 +131,7 @@ class PseudoTokenGridEncoder(nn.Module):
             grid_shape: Optional[Tuple[int, ...]] = None, 
             grid_range: Optional[Tuple[Tuple[float, float], ...]] = None,
             points_per_unit: Optional[int] = None,
+            coarsen_fn: Callable = coarsen_grid,
     ):
         super().__init__()
         self.grid_shape = grid_shape
@@ -140,6 +143,7 @@ class PseudoTokenGridEncoder(nn.Module):
 
         self.latents = nn.Parameter(torch.randn(*self.grid_shape, embed_dim))
         self.grid_shape = torch.as_tensor(self.grid_shape)
+        self.coarsen_fn = coarsen_fn
 
         self.fake_embedding = nn.Parameter(torch.randn(embed_dim))
         self.mhca_layer = mhca_layer
@@ -180,7 +184,7 @@ class PseudoTokenGridEncoder(nn.Module):
             assert torch.all(grid_shape % self.grid_shape == 0), (
                 "cannot properly coarsen incoming grid to match pseudo-grid."
                 )
-            x_grid = coarsen_grid(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
+            x_grid = self.coarsen_fn(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
             z_grid = mhca_to_grid(
                 x=xc, 
                 z=zc, 
@@ -210,7 +214,8 @@ def mhca_to_grid(
     S = x_grid_flat.shape[-2] # 'S'tructured
 
     # Quick calculation of nearest grid neighbour.
-    nearest_idx = nearest_gridded_neighbours(x, x_grid, k=1)[..., 0]
+    nearest_idx, _ = nearest_gridded_neighbours(x, x_grid, k=1)
+    nearest_idx = nearest_idx[..., 0]
 
     # shape (B, U)
     # _batch_ first repeats batch number then increments, range first increments then repeats

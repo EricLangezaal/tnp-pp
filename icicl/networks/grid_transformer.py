@@ -12,7 +12,7 @@ from .transformer import _get_clones
 from .patch_encoders import PatchEncoder
 from .transformer import TNPDTransformerEncoder
 
-from ..utils.grids import nearest_gridded_neighbours, flatten_grid, unflatten_grid
+from ..utils.grids import nearest_gridded_neighbours, flatten_grid, unflatten_grid, func_AvgPoolNd
 
 class SWINTransformerEncoder(nn.Module):
     def __init__(
@@ -51,41 +51,49 @@ class SWINTransformerEncoder(nn.Module):
 
         if self.patch_encoder is not None:
             zc = self.patch_encoder(zc)
-            xc = self.patch_encoder.average_input_locations(xc)
+            
+            xc = func_AvgPoolNd(
+                dim=xc.shape[-1],
+                input=xc.movedims(-1, 1),
+                kernel_size=self.patch_encoder.conv.kernel_size,
+                stride=self.patch_encoder.conv.stride,
+            )
+            xc = xc.movedims(-1, 1)
 
         for swin_layer, mhca_layer in zip(self.swin_layers, self.mhca_layers):
             zc = swin_layer(zc)
+            grid_shape = zc.shape[1:-1]
 
             if self.top_k_ctot is not None:
                 num_batches, nt = zt.shape[:2]
 
                 # (batch_size, n, k).
-                nearest_idx = nearest_gridded_neighbours(xt, xc, k=self.top_k_ctot)
+                nearest_idx, mask = nearest_gridded_neighbours(xt, xc, k=self.top_k_ctot)
 
-                zc, flat_to_grid_fn = flatten_grid(zc)
+                zc = flatten_grid(zc)
                 batch_idx = (
                     torch.arange(num_batches)
                     .unsqueeze(-1)
                     .unsqueeze(-1)
-                    .repeat(1, nt, self.top_k_ctot)
+                    .repeat(1, nt, nearest_idx.shape[-1])
                 )
                 nearest_zc = zc[
                     batch_idx,
                     nearest_idx,
                 ]
-                zc = flat_to_grid_fn(zc)
+                zc = unflatten_grid(zc, grid_shape)
 
                 # Rearrange tokens.
                 zt = einops.rearrange(zt, "b n e -> (b n) 1 e")
                 nearest_zc = einops.rearrange(nearest_zc, "b n k e -> (b n) k e")
+                mask = einops.rearrange(mask, "b n e -> (b n) 1 e")
 
                 # Do the MHCA operation, reshape and return.
-                zt = mhca_layer(zt, nearest_zc)
+                zt = mhca_layer(zt, nearest_zc, mask=mask)
 
                 zt = einops.rearrange(zt, "(b n) 1 e -> b n e", b=num_batches)
             else:
                 # Flatten xc before cross-attending.
-                grid_shape = zc.shape[1:-1]
                 zc = flatten_grid(zc)
                 zt = mhca_layer(zt, zc)
                 zc = unflatten_grid(zc, grid_shape)

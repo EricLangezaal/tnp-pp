@@ -3,7 +3,7 @@ from typing import Tuple
 
 import torch
 from check_shapes import check_shapes
-from ..utils.grids import convNdModule, func_convNd
+from ..utils.grids import convNdModule
 from torch import nn
 
 
@@ -43,32 +43,6 @@ class PatchEncoder(nn.Module):
         x = x.movedim(-1, 1)
         x = self.conv(x)
         # move 'channels' (i.e embed_dim) to end again for shape  (b, n1/p1, n2/p2, ..., ndim/pdim, e)
-        x = x.movedim(1, -1)
-
-        return x
-
-    @check_shapes(
-        "x: [m, ..., d]",
-        "return: [m, ..., d]",
-    )
-    def average_input_locations(
-        self,
-        x: torch.Tensor,
-    ) -> torch.Tensor:
-
-        grid_shape = torch.as_tensor(x.shape[1:-1])
-        assert torch.all(
-            grid_shape % torch.as_tensor(self.conv.kernel_size) == 0
-        ), "Kernel size does not divide grid."
-
-        # Average input locations within each patch.
-        dim = len(grid_shape)
-        kernel = torch.ones_like(self.conv.weight[:dim, 1]) / math.prod(
-            self.conv.kernel_size
-        )
-
-        x = x.movedim(-1, 1)
-        x = func_convNd(dim, x, kernel, stride=self.conv.stride, groups=dim)
         x = x.movedim(1, -1)
 
         return x

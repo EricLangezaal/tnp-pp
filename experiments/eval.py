@@ -1,7 +1,7 @@
 import lightning.pytorch as pl
 import torch
 from plot import plot
-from experiments.plot_globe import plot_cru
+from experiments.plot_globe import plot_globe
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
@@ -42,11 +42,11 @@ def main():
                 logging=experiment.misc.logging,
             )
         elif isinstance(gen_test, CRUDataGenerator) or isinstance(gen_test, ERA5DataGenerator):
-            plot_cru(
+            plot_globe(
                 model=model,
                 batches=batches,
-                x_mean=gen_test.x_mean,
-                x_std=gen_test.x_std,
+                x_mean=gen_test.x_mean if isinstance(gen_test, CRUDataGenerator) else None,
+                x_std=gen_test.x_std if isinstance(gen_test, CRUDataGenerator) else None,
                 y_mean=gen_test.y_mean,
                 y_std=gen_test.y_std,
                 num_fig=min(experiment.misc.num_plots, len(batches)),
@@ -130,7 +130,7 @@ def main():
             name=f"test/{eval_name}",
         )
     elif isinstance(gen_test, CRUDataGenerator):
-        plot_cru(
+        plot_globe(
             model=model,
             batches=batches,
             x_mean=gen_test.x_mean,

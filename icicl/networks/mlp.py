@@ -62,3 +62,35 @@ class MLP(nn.Module):
         x = self.net(x)
         x = uncompress(x)
         return x
+    
+
+class MLPWithEmbedding(MLP):
+    def __init__(
+        self,
+        embedding: nn.Module,
+        ignore_dims: Optional[Tuple[int, ...]] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.embedding = embedding
+        self.ignore_dims = ignore_dims
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.ignore_dims is not None:
+            active_dims = [
+                dim for dim in range(x.shape[-1]) if dim not in self.ignore_dims
+            ]
+            x_ignore = x[..., self.ignore_dims]
+            x_active = x[..., active_dims]
+        else:
+            x_ignore = None
+            x_active = x
+
+        out = self.embedding(x_active)
+        out = super().forward(out)
+
+        if x_ignore is not None:
+            out = torch.cat((x_ignore, out), dim=-1)
+
+        return out

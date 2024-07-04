@@ -1,4 +1,5 @@
 from typing import Tuple, Optional
+import itertools
 import math
 
 from check_shapes import check_shapes 
@@ -160,47 +161,114 @@ def unflatten_grid(
 @check_shapes(
     "x: [m, n, dx]",
     "x_grid: [m, ..., dx]",
-    "return: [m, n, k]",
+    "return[0]: [m, n, k]",
+    "return[1]: [m, n, k]",
 )
 def nearest_gridded_neighbours(
-    x: torch.Tensor, x_grid: torch.Tensor, k: int = 1
-) -> torch.Tensor:
-    grid_shape = torch.as_tensor(x_grid.shape[1:-1]).to(x.device)
+    x: torch.Tensor,
+    x_grid: torch.Tensor,
+    k: int = 1,
+    roll_dims: Optional[Tuple[int, ...]] = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    grid_shape = torch.as_tensor(x_grid.shape[1:-1], device=x.device)
     x_grid_flat = flatten_grid(x_grid)
+
+    # Get number of neighbors along each dimension.
+    dim_x = x.shape[-1]
+    num_grid_spacings = math.ceil(k ** (1 / dim_x))
 
     # Quick calculation of nearest grid neighbour.
     x_grid_min = x_grid_flat.amin(dim=(0, 1))
     x_grid_max = x_grid_flat.amax(dim=(0, 1))
     x_grid_spacing = (x_grid_max - x_grid_min) / (grid_shape - 1)
 
-    if k == 1:
-        nearest_multi_idx = (x - x_grid_min + x_grid_spacing / 2) // x_grid_spacing
+    nearest_multi_idx = (x - x_grid_min + x_grid_spacing / 2) // x_grid_spacing
+
+    # Generate a base grid for combinations of grid_spacing offsets from main neighbor.
+    base_grid = torch.tensor(
+        list(
+            itertools.product(
+                torch.arange(
+                    -num_grid_spacings // 2 + num_grid_spacings % 2,
+                    num_grid_spacings // 2 + 1,
+                ),
+                repeat=dim_x,
+            )
+        )
+    ).float()
+
+    # Reshape and expand the base grid
+    base_grid = base_grid.view(1, 1, -1, dim_x).expand(
+        *nearest_multi_idx.shape[:-1], -1, -1
+    )
+    # Expand the indices of nearest neighbors to account for more than 1.
+    nearest_multi_idx_expanded = nearest_multi_idx.unsqueeze(2).expand(
+        -1, -1, (num_grid_spacings + 1 - num_grid_spacings % 2) ** dim_x, -1
+    )
+    # Generate all combinations by adding the offsets to the main neighbor.
+    nearest_multi_idx = nearest_multi_idx_expanded + base_grid
+
+    # If not rolling_dims, do not allow neighbors to go off-grid.
+    # Otherwise, roll the grid along the specified dimension.
+    if roll_dims is None:
         nearest_multi_idx = torch.max(
             torch.min(nearest_multi_idx, grid_shape - 1), torch.zeros_like(grid_shape)
-        )
-        strides = torch.flip(
-            torch.cumprod(
-                torch.cat(
-                    (torch.ones((1,), device=grid_shape.device), grid_shape), dim=0
-                ),
-                dim=0,
-            )[:-1],
-            dims=(0,),
-        )
-        # (batch_size, n).
+        ).squeeze(-2)
+    else:
+        nearest_multi_idx = torch.cat(
+            [
+                (
+                    torch.max(
+                        torch.min(nearest_multi_idx[..., i], grid_shape[i] - 1),
+                        torch.tensor(0),
+                    ).unsqueeze(-1)
+                    if (i not in roll_dims)
+                    else (nearest_multi_idx[..., i] % grid_shape[i]).unsqueeze(-1)
+                )
+                for i in range(len(grid_shape))
+            ],
+            dim=-1,
+        ).squeeze(-2)
+
+    # Get strides.
+    strides = torch.flip(
+        torch.cumprod(
+            torch.cat((torch.ones((1,), device=grid_shape.device), grid_shape), dim=0),
+            dim=0,
+        )[:-1],
+        dims=(0,),
+    )
+
+    # (batch_size, nt, num_neighbors).
+    if k == 1:
         nearest_idx = (
             (nearest_multi_idx * strides).sum(dim=-1).type(torch.int).unsqueeze(-1)
         )
-
     else:
-        # Method 1
-        dists = (x[..., None, :] - x_grid_flat[:, None, ...]).abs().sum(dim=-1)
-        nearest_idx = torch.topk(dists, k=k, dim=2, largest=False).indices
+        nearest_idx = (
+            (nearest_multi_idx * strides).sum(dim=-1).type(torch.int).unsqueeze(-1)
+        ).squeeze(-1)
 
-        # Method 2
-        # dists = torch.cdist(x, x_grid_flat, p=1)
-        # nearest_idx = torch.topk(dists, k=k, dim=2, largest=False).indices
-    return nearest_idx
+    if k != 1:
+        # Get mask for MHCA.
+        mask = torch.ones_like(nearest_idx, dtype=torch.bool)
+
+        # Sort nearest_idx.
+        sorted_nearest_idx, indices = torch.sort(nearest_idx, dim=-1, stable=True)
+
+        # Find first occurence where consecutive elements are different.
+        first_occurrence = torch.ones_like(sorted_nearest_idx, dtype=torch.bool)
+        first_occurrence[..., 1:] = (
+            sorted_nearest_idx[..., 1:] != sorted_nearest_idx[..., :-1]
+        )
+
+        # Back to the original shape.
+        original_indices = torch.argsort(indices, dim=-1)
+        mask = torch.gather(first_occurrence, dim=-1, index=original_indices)
+    else:
+        mask = None
+
+    return nearest_idx, mask
 
 
 def coarsen_grid(grid: torch.Tensor, coarsen_factors: Tuple[int, ...]) -> torch.Tensor:

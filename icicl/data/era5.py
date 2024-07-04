@@ -33,19 +33,18 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         fnames: Optional[List[str]] = None,
         gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2",
         date_range: Tuple[str, str] = ("2019-01-01", "2019-12-31"),
-        lat_range: Tuple[float, float] = (90.0, -90.0),
-        lon_range: Tuple[float, float] = (0.0, 360.0),
+        lat_range: Tuple[float, float] = (-90.0, 90.0),
+        lon_range: Tuple[float, float] = (-180.0, 180.0),
         batch_grid_size: Tuple[int, int, int],
         min_num_batch: int = 1,
         ref_date: str = "2000-01-01",
-        data_vars: List[str] = ["t2m"],
+        data_vars: Tuple[str] = ("t2m",),
         t_spacing: int = 1,
         use_time: bool = True,
-        x_mean: Optional[Tuple[float, ...]] = None,
-        x_std: Optional[Tuple[float, ...]] = None,
         y_mean: Optional[Tuple[float, ...]] = None,
         y_std: Optional[Tuple[float, ...]] = None,
         lazy_loading: bool = True,
+        wrap_longitude: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -62,14 +61,20 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
                 consolidated=True,
             )
 
-        dataset = dataset.sel(
-            time=slice(*date_range),
-            latitude=slice(*lat_range),
-            longitude=slice(*lon_range),
-        )
+        # Ensure longitudes and latitudes are in standard format.
+        if dataset["longitude"].max() > 180:
+            dataset = dataset.assign_coords(longitude=dataset["longitude"].values - 180)
+        if dataset["latitude"].max() > 90:
+            dataset = dataset.assign_coords(latitude=dataset["latitude"].values - 90)
 
-        data_vars = list(data_vars)
-        dataset = dataset[data_vars]
+        dataset = dataset.sel(
+            latitude=slice(*sorted(lat_range, reverse=True)),
+            longitude=slice(*sorted(lon_range)),
+        )
+        if use_time:
+            dataset = dataset.sel(time=slice(*sorted(date_range)))
+
+        dataset = dataset[list(data_vars)]
 
         # Change time to hours since reference time.
         ref_datetime = datetime.strptime(ref_date, "%Y-%m-%d")
@@ -106,20 +111,16 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         else:
             self.input_vars = ["time", "latitude", "longitude"]
 
-        # Assign means and stds.
-        if x_mean is None or x_std is None:
-            x_mean = tuple(self.data[k][:].mean().item() for k in self.input_vars)
-            x_std = tuple(self.data[k][:].std().item() for k in self.input_vars)
-
         if y_mean is None or y_std is None:
             warnings.warn("Computing mean and standard deviation of observations.")
             y_mean = tuple(self.data[k][:].mean().values.item() for k in self.data_vars)
             y_std = tuple(self.data[k][:].std().values.item() for k in self.data_vars)
 
-        self.x_mean = torch.as_tensor(x_mean, dtype=torch.float)
-        self.x_std = torch.as_tensor(x_std, dtype=torch.float)
         self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
         self.y_std = torch.as_tensor(y_std, dtype=torch.float)
+
+        # Whether we allow batches to wrap around longitudinally.
+        self.wrap_longitude = wrap_longitude and len(self.data["longitude"]) == 1440
 
     def sample_idx(self, batch_size: int) -> List[Tuple[List, List, List]]:
         """Samples indices used to sample dataframe.
@@ -130,8 +131,33 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         Returns:
             Tuple[List, List, List]: Indicies.
         """
-        # Keep sampling locations until one with enough non-missing values.
-        # Must keep location the same across batch as missing values vary.
+        # TODO: if using same location for each batch, let lat_idx starting index extend
+        # to len(self.data["latitude"]) and truncate grid size.
+        if len(self.data["latitude"]) >= self.batch_grid_size[1]:
+            i = random.randint(0, len(self.data["latitude"]) - self.batch_grid_size[1])
+            lat_idx = list(range(i, i + self.batch_grid_size[1]))
+        else:
+            raise ValueError("Grid size is too large!")
+
+        # Allow longitude to wrap around.
+        if len(self.data["longitude"]) == self.batch_grid_size[2]:
+            lon_idx = list(range(len(self.data["longitude"])))
+
+        elif (
+            len(self.data["longitude"]) > self.batch_grid_size[2]
+            and self.wrap_longitude
+        ):
+            i = random.randint(0, len(self.data["longitude"]))
+            lon_idx = list(range(i, i + self.batch_grid_size[2]))
+            lon_idx = [idx % len(self.data["longitude"]) for idx in lon_idx]
+        elif len(self.data["longitude"]) > self.batch_grid_size[2]:
+            i = random.randint(0, len(self.data["longitude"] - self.batch_grid_size[2]))
+            lon_idx = list(range(i, i + self.batch_grid_size[2]))
+        else:
+            raise ValueError("Grid size is too large!")
+
+
+
         if self.batch_grid_size[1] > len(self.data["latitude"]) or (
             self.batch_grid_size[2] > len(self.data["longitude"])
         ):
@@ -235,8 +261,6 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         if not self.use_time:
             y_grid = y_grid.squeeze(1)
 
-        # Normalise inputs and outputs.
-        x_grid = (x_grid - self.x_mean) / self.x_std
         y_grid = (y_grid - self.y_mean) / self.y_std
 
         # Assumes same masking pattern for each grid.
@@ -324,8 +348,7 @@ class ERA5DataGeneratorFRF(ERA5DataGenerator):
         if not self.use_time:
             y_grid = y_grid.squeeze(1)
 
-        # Normalise inputs and outputs.
-        x_grid = (x_grid - self.x_mean) / self.x_std
+        # Normalise outputs.
         y_grid = (y_grid - self.y_mean) / self.y_std
 
         # Construct context mask using receptive field.
@@ -409,8 +432,9 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         batch = super().generate_batch(batch_shape)
         assert isinstance(batch, GriddedBatch), "batch must be gridded."
 
-        xc_on_grid = coarsen_grid(batch.x_grid, self.coarsen_factors)
-        yc_on_grid = coarsen_grid(batch.y_grid, self.coarsen_factors) 
+        # NOTE this modified batch.x_grid in place, so if we need it separately we need to clone it.
+        xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
+        yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
         
         xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
         yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
@@ -435,3 +459,40 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
 class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):
     # Confirmed this actually works.
     pass
+
+def coarsen_grid_era5(
+    grid: torch.Tensor,
+    coarsen_factors: Tuple[int, ...],
+    wrap_longitude: bool = False,
+    lon_dim: int = -1,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    if wrap_longitude:
+        lon_min = grid[..., 0, 0, lon_dim].clone()
+        grid = recenter_latlon_grid(grid, lon_dim)
+
+    coarse_grid = coarsen_grid(grid, coarsen_factors)
+
+    if wrap_longitude:
+        # Undo operations.
+        coarse_grid[..., lon_dim] = coarse_grid[..., lon_dim] + lon_min[..., None, None]
+        coarse_grid[..., lon_dim] = torch.where(
+            coarse_grid[..., lon_dim] >= 180,
+            coarse_grid[..., lon_dim] - 360,
+            coarse_grid[..., lon_dim],
+        )
+
+    return coarse_grid
+
+def recenter_latlon_grid(grid: torch.Tensor, lon_dim: int = -1):
+    # Assumes first index contains smallest longitude value.
+    lon_min = grid[..., 0, lon_dim]
+
+    grid[..., lon_dim] = torch.where(
+        (grid[..., lon_dim] - lon_min[..., None]) < 0,
+        (grid[..., lon_dim]) + 360,
+        grid[..., lon_dim],
+    )
+
+    grid[..., lon_dim] = grid[..., lon_dim] - lon_min[..., None]
+    return grid

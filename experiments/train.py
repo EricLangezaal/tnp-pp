@@ -1,7 +1,7 @@
 import torch
 
 from plot import plot
-from experiments.plot_globe import plot_cru
+from experiments.plot_globe import plot_globe
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
@@ -73,11 +73,11 @@ def main():
                     name=f"epoch-{epoch:04d}",
                 )
             elif isinstance(gen_train, CRUDataGenerator) or isinstance(gen_train, ERA5DataGenerator):
-                plot_cru(
+                plot_globe(
                     model=model,
                     batches=batches,
-                    x_mean=gen_val.x_mean,
-                    x_std=gen_val.x_std,
+                    x_mean=gen_val.x_mean if isinstance(gen_train, CRUDataGenerator) else None,
+                    x_std=gen_val.x_std if isinstance(gen_train, CRUDataGenerator) else None,
                     y_mean=gen_val.y_mean,
                     y_std=gen_val.y_std,
                     num_fig=min(5, len(batches)),
