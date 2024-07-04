@@ -1,11 +1,12 @@
 import torch
 
 from plot import plot
-from plot_cru import plot_cru
+from experiments.plot_globe import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
 from icicl.utils.data import adjust_num_batches
+from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.cru import CRUDataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
@@ -71,7 +72,7 @@ def main():
                     num_fig=min(5, len(batches)),
                     name=f"epoch-{epoch:04d}",
                 )
-            elif isinstance(gen_train, CRUDataGenerator):
+            elif isinstance(gen_train, CRUDataGenerator) or isinstance(gen_train, ERA5DataGenerator):
                 plot_cru(
                     model=model,
                     batches=batches,
@@ -83,7 +84,7 @@ def main():
                     figsize=(24.0, 5.0),
                     lat_range=gen_val.lat_range,
                     lon_range=gen_val.lon_range,
-                    time_idx=(0, -1),
+                    time_idx=(0, -1) if isinstance(gen_train, CRUDataGenerator) else None,
                     name=f"epoch-{epoch:04d}",
                 )
             elif isinstance(gen_train, KolmogorovGenerator):

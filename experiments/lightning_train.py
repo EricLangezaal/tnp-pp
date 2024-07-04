@@ -1,11 +1,12 @@
 import lightning.pytorch as pl
 import torch
 from plot import plot
-from plot_cru import plot_cru
+from experiments.plot_globe import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
 from icicl.data.cru import CRUDataGenerator
+from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
 from icicl.utils.data import adjust_num_batches
@@ -45,23 +46,23 @@ def main():
                 name=name,
             )
 
-    elif isinstance(gen_val, CRUDataGenerator):
-
+    elif isinstance(gen_val, CRUDataGenerator) or isinstance(gen_val, ERA5DataGenerator):
+                
         def plot_fn(model, batches, name):
-            plot_cru(
-                model=model,
-                batches=batches,
-                x_mean=gen_val.x_mean,
-                x_std=gen_val.x_std,
-                y_mean=gen_val.y_mean,
-                y_std=gen_val.y_std,
-                num_fig=min(5, len(batches)),
-                figsize=(24.0, 5.0),
-                lat_range=gen_val.lat_range,
-                lon_range=gen_val.lon_range,
-                time_idx=[0, -1],
-                name=name,
-            )
+                plot_cru(
+                    model=model,
+                    batches=batches,
+                    x_mean=gen_val.x_mean,
+                    x_std=gen_val.x_std,
+                    y_mean=gen_val.y_mean,
+                    y_std=gen_val.y_std,
+                    num_fig=min(5, len(batches)),
+                    figsize=(24.0, 5.0),
+                    lat_range=gen_val.lat_range,
+                    lon_range=gen_val.lon_range,
+                    time_idx=(0, -1) if isinstance(gen_train, CRUDataGenerator) else None,
+                    name=name,
+                )
 
     elif isinstance(gen_val, KolmogorovGenerator):
 

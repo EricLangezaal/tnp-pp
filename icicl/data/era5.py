@@ -29,44 +29,47 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
     def __init__(
         self,
         *,
-        data_dir: str,
-        fnames: List[str],
+        data_dir: Optional[str] = None,
+        fnames: Optional[List[str]] = None,
+        gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2",
+        date_range: Tuple[str, str] = ("2019-01-01", "2019-12-31"),
         lat_range: Tuple[float, float] = (90.0, -90.0),
         lon_range: Tuple[float, float] = (0.0, 360.0),
         batch_grid_size: Tuple[int, int, int],
         min_num_batch: int = 1,
         ref_date: str = "2000-01-01",
-        data_vars: Tuple[str] = ("t2m",),
+        data_vars: List[str] = ["t2m"],
         t_spacing: int = 1,
         use_time: bool = True,
         x_mean: Optional[Tuple[float, ...]] = None,
         x_std: Optional[Tuple[float, ...]] = None,
         y_mean: Optional[Tuple[float, ...]] = None,
         y_std: Optional[Tuple[float, ...]] = None,
-        lazy_loading: bool = False,
+        lazy_loading: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        def _preprocess(
-            ds: xr.Dataset,
-            lat_range: Tuple[float, float],
-            lon_range: Tuple[float, float],
-        ):
-            return ds.sel(
-                latitude=slice(*lat_range),
-                longitude=slice(*lon_range),
+        if fnames is not None and data_dir is not None:
+            dataset = xr.open_mfdataset(
+                [os.path.join(data_dir, fname) for fname in fnames],
+                chunks="auto",
+            )
+        else:
+            dataset = xr.open_zarr(
+                gcloud_url,
+                chunks={"time": 48},
+                consolidated=True,
             )
 
-        # Load datasets.
-        dataset = xr.open_mfdataset(
-            [os.path.join(data_dir, fname) for fname in fnames],
-            preprocess=partial(_preprocess, lat_range=lat_range, lon_range=lon_range),
-            chunks="auto",
+        dataset = dataset.sel(
+            time=slice(*date_range),
+            latitude=slice(*lat_range),
+            longitude=slice(*lon_range),
         )
 
-        drop_vars = list(set(dataset.data_vars) - set(data_vars))
-        dataset = dataset.drop_vars(drop_vars).astype(np.float32)
+        data_vars = list(data_vars)
+        dataset = dataset[data_vars]
 
         # Change time to hours since reference time.
         ref_datetime = datetime.strptime(ref_date, "%Y-%m-%d")

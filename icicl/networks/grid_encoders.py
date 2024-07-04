@@ -231,7 +231,7 @@ def mhca_to_grid(
     grid_stacked = torch.full((B * S, max_patch, E), -torch.inf, device=z_grid.device)
 
     # add nearest off the grid points to each on_the_grid point
-    idx_shifter = torch.arange(0, B * S, S).repeat_interleave(U)
+    idx_shifter = torch.arange(0, B * S, S, device=z.device).repeat_interleave(U)
     grid_stacked[nearest_idx.flatten() + idx_shifter, cumcount_idx.flatten()] = (
             z[u_batch_idx.flatten(), u_range_idx.flatten()]
     )

@@ -11,6 +11,7 @@ from torch import nn
 
 import wandb
 from icicl.data.base import Batch
+from icicl.data.on_off_grid import OOTGBatch
 from icicl.utils.experiment_utils import np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
@@ -40,43 +41,34 @@ def plot_cru(
     pred_fn: Callable = np_pred_fn,
     num_np_samples: int = 16,
 ):
-    time_idx = [0, -1] if time_idx is None else time_idx
+    time_idx = [0] if time_idx is None else time_idx
 
     for i in range(num_fig):
         batch = batches[i]
-        xc = batch.xc[:1]
-        yc = batch.yc[:1]
-        xt = batch.xt[:1]
-        yt = batch.yt[:1]
-        x = batch.x[:1]
-        y = batch.y[:1]
 
-        batch.xc = xc
-        batch.yc = yc
-        batch.xt = xt
-        batch.yt = yt
-        batch.x = x
-        batch.y = y
+        for key, value in vars(batch).items():
+            if isinstance(value, torch.Tensor):
+                setattr(batch, key, value[:1])
+        
+        with torch.no_grad():
+            yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
+            model_nll = -yt_pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
 
-        plot_batch = copy.deepcopy(batch)
-        plot_batch.xt = x
-
-        if not isinstance(model, nn.Module):
-            y_pred_dist = model(xc=xc, yc=yc, xt=x)
-            yt_pred_dist = model(xc=xc, yc=yc, xt=xt)
-
-            # Detach gradients.
-            y_pred_dist.loc = y_pred_dist.loc.detach().unsqueeze(0)
-            y_pred_dist.scale = y_pred_dist.scale.detach().unsqueeze(0)
-            yt_pred_dist.loc = yt_pred_dist.loc.detach().unsqueeze(0)
-            yt_pred_dist.scale = yt_pred_dist.scale.detach().unsqueeze(0)
-        else:
-            with torch.no_grad():
+            if isinstance(batch, OOTGBatch):
+                pred_mean, pred_std = yt_pred_dist.mean.cpu(), yt_pred_dist.stddev.cpu()
+                xc = batch.xc_off_grid
+                yc = batch.yc_off_grid
+                x = batch.xt
+                y = batch.yt
+            else:
+                plot_batch = copy.deepcopy(batch)
+                plot_batch.xt = batch.x
                 y_pred_dist = pred_fn(model, plot_batch, num_samples=num_np_samples)
-                yt_pred_dist = pred_fn(model, batch, num_samples=num_np_samples)
-
-        model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[..., 0].numel()
-        pred_mean, pred_std = y_pred_dist.mean.cpu(), y_pred_dist.stddev.cpu()
+                pred_mean, pred_std = y_pred_dist.mean.cpu(), y_pred_dist.stddev.cpu()
+                xc = batch.xc
+                yc = batch.yc
+                x = batch.x
+                y = batch.y
 
         # Rescale inputs and outputs.
         xc = (xc[..., :3].cpu() * x_std) + x_mean
@@ -89,31 +81,47 @@ def plot_cru(
         # Get indicies corresponding to single time points.
         ts = x[0, :, 0].unique()
         for idx in time_idx:
-            t = ts[idx]
-            data_idx_c = torch.where(xc[0, :, 0] == t)[0]
-            data_idx = torch.where(x[0, :, 0] == t)[0]
+            # TODO doesn't work when using Time in Era5
+            if isinstance(batch, OOTGBatch):
+               t = 0
+               data_idx_c = torch.arange(xc.shape[1])
+               data_idx = torch.arange(x.shape[1])
 
-            # Get data for this time point.
+               # move from (0, 360) to (-180, 180) in longtitude
+               xc = xc - torch.as_tensor([0, 180])
+               x = x - torch.as_tensor([0, 180])
+               #  Latitude ranges are wrong way around!
+               lat_range = (lat_range[1], lat_range[0])
+               lon_range = (lon_range[0] - 180, lon_range[1] - 180)  
+            
+            else:
+                t = ts[idx]
+                data_idx_c = torch.where(xc[0, :, 0] == t)[0]
+                data_idx = torch.where(x[0, :, 0] == t)[0]
+
+                # Get data for this time point.
             xc_ = xc[0, data_idx_c].cpu()
             yc_ = yc[0, data_idx_c, 0].cpu()
             x_ = x[0, data_idx].cpu()
             y_ = y[0, data_idx, 0].cpu()
             pred_mean_ = pred_mean[0, data_idx, 0]
-            vmin = min(y_.min(), y_.max())
-            vmax = max(y_.max(), y_.max())
             pred_std_ = pred_std[0, data_idx, 0]
+
+            vmin = min(y_.min(), y_.max()) # colormap
+            vmax = max(y_.max(), y_.max())
 
             # Note that x is (time, lat, lon).
             ylim = (
-                (x_[:, 1].min().item() - 0.5, x_[:, 1].max().item() + 0.5)
+                (x_[:, -2].min().item() - 0.5, x_[:, -2].max().item() + 0.5)
                 if lat_range is None
                 else lat_range
             )
             xlim = (
-                (x_[:, 2].min().item() - 0.5, x_[:, 2].max().item() + 0.5)
+                (x_[:, -1].min().item() - 0.5, x_[:, -1].max().item() + 0.5)
                 if lon_range is None
                 else lon_range
             )
+
             scatter_kwargs = {
                 "s": 15,
                 "marker": "s",
@@ -140,18 +148,18 @@ def plot_cru(
                     ax.set_axisbelow(True)
 
                 axes[0].scatter(
-                    xc_[:, 2],
-                    xc_[:, 1],
+                    xc_[:, -1],
+                    xc_[:, -2],
                     c=yc_,
                     **scatter_kwargs,
                 )
                 axes[1].scatter(
-                    x_[:, 2],
-                    x_[:, 1],
+                    x_[:, -1],
+                    x_[:, -2],
                     c=pred_mean_,
                     **scatter_kwargs,
                 )
-                sc = axes[2].scatter(x_[:, 2], x_[:, 1], c=y_, **scatter_kwargs)
+                sc = axes[2].scatter(x_[:, -1], x_[:, -2], c=y_, **scatter_kwargs)
 
                 axes[0].set_title("Context set", fontsize=18)
                 axes[1].set_title("Predictive mean", fontsize=18)
@@ -207,11 +215,11 @@ def plot_cru(
                         std_scatter_kwargs["vmin"] = y_plot.min()
                         std_scatter_kwargs["vmax"] = y_plot.max()
                         sc = ax.scatter(
-                            x_plot[:, 2], x_plot[:, 1], c=y_plot, **std_scatter_kwargs
+                            x_plot[:, -1], x_plot[:, -2], c=y_plot, **std_scatter_kwargs
                         )
                     else:
                         sc = ax.scatter(
-                            x_plot[:, 2], x_plot[:, 1], c=y_plot, **scatter_kwargs
+                            x_plot[:, -1], x_plot[:, -2], c=y_plot, **scatter_kwargs
                         )
 
                     # Add colourbar.

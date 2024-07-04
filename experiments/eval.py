@@ -1,12 +1,13 @@
 import lightning.pytorch as pl
 import torch
 from plot import plot
-from plot_cru import plot_cru
+from experiments.plot_globe import plot_cru
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
 import wandb
 from icicl.data.cru import CRUDataGenerator
+from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
 from icicl.utils.experiment_utils import initialize_evaluation, val_epoch
@@ -40,7 +41,7 @@ def main():
                 savefig=experiment.misc.savefig,
                 logging=experiment.misc.logging,
             )
-        elif isinstance(gen_test, CRUDataGenerator):
+        elif isinstance(gen_test, CRUDataGenerator) or isinstance(gen_test, ERA5DataGenerator):
             plot_cru(
                 model=model,
                 batches=batches,
@@ -50,8 +51,8 @@ def main():
                 y_std=gen_test.y_std,
                 num_fig=min(experiment.misc.num_plots, len(batches)),
                 figsize=(6, 6),
-                # lat_range=gen_test.lat_range,
-                # lon_range=gen_test.lon_range,
+                lat_range=gen_test.lat_range,
+                lon_range=gen_test.lon_range,
                 time_idx=[0],
                 name=eval_name,
                 subplots=experiment.misc.subplots,
