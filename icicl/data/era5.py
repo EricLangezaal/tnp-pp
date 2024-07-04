@@ -94,6 +94,8 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             "latitude": dataset["latitude"],
             "longitude": dataset["longitude"],
         }
+        if self.deterministic and lazy_loading:
+            warnings.warn("Deterministic generation with lazy loading will not speed up performance")
         if not lazy_loading:
             self.data = dask.compute(self.data)[0]
 
