@@ -35,7 +35,7 @@ tnpd_encoder:
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
   embed_dim: ${params.embed_dim}
-  grid_shape: ${eval:'[${params.on_grid_per_dim}, ${params.on_grid_per_dim}]'}
+  grid_shape: ${params.coarse_grid_shape}
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:
@@ -92,7 +92,10 @@ params:
 
   dim: 2
   grid_shape: [120, 240]
-  num_off_the_grid: 32
+  num_off_the_grid: 200
+  
+  # grid encoder moves it to this
+  coarse_grid_shape: [30, 60]
 
   embed_dim: 128
   num_heads: 8

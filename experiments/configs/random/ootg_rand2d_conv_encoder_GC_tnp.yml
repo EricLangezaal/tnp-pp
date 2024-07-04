@@ -36,6 +36,7 @@ grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
   dim: ${params.dim}
   init_lengthscale: ${eval:'2 * 1 / 8'}
+  grid_shape: ${params.coarse_grid_shape}
 
 transformer_encoder:
   _target_: icicl.networks.grid_transformer.GridTransformerEncoder
@@ -83,7 +84,9 @@ params:
 
   dim: 2
   grid_shape: [120, 240]
-  num_off_the_grid: 32
+  num_off_the_grid: 200
+
+  coarse_grid_shape: [30, 60]
 
   embed_dim: 128
   num_heads: 8

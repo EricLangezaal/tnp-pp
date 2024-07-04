@@ -91,7 +91,7 @@ params:
 
   dim: 2
   grid_shape: [120, 240]
-  num_off_the_grid: 32
+  num_off_the_grid: 200
 
   embed_dim: 128
   num_heads: 8
@@ -99,7 +99,7 @@ params:
   norm_first: True
   num_layers: 5
 
-  patch_size: [5, 5]
+  patch_size: [4, 4]
 
 
 misc:
