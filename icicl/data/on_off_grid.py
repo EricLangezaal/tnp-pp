@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from typing import Tuple, Optional
+from math import prod
+
 import torch
 
 from .base import DataGenerator
@@ -107,7 +109,7 @@ class RandomOOTGGenerator(DataGenerator):
     def __init__(self, *, num_off_grid_context: int, grid_shape: Tuple[int, ...], num_targets: int, dim: int =1, **kwargs):
         super().__init__(**kwargs)
         self.num_off_grid_context = num_off_grid_context
-        self.grid_shape = grid_shape
+        self.grid_shape = tuple(grid_shape)
         self.num_targets = num_targets
         self.dim = dim
 
@@ -123,7 +125,7 @@ class RandomOOTGGenerator(DataGenerator):
         x_off_grid = torch.randn(*batch_shape, num_ctx + num_trg, self.dim)
         y_off_grid = torch.randn(x_off_grid.shape[:-1] + (1,))
 
-        x_on_grid = torch.randn(*batch_shape, *self.grid_shape, self.dim)
+        x_on_grid = torch.randn(*batch_shape, prod(self.grid_shape), self.dim)
         y_on_grid = torch.randn(x_on_grid.shape[:-1] + (1,))
 
         return OOTGBatch(

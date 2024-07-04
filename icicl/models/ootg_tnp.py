@@ -9,6 +9,7 @@ from .tnp import TNPDDecoder
 
 from ..networks.grid_encoders import IdentityGridEncoder, SetConvGridEncoder, PseudoTokenGridEncoder
 from ..networks.grid_transformer import SWINTransformerEncoder, GridTransformerEncoder
+from ..utils.grids import coarsen_grid
 from ..utils.helpers import preprocess_observations
 
 
@@ -21,7 +22,7 @@ class OOTG_TNPDEncoder(nn.Module):
             xy_encoder: nn.Module,
             x_encoder: nn.Module = nn.Identity(),
             y_encoder: nn.Module = nn.Identity(),
-            patch_encoder: nn.Module = nn.Identity(),
+            patch_encoder: nn.Module = None,
     ):
         super().__init__()
 
@@ -72,8 +73,11 @@ class OOTG_TNPDEncoder(nn.Module):
         # merge ON grid context x and y and encode it
         zc_on_grid = torch.cat((xc_grid_encoded, yc_grid_encoded), dim=-1)
         zc_on_grid = self.xy_encoder(zc_on_grid)
+        
         # TODO remove again?
-        zc_on_grid = self.patch_encoder(zc_on_grid)
+        if self.patch_encoder is not None:
+           zc_on_grid = self.patch_encoder(zc_on_grid)
+           xc_on_grid = coarsen_grid(xc_on_grid, self.patch_encoder.conv.kernel_size)
 
         # merge OFF grid TARGET x and y and encode it
         zt = torch.cat((xt_encoded, yt_encoded), dim=-1)

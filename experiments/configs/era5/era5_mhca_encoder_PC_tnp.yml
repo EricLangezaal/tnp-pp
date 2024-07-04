@@ -3,9 +3,9 @@
 generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
-    data_dir: ./data/era5/
+    data_dir: ~/rds/hpc-work/data/era5/
     fnames:
-      - 2019_2m_temperature.nc
+      - jan_2019_2m_temperature.nc
     data_vars: ["t2m"]
     min_pc: 0.0001
     max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
@@ -14,14 +14,14 @@ generators:
     max_nt: ${params.num_targets}
     use_time: False
     return_grid: True
-    lazy_loading: True
+    lazy_loading: False
     samples_per_epoch: 16_000
     batch_size: 16
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
-    data_dir: ./data/era5/
+    data_dir: ~/rds/hpc-work/data/era5/
     fnames:
-      - 2019_2m_temperature.nc
+      - jan_2019_2m_temperature.nc
     data_vars: ["t2m"]
     min_pc: 0.0001
     max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
@@ -30,7 +30,7 @@ generators:
     max_nt: ${params.num_targets}
     use_time: False
     return_grid: True
-    lazy_loading: True
+    lazy_loading: False
     samples_per_epoch: 160
     batch_size: 16
 
@@ -127,7 +127,7 @@ params:
 misc:
   project: era5-no-time
   name: mhca_encoder-PC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
-  num_workers: 16
+  num_workers: 0
   gradient_clip_val: 0.5
   plot_interval: 10
   logging: False # TODO remove
