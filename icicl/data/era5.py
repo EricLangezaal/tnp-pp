@@ -53,6 +53,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             dataset = xr.open_mfdataset(
                 [os.path.join(data_dir, fname) for fname in fnames],
                 chunks="auto",
+                mmap=False, # This is Scipy backend specific. Gives warnings otherwise about not being able to close the file.
             )
         else:
             dataset = xr.open_zarr(
