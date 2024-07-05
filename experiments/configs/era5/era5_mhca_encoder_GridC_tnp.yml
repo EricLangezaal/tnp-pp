@@ -5,10 +5,10 @@ generators:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ~/rds/hpc-work/data/era5/
     fnames:
-      - jan_2019_2m_temperature.nc
+      - 2019_2m_temperature.nc
     data_vars: ["t2m"]
-    min_pc: 0.0001
-    max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
+    min_pc: 0.0005
+    max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
     y_mean: [279.0644808446564] # calculated previously
     y_std: [21.169963472302797]
     batch_grid_size: ${params.batch_grid_size}
@@ -17,28 +17,28 @@ generators:
     use_time: False
     return_grid: True
     lazy_loading: False
-    samples_per_epoch: 16_000
-    batch_size: 16
+    samples_per_epoch: 4_000
+    batch_size: 8
     deterministic: ${params.deterministic}
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ~/rds/hpc-work/data/era5/
     fnames:
-      - jan_2019_2m_temperature.nc
+      - jan_2020_2m_temperature.nc
     data_vars: ["t2m"]
-    min_pc: 0.0001
-    max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
+    min_pc: 0.0005
+    max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
     return_grid: True
     lazy_loading: False
-    samples_per_epoch: 160
-    batch_size: 16
+    samples_per_epoch: 1_000
+    batch_size: 8
     deterministic: ${params.deterministic}
-    num_workers: 10
+    num_workers: 32
     
 model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD
@@ -51,13 +51,14 @@ tnpd_encoder:
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
-  patch_encoder: ${patch_encoder}
+  x_encoder: ${siren_net}
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
   grid_shape: [30, 60] # (720 / 6 / 4, 1440 / 6 / 4)
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
+  coarsen_fn: ${coarsen_fn}
 
 grid_mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -72,11 +73,6 @@ transformer_encoder:
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
 
-patch_encoder:
-  _target_: icicl.networks.patch_encoders.PatchEncoder
-  embed_dim: ${params.embed_dim}
-  patch_size: ${params.patch_size}
-
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
@@ -87,10 +83,30 @@ mhca_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'2 + ${params.y_dim} + ${params.x_dim}'} # two from preprocessing
+  # 2 from preprocessing y, ydim, and output of sirennet
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.dim_x} - 2'} 
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
+
+siren_net:
+  _target_: icicl.networks.mlp.MLPWithEmbedding
+  embedding: ${spherical_harmonics}
+  in_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  out_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  num_layers: 2
+  width: ${eval:'${params.num_legendre_polys} ** 2'}
+  ignore_dims: ${params.siren_net_ignore_dims}
+
+spherical_harmonics:
+  _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
+  num_legendre_polys: ${params.num_legendre_polys}
+
+coarsen_fn:
+  _target_: icicl.data.era5.coarsen_grid_era5
+  _partial_: True
+  wrap_longitude: True
+  lon_dim: -1
 
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder
@@ -99,7 +115,7 @@ tnpd_decoder:
 z_decoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.embed_dim}
-  out_dim: 2 # 1 for std and 1 for means
+  out_dim: ${eval:'2 * ${params.y_dim}'}
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -117,9 +133,10 @@ params:
 
   x_dim: 2
   y_dim: 1
+  
   batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
-  num_targets: 200
+  num_targets: 500
 
   embed_dim: 128
   num_heads: 8
@@ -127,13 +144,13 @@ params:
   norm_first: True
   num_layers: 5
 
-  patch_size: [4, 4]
+  siren_net_ignore_dims: null
+  num_legendre_polys: 10
 
 
 misc:
   project: era5-no-time
-  name: mhca_encoder-PC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
+  name: mhca_encoder-GridC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}
   gradient_clip_val: 0.5
   plot_interval: 10
-  logging: False # TODO remove
   resume_from_checkpoint: null
