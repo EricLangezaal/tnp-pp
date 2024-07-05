@@ -1,4 +1,4 @@
-# So use MHCA Encoder to same grid, coarsen grid using patch embedding and no swin attention
+# So use MHCA Encoder to coarsen grid (no patch embedding) and no swin attention
 
 generators:
   train:
@@ -17,8 +17,8 @@ generators:
     use_time: False
     return_grid: True
     lazy_loading: False
-    samples_per_epoch: 4_000
-    batch_size: 8
+    samples_per_epoch: 8_000
+    batch_size: 16
     deterministic: ${params.deterministic}
     num_workers: 32
   val:
@@ -35,8 +35,8 @@ generators:
     use_time: False
     return_grid: True
     lazy_loading: False
-    samples_per_epoch: 1_000
-    batch_size: 8
+    samples_per_epoch: 2_000
+    batch_size: 16
     deterministic: ${params.deterministic}
     num_workers: 32
     
@@ -84,7 +84,7 @@ mhca_layer:
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
   # 2 from preprocessing y, ydim, and output of sirennet
-  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.dim_x} - 2'} 
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}

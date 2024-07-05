@@ -90,7 +90,7 @@ patch_encoder:
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
   # 2 from preprocessing y, ydim, and output of sirennet
-  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.dim_x} - 2'} 
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
