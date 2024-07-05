@@ -416,6 +416,9 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     # use tensor cores effectively
     torch.set_float32_matmul_precision('high')
 
+    if experiment.misc.num_workers > 1:
+        torch.multiprocessing.set_sharing_strategy("file_system")
+
     if isinstance(experiment.model, nn.Module):
         if experiment.misc.resume_from_checkpoint:
             # Downloads to "./checkpoints/last.ckpt".
