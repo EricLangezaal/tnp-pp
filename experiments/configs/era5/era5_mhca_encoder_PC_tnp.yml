@@ -5,7 +5,7 @@ generators:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ~/rds/hpc-work/data/era5/
     fnames:
-      - 2019_2m_temperature.nc
+      - jan_2019_2m_temperature.nc
     data_vars: ["t2m"]
     min_pc: 0.0001
     max_pc: 0.001 # max percentage context points out of total (product of batch_grid_size)
@@ -20,6 +20,7 @@ generators:
     samples_per_epoch: 16_000
     batch_size: 16
     deterministic: ${params.deterministic}
+    num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     data_dir: ~/rds/hpc-work/data/era5/
@@ -37,6 +38,7 @@ generators:
     samples_per_epoch: 160
     batch_size: 16
     deterministic: ${params.deterministic}
+    num_workers: 10
     
 model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD
@@ -111,7 +113,7 @@ optimiser:
 
 params:
   epochs: 200
-  deterministic: True
+  deterministic: False
 
   x_dim: 2
   y_dim: 1
@@ -131,7 +133,6 @@ params:
 misc:
   project: era5-no-time
   name: mhca_encoder-PC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
-  num_workers: 0
   gradient_clip_val: 0.5
   plot_interval: 10
   logging: False # TODO remove

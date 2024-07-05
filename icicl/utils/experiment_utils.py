@@ -320,7 +320,6 @@ def create_default_config() -> DictConfig:
                 "_target_": "icicl.utils.experiment_utils.np_pred_fn",
                 "_partial_": True,
             },
-            "num_workers": 1,
         }
     }
     return OmegaConf.create(default_config)

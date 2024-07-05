@@ -59,6 +59,7 @@ class DataGenerator(torch.utils.data.IterableDataset, ABC):
         batch_size: int,
         deterministic: bool = False,
         deterministic_seed: int = 0,
+        num_workers: int = 0,
         **kwargs,
     ):
         """Base data generator, which can be used to derive other data generators,
@@ -73,6 +74,7 @@ class DataGenerator(torch.utils.data.IterableDataset, ABC):
         self.samples_per_epoch = samples_per_epoch
         self.batch_size = batch_size
         self.num_batches = samples_per_epoch // batch_size
+        self.num_workers = num_workers
 
         # Set batch counter.
         self.batch_counter = 0

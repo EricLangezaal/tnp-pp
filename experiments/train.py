@@ -29,13 +29,13 @@ def main():
 
     train_loader = torch.utils.data.DataLoader(
         gen_train,
-        num_workers=experiment.misc.num_workers,
+        num_workers=gen_train.num_workers,
         batch_size=None,
         worker_init_fn=adjust_num_batches,
     )
     val_loader = torch.utils.data.DataLoader(
         gen_val,
-        num_workers=experiment.misc.num_workers,
+        num_workers=gen_val.num_workers,
         batch_size=None,
         worker_init_fn=adjust_num_batches,
     )
