@@ -1,4 +1,4 @@
-# So use MHCA Encoder to same grid, coarsen grid using patch embedding and no swin attention
+# So use MHCA Encoder to same grid, coarsen grid using patch embedding and Swin attention
 
 generators:
   train:
@@ -29,6 +29,8 @@ generators:
     data_vars: ["t2m"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
+    y_mean: [279.0644808446564] # calculated previously
+    y_std: [21.169963472302797]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
@@ -52,15 +54,13 @@ tnpd_encoder:
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
   x_encoder: ${siren_net}
-  patch_encoder: ${patch_encoder}
-  coarsen_fn: ${coarsen_fn}
-
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  grid_shape: [30, 60]
+  grid_shape: ${eval:'(${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1])'}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
+  coarsen_fn: ${coarsen_fn}
 
 grid_mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -71,9 +71,19 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
+  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
   mhca_layer: ${mhca_layer}
+  swin_layer: ${swin_layer} 
   num_layers: ${params.num_layers}
+
+swin_layer:
+  _target_: icicl.networks.swin_attention.SWINAttentionLayer
+  window_sizes: ${params.window_sizes}
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -82,11 +92,6 @@ mhca_layer:
   head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
   norm_first: ${params.norm_first}
-
-patch_encoder:
-  _target_: icicl.networks.patch_encoders.PatchEncoder
-  embed_dim: ${params.embed_dim}
-  patch_size: ${params.patch_size}
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
@@ -154,12 +159,12 @@ params:
   siren_net_ignore_dims: null
   num_legendre_polys: 10
 
-  patch_size: [4, 4]
+  window_sizes: [8, 8]
 
 
 misc:
   project: era5-no-time
-  name: PatchC-mhca_encoder-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
+  name: mhca_encoder-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

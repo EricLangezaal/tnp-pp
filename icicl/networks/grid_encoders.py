@@ -42,6 +42,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
         init_lengthscale: float,
         grid_shape: Optional[Tuple[int, ...]] = None,
         coarsen_fn: Callable = coarsen_grid,
+        dist_fn: Optional[Callable] = None,
     ):
         super().__init__() 
         init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=torch.float32)
@@ -51,6 +52,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
         )
         self.grid_shape = None if grid_shape is None else torch.as_tensor(grid_shape)
         self.coarsen_fn = coarsen_fn
+        self.dist_fn = dist_fn
 
     @property
     def lengthscale(self):
@@ -73,8 +75,13 @@ class SetConvGridEncoder(IdentityGridEncoder):
         
         if self.grid_shape is None:
             x_grid = xc_on_grid
-            z_grid = setconv_to_grid(xc_off_grid, zc_off_grid, x_grid, self.lengthscale,
-                                       zc_on_grid if not ignore_on_grid else None)
+            z_grid = setconv_to_grid(
+                x=xc_off_grid, 
+                z=zc_off_grid, 
+                x_grid=x_grid, 
+                lengthscale=self.lengthscale,
+                z_grid=zc_on_grid if not ignore_on_grid else None, 
+                dist_func=self.dist_fn)
         else:
             xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, ignore_on_grid)
 
@@ -84,7 +91,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
                 )
             x_grid = self.coarsen_fn(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
 
-            z_grid = setconv_to_grid(xc, zc, x_grid, self.lengthscale)
+            z_grid = setconv_to_grid(x=xc, z=zc, x_grid=x_grid, lengthscale=self.lengthscale, dist_func=self.dist_fn)
         return x_grid, z_grid
     
 
@@ -102,10 +109,11 @@ def setconv_to_grid(
     x_grid: torch.Tensor,
     lengthscale: torch.Tensor,
     z_grid: Optional[torch.Tensor] = None,
+    dist_func: Optional[Callable] = None,
 ):
     grid_shape = x_grid.shape[1:-1]
     x_grid_flat = flatten_grid(x_grid)
-    weights = compute_eq_weights(x_grid_flat, x, lengthscale)
+    weights = compute_eq_weights(x_grid_flat, x, lengthscale, dist_func)
 
     # Multiply context outputs by weights.
     # (batch_size, num_grid_points, embed_dim).

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 
 import torch
 from torch import nn
@@ -23,6 +23,7 @@ class OOTG_TNPDEncoder(nn.Module):
             x_encoder: nn.Module = nn.Identity(),
             y_encoder: nn.Module = nn.Identity(),
             patch_encoder: nn.Module = None,
+            coarsen_fn: Callable = coarsen_grid,
     ):
         super().__init__()
 
@@ -36,6 +37,7 @@ class OOTG_TNPDEncoder(nn.Module):
         self.y_encoder = y_encoder
 
         self.patch_encoder = patch_encoder
+        self.coarsen_fn = coarsen_fn
 
     @check_shapes(
         "xc_off_grid: [b, n, dx]", "yc_off_grid: [b, n, dy]", "xc_on_grid: [b, ..., dx]", "yc_on_grid: [b, ..., dy]", "xt: [b, nt, dx]"
@@ -77,7 +79,7 @@ class OOTG_TNPDEncoder(nn.Module):
         # TODO remove again?
         if self.patch_encoder is not None:
            zc_on_grid = self.patch_encoder(zc_on_grid)
-           xc_on_grid = coarsen_grid(xc_on_grid, self.patch_encoder.conv.kernel_size)
+           xc_on_grid = self.coarsen_fn(xc_on_grid, self.patch_encoder.conv.kernel_size)
 
         # merge OFF grid TARGET x and y and encode it
         zt = torch.cat((xt_encoded, yt_encoded), dim=-1)

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import math
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 
 from .initialisation import weights_init
 
@@ -110,6 +110,7 @@ def compute_eq_weights(
     x1: torch.Tensor,
     x2: torch.Tensor,
     lengthscales: torch.Tensor,
+    dist_func: Optional[Callable] = None,
 ) -> torch.Tensor:
     """Compute the weights for the SetConv layer, mapping from `x1` to `x2`.
 
@@ -121,6 +122,8 @@ def compute_eq_weights(
     Returns:
         Tensor of shape (batch_size, num_x1, num_x2) or (batch_size, num_x1, num_x2, num_lengthscales)
     """
+    if dist_func is None:
+        dist_func = lambda x1, x2: x1 - x2
 
     # Expand dimensions for broadcasting
     x1 = x1[:, :, None, :]
@@ -133,12 +136,12 @@ def compute_eq_weights(
         x1 = x1[..., None]
         x2 = x2[..., None]
         dist2 = torch.sum(
-            ((x1 - x2) / lengthscales).pow(2),
+            (dist_func(x1, x2) / lengthscales).pow(2),
             dim=-2,
         )  # shape (batch_size, num_x1, num_x2, num_lengthscales)
     elif len(lengthscales.shape) == 4:
         dist2 = torch.sum(
-            ((x1 - x2) / lengthscales).pow(2),
+            (dist_func(x1, x2) / lengthscales).pow(2),
             dim=-1,
         )  # shape (batch_size, num_x1, num_x2)
     else:
@@ -146,5 +149,22 @@ def compute_eq_weights(
 
     # Compute weights
     weights = torch.exp(-0.5 * dist2)
-
     return weights
+
+def haversine_dist(x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
+    """
+    Taken from https://www.movable-type.co.uk/scripts/latlong.html
+    Setting R=1
+    """
+    to_rad = lambda x: x * math.pi / 180
+
+    phi1 = to_rad(x1[...,-2]) # latitude angle
+    phi2 = to_rad(x2[...,-2]) # latitude angle
+
+    delta_phi = to_rad(x2[..., -2] - x1[..., -2])
+    delta_l = to_rad(x2[..., -1] - x1[..., -1]) # longitude angle difference
+
+    a = torch.sin(delta_phi / 2).pow(2) + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_l / 2).pow(2)
+    c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+
+    return c

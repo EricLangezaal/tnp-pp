@@ -52,28 +52,21 @@ tnpd_encoder:
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
   x_encoder: ${siren_net}
-  patch_encoder: ${patch_encoder}
-  coarsen_fn: ${coarsen_fn}
 
+grid_encoder:
+  _target_: icicl.networks.grid_encoders.SetConvGridEncoder
+  dim: ${params.x_dim}
+  init_lengthscale: ${eval:'2 * 1 / 8'}
+  dist_fn: ${dist_fn}
 
-grid_encoder: 
-  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  grid_shape: [30, 60]
-  embed_dim: ${params.embed_dim}
-  mhca_layer: ${grid_mhca_layer}
-
-grid_mhca_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
-  embed_dim: ${params.embed_dim}
-  num_heads: ${params.num_heads}
-  head_dim: ${params.head_dim}
-  feedforward_dim: ${params.embed_dim}
-  norm_first: ${params.norm_first}
+dist_fn:
+  _target_: icicl.utils.conv.haversine_dist
 
 transformer_encoder:
   _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   num_layers: ${params.num_layers}
+  patch_encoder: ${patch_encoder}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -108,12 +101,6 @@ siren_net:
 spherical_harmonics:
   _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
   num_legendre_polys: ${params.num_legendre_polys}
-
-coarsen_fn:
-  _target_: icicl.data.era5.coarsen_grid_era5
-  _partial_: True
-  wrap_longitude: True
-  lon_dim: -1
 
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder
@@ -159,7 +146,7 @@ params:
 
 misc:
   project: era5-no-time
-  name: PatchC-mhca_encoder-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
+  name: setconv-PatchC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
