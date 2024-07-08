@@ -100,7 +100,6 @@ class SetConvGridEncoder(IdentityGridEncoder):
     "z: [m, n, dz]",
     "x_grid: [m, ..., dx]",
     "z_grid: [m, ..., dz]",
-    "lengthscale: [dx]",
     "return: [m, ..., dz]",
 )
 def setconv_to_grid(

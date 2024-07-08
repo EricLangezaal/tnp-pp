@@ -10,11 +10,11 @@
 
 #! sbatch directives begin here ###############################
 #! Name of the job:
-#SBATCH -J e5pcmt
+#SBATCH -J e5pcsct
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
 #SBATCH -A MLMI-erl50-SL2-GPU
 
-#SBATCH --output=slurm_files/logs/era5_PatchC_mhca_tnp_%A.out
+#SBATCH --output=slurm_files/logs/era5_PatchC_setconv_tnp_%A.out
 
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
@@ -56,7 +56,7 @@ workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to t
                              # in which sbatch is run.
 
 #! Your_python your_code, args
-CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_PatchC_mhca_encoder_tnp.yml misc.progress_bars=False"
+CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_PatchC_setconv_tnp.yml misc.progress_bars=False"
 
 ###############################################################
 ### You should not have to change anything below this line ####

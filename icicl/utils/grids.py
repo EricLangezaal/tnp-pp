@@ -176,6 +176,11 @@ def nearest_gridded_neighbours(
     # Get number of neighbors along each dimension.
     dim_x = x.shape[-1]
     num_grid_spacings = math.ceil(k ** (1 / dim_x))
+    
+    # Set roll_dims to the actual index if they are specified as (-x, )
+    num_dims = len(grid_shape)
+    if roll_dims is not None:
+        roll_dims = tuple(roll_dim % num_dims for roll_dim in roll_dims)
 
     # Quick calculation of nearest grid neighbour.
     x_grid_min = x_grid_flat.amin(dim=(0, 1))
@@ -226,7 +231,7 @@ def nearest_gridded_neighbours(
                     if (i not in roll_dims)
                     else (nearest_multi_idx[..., i] % grid_shape[i]).unsqueeze(-1)
                 )
-                for i in range(len(grid_shape))
+                for i in range(num_dims)
             ],
             dim=-1,
         ).squeeze(-2)
