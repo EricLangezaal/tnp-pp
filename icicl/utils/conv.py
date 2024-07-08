@@ -140,7 +140,6 @@ def compute_eq_weights(
             dim=-2,
         )  # shape (batch_size, num_x1, num_x2, num_lengthscales)
     elif len(lengthscales.shape) == 4:
-        print(dist_func(x1, x2).shape)
         dist2 = torch.sum(
             (dist_func(x1, x2) / lengthscales).pow(2),
             dim=-1,
@@ -157,8 +156,6 @@ def haversine_dist(x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
     Taken from https://www.movable-type.co.uk/scripts/latlong.html
     Setting R=1
     """
-
-    print(x1.shape, x2.shape)
 
     to_rad = lambda x: x * torch.pi / 180
 

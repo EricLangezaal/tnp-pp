@@ -10,6 +10,7 @@ from icicl.data.cru import CRUDataGenerator
 from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
+from icicl.utils.data import adjust_num_batches
 from icicl.utils.experiment_utils import initialize_evaluation, val_epoch
 from icicl.utils.lightning_utils import LitWrapper
 
@@ -20,6 +21,12 @@ def main():
     model = experiment.model
     eval_name = experiment.misc.name
     gen_test = experiment.generators.val
+    val_loader = torch.utils.data.DataLoader(
+        gen_test,
+        num_workers=gen_test.num_workers,
+        batch_size=None,
+        worker_init_fn=adjust_num_batches,
+    )
 
     model.eval()
 
@@ -95,7 +102,7 @@ def main():
     if experiment.misc.lightning_eval:
         lit_model = LitWrapper(model)
         trainer = pl.Trainer(devices=1)
-        trainer.test(model=lit_model, dataloaders=gen_test)
+        trainer.test(model=lit_model, dataloaders=val_loader)
         test_result = {
             k: [result[k] for result in lit_model.test_outputs]
             for k in lit_model.test_outputs[0].keys()
@@ -142,21 +149,6 @@ def main():
             lat_range=gen_test.lat_range,
             lon_range=gen_test.lon_range,
             time_idx=(0, -1) if isinstance(gen_test, CRUDataGenerator) else None,
-            name=f"test/{eval_name}/",
-        )
-    elif isinstance(gen_test, CRUDataGenerator):
-        plot_globe(
-            model=model,
-            batches=batches,
-            x_mean=gen_test.x_mean,
-            x_std=gen_test.x_std,
-            y_mean=gen_test.y_mean,
-            y_std=gen_test.y_std,
-            num_fig=min(experiment.misc.num_plots, len(batches)),
-            figsize=(24.0, 5.0),
-            lat_range=gen_test.lat_range,
-            lon_range=gen_test.lon_range,
-            time_idx=(0, -1),
             name=f"test/{eval_name}/",
         )
     elif isinstance(gen_test, KolmogorovGenerator):
