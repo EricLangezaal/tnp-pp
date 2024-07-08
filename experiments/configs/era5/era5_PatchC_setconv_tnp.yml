@@ -1,4 +1,4 @@
-# So use MHCA Encoder to same grid, coarsen grid using patch embedding and no swin attention
+# So  coarsen grid using patch embedding and SetConv Encoder to same grid and no swin attention
 
 generators:
   train:

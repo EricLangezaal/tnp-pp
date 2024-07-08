@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import einops
 import warnings
@@ -22,6 +22,7 @@ class SWINTransformerEncoder(nn.Module):
         swin_layer: SWINAttentionLayer,
         patch_encoder: Optional[PatchEncoder] = None,
         top_k_ctot: Optional[int] = None,
+        roll_dims: Optional[Tuple[int,...]] = None,
     ):
         super().__init__()
 
@@ -29,6 +30,7 @@ class SWINTransformerEncoder(nn.Module):
         self.swin_layers = _get_clones(swin_layer, num_layers)
         self.patch_encoder = patch_encoder
         self.top_k_ctot = top_k_ctot
+        self.roll_dims = roll_dims
 
     @check_shapes(
         "xc: [m, ..., dx]",
@@ -68,7 +70,9 @@ class SWINTransformerEncoder(nn.Module):
                 num_batches, nt = zt.shape[:2]
 
                 # (batch_size, n, k).
-                nearest_idx, mask = nearest_gridded_neighbours(xt, xc, k=self.top_k_ctot)
+                nearest_idx, mask = nearest_gridded_neighbours(
+                    xt, xc, k=self.top_k_ctot, roll_dims=self.roll_dims
+                )
 
                 zc = flatten_grid(zc)
                 batch_idx = (
