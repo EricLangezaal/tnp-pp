@@ -140,6 +140,7 @@ def compute_eq_weights(
             dim=-2,
         )  # shape (batch_size, num_x1, num_x2, num_lengthscales)
     elif len(lengthscales.shape) == 4:
+        print(dist_func(x1, x2).shape)
         dist2 = torch.sum(
             (dist_func(x1, x2) / lengthscales).pow(2),
             dim=-1,
@@ -156,13 +157,16 @@ def haversine_dist(x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
     Taken from https://www.movable-type.co.uk/scripts/latlong.html
     Setting R=1
     """
-    to_rad = lambda x: x * math.pi / 180
 
-    phi1 = to_rad(x1[...,-2]) # latitude angle
-    phi2 = to_rad(x2[...,-2]) # latitude angle
+    print(x1.shape, x2.shape)
 
-    delta_phi = to_rad(x2[..., -2] - x1[..., -2])
-    delta_l = to_rad(x2[..., -1] - x1[..., -1]) # longitude angle difference
+    to_rad = lambda x: x * torch.pi / 180
+
+    phi1 = to_rad(x1[...,-2:-1]) # latitude angle
+    phi2 = to_rad(x2[...,-2:-1]) # latitude angle
+
+    delta_phi = to_rad(x2[..., -2:-1] - x1[..., -2:-1])
+    delta_l = to_rad(x2[..., -1:] - x1[..., -1:]) # longitude angle difference
 
     a = torch.sin(delta_phi / 2).pow(2) + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_l / 2).pow(2)
     c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))

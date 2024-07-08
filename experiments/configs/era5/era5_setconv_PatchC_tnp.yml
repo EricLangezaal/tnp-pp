@@ -29,6 +29,8 @@ generators:
     data_vars: ["t2m"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
+    y_mean: [279.0644808446564] # calculated previously
+    y_std: [21.169963472302797]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
@@ -55,12 +57,13 @@ tnpd_encoder:
 
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
-  dim: ${params.x_dim}
-  init_lengthscale: ${eval:'2 * 1 / 8'}
+  dim: 1 # since it combines lat/lon already there's only 1
+  init_lengthscale: ${eval:'2 * 24'}
   dist_fn: ${dist_fn}
 
 dist_fn:
   _target_: icicl.utils.conv.haversine_dist
+  _partial_: True
 
 transformer_encoder:
   _target_: icicl.networks.grid_transformer.GridTransformerEncoder

@@ -18,8 +18,8 @@ def main():
     experiment = initialize_evaluation()
 
     model = experiment.model
-    eval_name = experiment.misc.eval_name
-    gen_test = experiment.generators.test
+    eval_name = experiment.misc.name
+    gen_test = experiment.generators.val
 
     model.eval()
 
@@ -128,6 +128,21 @@ def main():
             batches=batches,
             num_fig=min(experiment.misc.num_plots, len(batches)),
             name=f"test/{eval_name}",
+        )
+    elif isinstance(gen_test, CRUDataGenerator) or isinstance(gen_test, ERA5DataGenerator):
+        plot_globe(
+            model=model,
+            batches=batches,
+            x_mean=gen_test.x_mean if isinstance(gen_test, CRUDataGenerator) else None,
+            x_std=gen_test.x_std if isinstance(gen_test, CRUDataGenerator) else None,
+            y_mean=gen_test.y_mean,
+            y_std=gen_test.y_std,
+            num_fig=min(5, len(batches)),
+            figsize=(24.0, 5.0),
+            lat_range=gen_test.lat_range,
+            lon_range=gen_test.lon_range,
+            time_idx=(0, -1) if isinstance(gen_test, CRUDataGenerator) else None,
+            name=f"test/{eval_name}/",
         )
     elif isinstance(gen_test, CRUDataGenerator):
         plot_globe(

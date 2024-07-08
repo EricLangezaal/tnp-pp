@@ -72,19 +72,19 @@ def main():
                     num_fig=min(5, len(batches)),
                     name=f"epoch-{epoch:04d}",
                 )
-            elif isinstance(gen_train, CRUDataGenerator) or isinstance(gen_train, ERA5DataGenerator):
+            elif isinstance(gen_val, CRUDataGenerator) or isinstance(gen_val, ERA5DataGenerator):
                 plot_globe(
                     model=model,
                     batches=batches,
-                    x_mean=gen_val.x_mean if isinstance(gen_train, CRUDataGenerator) else None,
-                    x_std=gen_val.x_std if isinstance(gen_train, CRUDataGenerator) else None,
+                    x_mean=gen_val.x_mean if isinstance(gen_val, CRUDataGenerator) else None,
+                    x_std=gen_val.x_std if isinstance(gen_val, CRUDataGenerator) else None,
                     y_mean=gen_val.y_mean,
                     y_std=gen_val.y_std,
                     num_fig=min(5, len(batches)),
                     figsize=(24.0, 5.0),
                     lat_range=gen_val.lat_range,
                     lon_range=gen_val.lon_range,
-                    time_idx=(0, -1) if isinstance(gen_train, CRUDataGenerator) else None,
+                    time_idx=(0, -1) if isinstance(gen_val, CRUDataGenerator) else None,
                     name=f"epoch-{epoch:04d}",
                 )
             elif isinstance(gen_train, KolmogorovGenerator):

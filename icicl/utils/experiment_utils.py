@@ -306,7 +306,7 @@ def create_default_config() -> DictConfig:
             "progress_bars": True,
             "seed": 0,
             "plot_interval": 1,
-            "lightning_eval": False,
+            "lightning_eval": True,
             "num_plots": 5,
             "gradient_clip_val": None,
             "only_plots": False,
