@@ -1,0 +1,182 @@
+# So use Patch coarsening then MHCA Encoder to same grid and Swin attention. Do use efficient top_k cross_attention.
+
+generators:
+  train:
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    data_dir: ~/rds/hpc-work/data/era5/
+    fnames:
+      - 2019_2m_temperature.nc
+    data_vars: ["t2m"]
+    min_pc: 0.0005
+    max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
+    y_mean: [279.0644808446564] # calculated previously
+    y_std: [21.169963472302797]
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    use_time: False
+    return_grid: True
+    lazy_loading: False
+    samples_per_epoch: 8_000
+    batch_size: 16
+    deterministic: ${params.deterministic}
+    num_workers: 32
+  val:
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    data_dir: ~/rds/hpc-work/data/era5/
+    fnames:
+      - jan_2020_2m_temperature.nc
+    data_vars: ["t2m"]
+    min_pc: 0.0005
+    max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
+    y_mean: [279.0644808446564] # calculated previously
+    y_std: [21.169963472302797]
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    use_time: False
+    return_grid: True
+    lazy_loading: False
+    samples_per_epoch: 2_000
+    batch_size: 16
+    deterministic: ${params.deterministic}
+    num_workers: 32
+    
+model:
+  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  encoder: ${tnpd_encoder}
+  decoder: ${tnpd_decoder}
+  likelihood: ${likelihood}
+
+tnpd_encoder:
+  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
+  grid_encoder: ${grid_encoder}
+  transformer_encoder: ${transformer_encoder}
+  xy_encoder: ${xy_encoder}
+  x_encoder: ${siren_net}
+  patch_encoder: ${patch_encoder}
+  coarsen_fn: ${coarsen_fn}
+
+grid_encoder: 
+  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
+  grid_shape: [30, 60]
+  embed_dim: ${params.embed_dim}
+  mhca_layer: ${grid_mhca_layer}
+
+grid_mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+transformer_encoder:
+  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
+  mhca_layer: ${mhca_layer}
+  swin_layer: ${swin_layer} 
+  num_layers: ${params.num_layers}
+  roll_dims: ${params.roll_dims}
+  top_k_ctot: ${params.top_k_ctot}
+
+swin_layer:
+  _target_: icicl.networks.swin_attention.SWINAttentionLayer
+  window_sizes: ${params.window_sizes}
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+  roll_dims: ${params.roll_dims}
+
+mhca_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+xy_encoder:
+  _target_: icicl.networks.mlp.MLP
+  # 2 from preprocessing y, ydim, and output of sirennet
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
+  out_dim: ${params.embed_dim}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+siren_net:
+  _target_: icicl.networks.mlp.MLPWithEmbedding
+  embedding: ${spherical_harmonics}
+  in_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  out_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  num_layers: 2
+  width: ${eval:'${params.num_legendre_polys} ** 2'}
+  ignore_dims: ${params.siren_net_ignore_dims}
+
+spherical_harmonics:
+  _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
+  num_legendre_polys: ${params.num_legendre_polys}
+
+patch_encoder:
+  _target_: icicl.networks.patch_encoders.PatchEncoder
+  embed_dim: ${params.embed_dim}
+  patch_size: ${params.patch_size}
+
+coarsen_fn:
+  _target_: icicl.data.era5.coarsen_grid_era5
+  _partial_: True
+  wrap_longitude: True
+  lon_dim: -1
+
+tnpd_decoder:
+  _target_: icicl.models.tnp.TNPDDecoder
+  z_decoder: ${z_decoder}
+
+z_decoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.embed_dim}
+  out_dim: ${eval:'2 * ${params.y_dim}'}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.AdamW
+  _partial_: True
+  lr: 5.0e-4
+
+params:
+  epochs: 200
+  deterministic: False
+
+  roll_dims: [-1,] # longitude
+  x_dim: 2
+  y_dim: 1
+  
+  batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
+  coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
+  num_targets: 500
+
+  embed_dim: 128
+  num_heads: 8
+  head_dim: 16
+  norm_first: True
+  num_layers: 5
+
+  siren_net_ignore_dims: null
+  num_legendre_polys: 10
+
+  top_k_ctot: 9
+  window_sizes: [8, 8]
+  patch_size: [4, 4]
+
+
+misc:
+  project: era5-no-time
+  name: mhca_encoder-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}PS=${params.patch_size}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}
+  gradient_clip_val: 0.5
+  plot_interval: 10
+  resume_from_checkpoint: null
