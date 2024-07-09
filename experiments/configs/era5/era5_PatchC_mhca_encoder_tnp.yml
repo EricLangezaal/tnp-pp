@@ -17,6 +17,7 @@ generators:
     use_time: False
     return_grid: True
     lazy_loading: False
+    ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 8_000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -37,6 +38,7 @@ generators:
     use_time: False
     return_grid: True
     lazy_loading: False
+    ignore_on_grid: ${params.ignore_on_grid}
     samples_per_epoch: 2_000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -139,6 +141,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False
+  ignore_on_grid: False
 
   x_dim: 2
   y_dim: 1
@@ -161,7 +164,7 @@ params:
 
 misc:
   project: era5-no-time
-  name: PatchC-mhca_encoder-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
+  name: PatchC-mhca_encoder-TNP_NoGrid=${params.ignore_on_grid}_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

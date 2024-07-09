@@ -76,7 +76,7 @@ class OOTG_TNPDEncoder(nn.Module):
         zc_on_grid = torch.cat((xc_grid_encoded, yc_grid_encoded), dim=-1)
         zc_on_grid = self.xy_encoder(zc_on_grid)
         
-        # TODO remove again?
+        # PATCH Embed first if configured
         if self.patch_encoder is not None:
            zc_on_grid = self.patch_encoder(zc_on_grid)
            xc_on_grid = self.coarsen_fn(xc_on_grid, self.patch_encoder.conv.kernel_size)

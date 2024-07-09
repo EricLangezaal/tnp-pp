@@ -421,6 +421,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
     def __init__(
         self,
         coarsen_factors: Tuple[int, ...] = (4, 4),
+        ignore_on_grid: bool = False,
         **kwargs,
     ):
         kwargs["return_grid"] = True
@@ -430,6 +431,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
             "please specify a coarsing for each grid dimension"
         )
         self.coarsen_factors = tuple(coarsen_factors)
+        self.ignore_on_grid = ignore_on_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
         batch = super().generate_batch(batch_shape)
@@ -456,7 +458,8 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
            yc_on_grid=yc_on_grid,
            xc_off_grid=batch.xc,
            yc_off_grid=batch.yc,
-           gt_pred=None
+           gt_pred=None,
+           ignore_on_grid=self.ignore_on_grid,
         )
 
 class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):
