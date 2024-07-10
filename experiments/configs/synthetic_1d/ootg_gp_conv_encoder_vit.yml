@@ -69,13 +69,14 @@ tnpd_encoder:
 
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
-  dim: ${params.dim}
+  ard_num_dims: ${params.dim}
   init_lengthscale: ${eval:'2 * 1 / ${params.points_per_unit}'}
 
 transformer_encoder:
   _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   patch_encoder: ${patch_encoder}
   mhca_layer: ${mhca_layer}
+  mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
 
 patch_encoder:
@@ -85,6 +86,14 @@ patch_encoder:
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhsa_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}

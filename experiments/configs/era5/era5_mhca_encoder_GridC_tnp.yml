@@ -73,10 +73,20 @@ grid_mhca_layer:
 transformer_encoder:
   _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
+  mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
+  top_k_ctot: ${params.top_k_ctot}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhsa_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -146,13 +156,15 @@ params:
   norm_first: True
   num_layers: 5
 
+  top_k_ctot: 9
+
   siren_net_ignore_dims: null
   num_legendre_polys: 10
 
 
 misc:
   project: era5-no-time
-  name: mhca_encoder-GridC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}
+  name: mhca_encoder-GridC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

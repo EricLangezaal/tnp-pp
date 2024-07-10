@@ -38,14 +38,17 @@ class SetConvGridEncoder(IdentityGridEncoder):
     def __init__(
         self,
         *,
-        dim: int,
+        ard_num_dims: Optional[int] = None,
         init_lengthscale: float,
         grid_shape: Optional[Tuple[int, ...]] = None,
         coarsen_fn: Callable = coarsen_grid,
         dist_fn: Optional[Callable] = None,
     ):
         super().__init__() 
-        init_lengthscale = torch.as_tensor(dim * [init_lengthscale], dtype=torch.float32)
+        self.ard_num_dims = ard_num_dims
+        num_lengthscale_dims = 1 if ard_num_dims is None else ard_num_dims
+        
+        init_lengthscale = torch.as_tensor(num_lengthscale_dims * [init_lengthscale], dtype=torch.float32)
         self.lengthscale_param = nn.Parameter(
             (init_lengthscale.clone().detach().exp() - 1).log(),
             requires_grad=True,

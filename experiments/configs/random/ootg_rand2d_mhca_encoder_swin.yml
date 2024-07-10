@@ -49,9 +49,9 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
-  swin_layer: ${swin_layer}
+  mhsa_layer: ${swin_layer}
   num_layers: ${params.num_layers}
 
 swin_layer:

@@ -151,21 +151,25 @@ def compute_eq_weights(
     weights = torch.exp(-0.5 * dist2)
     return weights
 
-def haversine_dist(x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
+
+def haversine_dist(
+    x1: torch.Tensor, x2: torch.Tensor, latlon_dims: Tuple[int, int] = (-2, -1)
+) -> torch.Tensor:
     """
     Taken from https://www.movable-type.co.uk/scripts/latlong.html
     Setting R=1
     """
+    lat1, lon1 = x1[..., latlon_dims[0], None], x1[..., latlon_dims[1], None]
+    lat2, lon2 = x2[..., latlon_dims[0], None], x2[..., latlon_dims[1], None]
 
-    to_rad = lambda x: x * torch.pi / 180
+    lat1, lon1, lat2, lon2 = map(torch.deg2rad, (lat1, lon1, lat2, lon2))
 
-    phi1 = to_rad(x1[...,-2:-1]) # latitude angle
-    phi2 = to_rad(x2[...,-2:-1]) # latitude angle
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
 
-    delta_phi = to_rad(x2[..., -2:-1] - x1[..., -2:-1])
-    delta_l = to_rad(x2[..., -1:] - x1[..., -1:]) # longitude angle difference
-
-    a = torch.sin(delta_phi / 2).pow(2) + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_l / 2).pow(2)
+    a = torch.sin(dlat / 2).pow(2) + torch.cos(lat1) * torch.cos(lat2) * torch.sin(
+        dlon / 2
+    ).pow(2)
     c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
 
     return c

@@ -44,7 +44,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         y_mean: Optional[Tuple[float, ...]] = None,
         y_std: Optional[Tuple[float, ...]] = None,
         lazy_loading: bool = True,
-        wrap_longitude: bool = True,
+        wrap_longitude: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -68,8 +68,11 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         if dataset["latitude"].max() > 90:
             dataset = dataset.assign_coords(latitude=dataset["latitude"].values - 90)
 
+        # Sort latitude and longitude values.
+        dataset = dataset.sortby(["latitude", "longitude"])
+
         dataset = dataset.sel(
-            latitude=slice(*sorted(lat_range, reverse=True)),
+            latitude=slice(*sorted(lat_range)),
             longitude=slice(*sorted(lon_range)),
         )
         if use_time:
@@ -82,6 +85,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         ref_np_datetime = np.datetime64(ref_datetime)
         hours = (dataset["time"][:].data - ref_np_datetime) / np.timedelta64(1, "h")
         dataset = dataset.assign_coords(time=hours)
+        dataset = dataset.transpose("time", "latitude", "longitude")
 
         self.lat_range = lat_range
         self.lon_range = lon_range
@@ -123,8 +127,8 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
         # Whether we allow batches to wrap around longitudinally.
-        self.wrap_longitude = wrap_longitude and len(self.data["longitude"]) == 1440
-
+        self.wrap_longitude = wrap_longitude
+        
     def sample_idx(self, batch_size: int) -> List[Tuple[List, List, List]]:
         """Samples indices used to sample dataframe.
 
@@ -441,17 +445,17 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
         yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
         
-        #xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
-        #yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
+        xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
+        yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
         # NOTE: order here is different from synthetic.
-        #x = torch.cat((xc, batch.xt), dim=-2)
-        #y = torch.cat((yc, batch.yt), dim=-2)
+        x = torch.cat((xc, batch.xt), dim=-2)
+        y = torch.cat((yc, batch.yt), dim=-2)
 
         return OOTGBatch(
-           x=None, # can safely set these to None, might save memory.
-           y=None,
-           xc=None,
-           yc=None,
+           x=x,
+           y=y,
+           xc=xc,
+           yc=yc,
            xt=batch.xt,
            yt=batch.yt,
            xc_on_grid=xc_on_grid,

@@ -36,13 +36,13 @@ tnpd_encoder:
 
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
-  dim: ${params.dim}
+  ard_num_dims: ${params.dim}
   init_lengthscale: ${eval:'2 * 1 / 8'}
 
 transformer_encoder:
-  _target_: icicl.networks.grid_transformer.SWINTransformerEncoder
+  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
-  swin_layer: ${swin_layer}
+  mhsa_layer: ${swin_layer}
   num_layers: ${params.num_layers}
 
 swin_layer:

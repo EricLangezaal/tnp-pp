@@ -8,7 +8,7 @@ from .base import OOTGConditionalNeuralProcess
 from .tnp import TNPDDecoder
 
 from ..networks.grid_encoders import IdentityGridEncoder, SetConvGridEncoder, PseudoTokenGridEncoder
-from ..networks.grid_transformer import SWINTransformerEncoder, GridTransformerEncoder
+from ..networks.grid_transformer import GridTransformerEncoder
 from ..utils.grids import coarsen_grid
 from ..utils.helpers import preprocess_observations
 
@@ -17,7 +17,7 @@ class OOTG_TNPDEncoder(nn.Module):
 
     def __init__(
             self,
-            transformer_encoder: Union[SWINTransformerEncoder, GridTransformerEncoder],
+            transformer_encoder: Union[GridTransformerEncoder],
             grid_encoder: Union[IdentityGridEncoder, SetConvGridEncoder, PseudoTokenGridEncoder],
             xy_encoder: nn.Module,
             x_encoder: nn.Module = nn.Identity(),
@@ -91,10 +91,8 @@ class OOTG_TNPDEncoder(nn.Module):
             zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid,
             ignore_on_grid=ignore_on_grid
         )
-        if isinstance(self.transformer_encoder, SWINTransformerEncoder):
-            zt = self.transformer_encoder(xc, zc, xt, zt)
-        else:
-            zt = self.transformer_encoder(zc, zt)
+
+        zt = self.transformer_encoder(xc, zc, xt, zt)
         return zt
     
 

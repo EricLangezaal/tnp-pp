@@ -1,11 +1,10 @@
 import lightning.pytorch as pl
 import torch
 from plot import plot
-from plot_globe import plot_globe
+from plot_era5 import plot_era5
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
-from icicl.data.cru import CRUDataGenerator
 from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.image import ImageGenerator
 from icicl.data.kolmogorov import KolmogorovGenerator
@@ -46,22 +45,18 @@ def main():
                 name=name,
             )
 
-    elif isinstance(gen_val, CRUDataGenerator) or isinstance(gen_val, ERA5DataGenerator):
+    elif isinstance(gen_val, ERA5DataGenerator):
                 
         def plot_fn(model, batches, name):
-                plot_globe(
+                plot_era5(
                     model=model,
                     batches=batches,
-                    x_mean=gen_val.x_mean if isinstance(gen_val, CRUDataGenerator) else None,
-                    x_std=gen_val.x_std if isinstance(gen_val, CRUDataGenerator) else None,
                     y_mean=gen_val.y_mean,
                     y_std=gen_val.y_std,
                     num_fig=min(5, len(batches)),
-                    figsize=(24.0, 5.0),
-                    lat_range=gen_val.lat_range,
-                    lon_range=gen_val.lon_range,
-                    time_idx=(0, -1) if isinstance(gen_val, CRUDataGenerator) else None,
+                    figsize=(15.0, 5.0),
                     name=name,
+                    subplots=True,
                 )
 
     elif isinstance(gen_val, KolmogorovGenerator):
