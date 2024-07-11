@@ -40,8 +40,7 @@ def plot_era5(
                 setattr(batch, key, value[:1])
 
         plot_batch = copy.deepcopy(batch)
-        # since we put the full grid in the 'x'
-        plot_batch.xt = flatten_grid(plot_batch.x)
+        plot_batch.xt = flatten_grid(plot_batch.xc_on_grid)
 
         with torch.no_grad():
             yt_pred_dist = pred_fn(model, batch)
@@ -62,9 +61,8 @@ def plot_era5(
         pred_mean_t = (pred_mean_t[0] * y_std) + y_mean
         pred_std_t = pred_std_t[0] * y_std
 
-        # since we put the full resolution grid in the 'x' and 'y'
-        x_grid = flatten_grid(batch.x)[0].cpu()
-        y_grid = flatten_grid(batch.y)[0].cpu() * y_std + y_mean
+        x_grid = flatten_grid(batch.xc_on_grid)[0].cpu()
+        y_grid = flatten_grid(batch.yc_on_grid)[0].cpu() * y_std + y_mean
         pred_mean_grid = (pred_mean_grid[0] * y_std) + y_mean
         pred_std_grid = pred_std_grid[0] * y_std
 
