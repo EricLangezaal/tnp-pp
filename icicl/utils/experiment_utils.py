@@ -280,7 +280,7 @@ def val_epoch(
             result["gt_loglik"].append(gt_loglik)
 
         result["loglik"].append(loglik)
-        result["rmse"] = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
+        result["rmse"].append(nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu())
 
 
     loglik = torch.stack(result["loglik"])
