@@ -156,12 +156,11 @@ params:
   num_legendre_polys: 10
 
   top_k_ctot: 9
-  patch_size: [4, 4]
 
 
 misc:
   project: era5-no-time
-  name: PatchC-setconv-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-KCA=${params.top_k_ctot}
+  name: setconv-GridC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
