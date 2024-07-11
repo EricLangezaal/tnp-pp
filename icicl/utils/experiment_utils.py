@@ -280,12 +280,16 @@ def val_epoch(
             result["gt_loglik"].append(gt_loglik)
 
         result["loglik"].append(loglik)
+        result["rmse"] = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
+
 
     loglik = torch.stack(result["loglik"])
     result["mean_loglik"] = loglik.mean()
     result["std_loglik"] = loglik.std() / (len(loglik) ** 0.5)
     result["mean_loss"] = -loglik.mean()
     result["std_loss"] = loglik.std() / (len(loglik) ** 0.5)
+
+    result["rmse"] = torch.stack(result["rmse"]).mean()
 
     if "gt_loglik" in result:
         gt_loglik = torch.stack(result["gt_loglik"])
@@ -505,6 +509,9 @@ def evaluation_summary(name: str, result: Dict[str, Any]) -> None:
 
     if "mean_loglik" in result:
         wandb.log({f"{name}/loglik": result["mean_loglik"]})
+
+    if "rmse" in result:
+        wandb.log({f"{name}/rmse": result["rmse"]})
 
     if "mean_gt_loglik" in result:
         wandb.log(

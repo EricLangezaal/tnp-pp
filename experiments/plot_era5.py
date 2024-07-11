@@ -40,7 +40,8 @@ def plot_era5(
                 setattr(batch, key, value[:1])
 
         plot_batch = copy.deepcopy(batch)
-        plot_batch.xt = flatten_grid(plot_batch.xc_on_grid)
+        # since we put the full grid in the 'x'
+        plot_batch.xt = flatten_grid(plot_batch.x)
 
         with torch.no_grad():
             yt_pred_dist = pred_fn(model, batch)
@@ -61,16 +62,16 @@ def plot_era5(
         pred_mean_t = (pred_mean_t[0] * y_std) + y_mean
         pred_std_t = pred_std_t[0] * y_std
 
-        xc_on_grid = flatten_grid(batch.xc_on_grid)[0].cpu()
-        yc_on_grid = flatten_grid(batch.yc_on_grid)[0].cpu() * y_std + y_mean
-
+        # since we put the full resolution grid in the 'x' and 'y'
+        x_grid = flatten_grid(batch.x)[0].cpu()
+        y_grid = flatten_grid(batch.y)[0].cpu() * y_std + y_mean
         pred_mean_grid = (pred_mean_grid[0] * y_std) + y_mean
         pred_std_grid = pred_std_grid[0] * y_std
 
-        diff_grid = yc_on_grid - pred_mean_grid
+        diff_grid = y_grid - pred_mean_grid
         diff_grid_norm = diff_grid / pred_std_grid
 
-        vmin, vmax = yc_on_grid.min(), yc_on_grid.max()
+        vmin, vmax = y_grid.min(), y_grid.max()
         scatter_kwargs = {
             "s": 15,
             "marker": "s",
@@ -106,13 +107,13 @@ def plot_era5(
             row1 = axes[0, 2].scatter(xc_off_grid[:, -1], xc_off_grid[:, -2], c=yc_off_grid, **scatter_kwargs)
             axes[0, 2].set_title("Off grid context", fontsize=18)
 
-            row2_col1 = axes[1, 0].scatter(xc_on_grid[:, -1], xc_on_grid[:, -2], c=pred_mean_grid, **scatter_kwargs)
+            row2_col1 = axes[1, 0].scatter(x_grid[:, -1], x_grid[:, -2], c=pred_mean_grid, **scatter_kwargs)
             axes[1, 0].set_title("Global predictions", fontsize=18)
 
-            row2_col2 = axes[1, 1].scatter(xc_on_grid[:, -1], xc_on_grid[:, -2], c=yc_on_grid, **scatter_kwargs)
+            row2_col2 = axes[1, 1].scatter(x_grid[:, -1], x_grid[:, -2], c=y_grid, **scatter_kwargs)
             axes[1, 1].set_title("Global true values", fontsize=18)
 
-            row2_diffs = axes[1, 2].scatter(xc_on_grid[:, -1], xc_on_grid[:, -2], c=diff_grid, **scatter_kwargs | diff_args)
+            row2_diffs = axes[1, 2].scatter(x_grid[:, -1], x_grid[:, -2], c=diff_grid, **scatter_kwargs | diff_args)
             axes[1, 2].set_title("Global difference", fontsize=18)
 
             # Add colourbar.
@@ -137,8 +138,8 @@ def plot_era5(
             scatter_kwargs["s"] = 10
             for fig_name, x_plot, y_plot in zip(
                 ("Target predictions", "Target true values", "Off grid context", "Global predictions", "Global true values", "Global difference", "Normalised global difference"),
-                (xt, xt, xc_off_grid, xc_on_grid, xc_on_grid, xc_on_grid, xc_on_grid),
-                (pred_mean_t, yt, yc_off_grid, pred_mean_grid, yc_on_grid, diff_grid, diff_grid_norm),
+                (xt, xt, xc_off_grid, x_grid, x_grid, x_grid, x_grid),
+                (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, diff_grid_norm),
             ):
                 fig = plt.figure(figsize=figsize)
 

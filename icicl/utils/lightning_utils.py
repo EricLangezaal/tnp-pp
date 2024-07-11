@@ -55,6 +55,7 @@ class LitWrapper(pl.LightningModule):
         pred_dist = self.pred_fn(self.model, batch)
         loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
+        result["rmse"] = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
 
         if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
@@ -112,6 +113,8 @@ class LitWrapper(pl.LightningModule):
         std_loglik = loglik.std() / (len(loglik) ** 0.5)
         self.log("val/loglik", mean_loglik)
         self.log("val/std_loglik", std_loglik)
+
+        self.log("val/rmse", torch.stack(results["rmse"]).mean())
 
         if self.checkpointer is not None:
             # For checkpointing.

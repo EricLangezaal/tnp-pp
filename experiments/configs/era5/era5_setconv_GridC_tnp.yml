@@ -54,13 +54,13 @@ tnpd_encoder:
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
   x_encoder: ${siren_net}
-  patch_encoder: ${patch_encoder}
-  coarsen_fn: ${coarsen_fn}
 
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
   init_lengthscale: 0.1
+  grid_shape: [30, 60]
   dist_fn: ${dist_fn}
+  coarsen_fn: ${coarsen_fn}
 
 dist_fn:
   _target_: icicl.utils.conv.haversine_dist
@@ -88,11 +88,6 @@ mhsa_layer:
   head_dim: ${params.head_dim}
   feedforward_dim: ${params.embed_dim}
   norm_first: ${params.norm_first}
-
-patch_encoder:
-  _target_: icicl.networks.patch_encoders.PatchEncoder
-  embed_dim: ${params.embed_dim}
-  patch_size: ${params.patch_size}
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP

@@ -105,6 +105,8 @@ def main():
         test_result["mean_loglik"] = loglik.mean()
         test_result["std_loglik"] = loglik.std() / (len(loglik) ** 0.5)
 
+        test_result["rmse"] = torch.stack(test_result["rmse"]).mean()
+
         if "gt_loglik" in test_result:
             gt_loglik = torch.stack(test_result["gt_loglik"])
             test_result["mean_gt_loglik"] = gt_loglik.mean()
@@ -117,6 +119,7 @@ def main():
 
     wandb.run.summary[f"test/{eval_name}/loglik"] = test_result["mean_loglik"]
     wandb.run.summary[f"test/{eval_name}/std_loglik"] = test_result["std_loglik"]
+    wandb.run.summary[f"test/{eval_name}/rmse"] = test_result["rmse"]
     if "mean_gt_loglik" in test_result:
         wandb.run.summary[f"test/{eval_name}/gt_loglik"] = test_result["mean_gt_loglik"]
         wandb.run.summary[f"test/{eval_name}/std_gt_loglik"] = test_result[
@@ -130,21 +133,19 @@ def main():
             num_fig=min(experiment.misc.num_plots, len(batches)),
             name=f"test/{eval_name}",
         )
-    elif isinstance(gen_test, CRUDataGenerator) or isinstance(gen_test, ERA5DataGenerator):
-        plot_globe(
-            model=model,
-            batches=batches,
-            x_mean=gen_test.x_mean if isinstance(gen_test, CRUDataGenerator) else None,
-            x_std=gen_test.x_std if isinstance(gen_test, CRUDataGenerator) else None,
-            y_mean=gen_test.y_mean,
-            y_std=gen_test.y_std,
-            num_fig=min(5, len(batches)),
-            figsize=(24.0, 5.0),
-            lat_range=gen_test.lat_range,
-            lon_range=gen_test.lon_range,
-            time_idx=(0, -1) if isinstance(gen_test, CRUDataGenerator) else None,
-            name=f"test/{eval_name}/",
-        )
+    elif isinstance(gen_test, ERA5DataGenerator):
+            plot_era5(
+                model=model,
+                batches=batches,
+                y_mean=gen_test.y_mean,
+                y_std=gen_test.y_std,
+                num_fig=min(experiment.misc.num_plots, len(batches)),
+                figsize=(15.0, 5.0),
+                name=eval_name,
+                subplots=experiment.misc.subplots,
+                savefig=experiment.misc.savefig,
+                logging=experiment.misc.logging,
+            )
     elif isinstance(gen_test, KolmogorovGenerator):
         plot_kolmogorov(
             model=model,

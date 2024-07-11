@@ -57,7 +57,7 @@ tnpd_encoder:
 
 grid_encoder:
   _target_: icicl.networks.grid_encoders.SetConvGridEncoder
-  init_lengthscale: ${eval:'2 * 1/(4 / ${params.coarsen_factors}[0])'}
+  init_lengthscale: 0.1
   dist_fn: ${dist_fn}
 
 dist_fn:
