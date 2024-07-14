@@ -39,8 +39,13 @@ def plot_era5(
             if isinstance(value, torch.Tensor):
                 setattr(batch, key, value[:1])
 
+        if batch.x is not None and batch.y is not None:
+            x_grid, y_grid = batch.x, batch.y
+        else:
+            x_grid, y_grid = batch.xc_on_grid, batch.yc_on_grid
+
         plot_batch = copy.deepcopy(batch)
-        plot_batch.xt = flatten_grid(plot_batch.xc_on_grid)
+        plot_batch.xt = flatten_grid(x_grid)
 
         with torch.no_grad():
             yt_pred_dist = pred_fn(model, batch)
@@ -61,8 +66,8 @@ def plot_era5(
         pred_mean_t = (pred_mean_t[0] * y_std) + y_mean
         pred_std_t = pred_std_t[0] * y_std
 
-        x_grid = flatten_grid(batch.xc_on_grid)[0].cpu()
-        y_grid = flatten_grid(batch.yc_on_grid)[0].cpu() * y_std + y_mean
+        x_grid = flatten_grid(x_grid)[0].cpu()
+        y_grid = flatten_grid(y_grid)[0].cpu() * y_std + y_mean
         pred_mean_grid = (pred_mean_grid[0] * y_std) + y_mean
         pred_std_grid = pred_std_grid[0] * y_std
 
@@ -78,7 +83,8 @@ def plot_era5(
             "vmax": vmax,
             "lw": 0,
         }
-        diff_args = {"vmin": diff_grid.min(), "vmax": diff_grid.max(), "cmap": "seismic"}
+        grid_args = scatter_kwargs | {"s": 2 if len(x_grid) < 50000 else 0.3}
+        diff_args = grid_args | {"vmin": diff_grid.min(), "vmax": diff_grid.max(), "cmap": "seismic"}
 
         if subplots:
             fig, axes = plt.subplots(
@@ -105,13 +111,13 @@ def plot_era5(
             row1 = axes[0, 2].scatter(xc_off_grid[:, -1], xc_off_grid[:, -2], c=yc_off_grid, **scatter_kwargs)
             axes[0, 2].set_title("Off grid context", fontsize=18)
 
-            row2_col1 = axes[1, 0].scatter(x_grid[:, -1], x_grid[:, -2], c=pred_mean_grid, **scatter_kwargs)
+            row2_col1 = axes[1, 0].scatter(x_grid[:, -1], x_grid[:, -2], c=pred_mean_grid, **grid_args)
             axes[1, 0].set_title("Global predictions", fontsize=18)
 
-            row2_col2 = axes[1, 1].scatter(x_grid[:, -1], x_grid[:, -2], c=y_grid, **scatter_kwargs)
+            row2_col2 = axes[1, 1].scatter(x_grid[:, -1], x_grid[:, -2], c=y_grid, **grid_args)
             axes[1, 1].set_title("Global true values", fontsize=18)
 
-            row2_diffs = axes[1, 2].scatter(x_grid[:, -1], x_grid[:, -2], c=diff_grid, **scatter_kwargs | diff_args)
+            row2_diffs = axes[1, 2].scatter(x_grid[:, -1], x_grid[:, -2], c=diff_grid, **diff_args)
             axes[1, 2].set_title("Global difference", fontsize=18)
 
             # Add colourbar.

@@ -55,7 +55,7 @@ class GridTransformerEncoder(nn.Module):
             zc = self.patch_encoder(zc)
             
             xc = func_AvgPoolNd(
-                dim=xc.shape[-1],
+                n=xc.shape[-1],
                 input=xc.movedim(-1, 1),
                 kernel_size=self.patch_encoder.conv.kernel_size,
                 stride=self.patch_encoder.conv.stride,

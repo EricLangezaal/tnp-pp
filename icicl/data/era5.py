@@ -426,6 +426,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         self,
         coarsen_factors: Tuple[int, ...] = (4, 4),
         ignore_on_grid: bool = False,
+        store_original_grid: bool = False,
         **kwargs,
     ):
         kwargs["return_grid"] = True
@@ -436,12 +437,18 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         )
         self.coarsen_factors = tuple(coarsen_factors)
         self.ignore_on_grid = ignore_on_grid
+        self.store_original_grid = store_original_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
         batch = super().generate_batch(batch_shape)
         assert isinstance(batch, GriddedBatch), "batch must be gridded."
 
-        # NOTE this modified batch.x_grid in place, so if we need it separately we need to clone it.
+        x_grid, y_grid = None, None
+        if self.store_original_grid:
+            x_grid = batch.x_grid.clone()
+            y_grid = batch.y_grid.clone()
+
+        # NOTE this modified batch.x_grid in place
         xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
         yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
         
@@ -452,8 +459,8 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         #y = torch.cat((yc, batch.yt), dim=-2)
 
         return OOTGBatch(
-           x=None,
-           y=None,
+           x=x_grid,
+           y=y_grid,
            xc=None,
            yc=None,
            xt=batch.xt,
