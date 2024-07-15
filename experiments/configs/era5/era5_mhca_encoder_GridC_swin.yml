@@ -1,4 +1,4 @@
-# So use Patch coarsening then MHCA Encoder to same grid and Swin attention. Do use efficient top_k cross_attention.
+# So use MHCA Encoder to same grid and Swin attention without coarsening. Do use efficient top_k cross_attention.
 
 generators:
   train:
@@ -54,14 +54,13 @@ tnpd_encoder:
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
   x_encoder: ${siren_net}
-  patch_encoder: ${patch_encoder}
-  coarsen_fn: ${coarsen_fn}
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  grid_shape: [30, 60]
+  grid_shape: [30, 60] # (720 / 6 / 4, 1440 / 6 / 4)
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
+  coarsen_fn: ${coarsen_fn}
 
 grid_mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -118,11 +117,6 @@ spherical_harmonics:
   _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
   num_legendre_polys: ${params.num_legendre_polys}
 
-patch_encoder:
-  _target_: icicl.networks.patch_encoders.PatchEncoder
-  embed_dim: ${params.embed_dim}
-  patch_size: ${params.patch_size}
-
 coarsen_fn:
   _target_: icicl.data.era5.coarsen_grid_era5
   _partial_: True
@@ -171,12 +165,11 @@ params:
 
   top_k_ctot: 9
   window_sizes: [6, 6]
-  patch_size: [4, 4]
 
 
 misc:
   project: era5-no-time
-  name: PatchC-mhca_encoder-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}PS=${params.patch_size}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}
+  name: mhca_encoder-GridC-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

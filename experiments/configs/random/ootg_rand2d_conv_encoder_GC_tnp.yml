@@ -90,7 +90,6 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  ignore_on_grid: False
 
   dim: 2
   grid_shape: [120, 240]

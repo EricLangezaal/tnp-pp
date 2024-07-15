@@ -1,12 +1,26 @@
 from dataclasses import dataclass
 from typing import Tuple, Optional
 from math import prod
+from enum import Enum, auto
 
 import torch
 
 from .base import DataGenerator
 from .synthetic import SyntheticGenerator, SyntheticBatch
 from ..utils.grids import unflatten_grid, flatten_grid, make_grid_from_range
+
+class DataModality(Enum):
+    ON_GRID = 1
+    OFF_GRID = 2
+    BOTH = 3
+
+    def get(self, on_grid, off_grid):
+        if self == DataModality.ON_GRID:
+            return on_grid
+        elif self == DataModality.OFF_GRID:
+            return off_grid
+        else:
+            return torch.cat((off_grid, flatten_grid(on_grid)), dim=-2)
 
 @dataclass
 class OOTGBatch(SyntheticBatch):
@@ -16,7 +30,7 @@ class OOTGBatch(SyntheticBatch):
     xc_off_grid: torch.Tensor
     yc_off_grid: torch.Tensor
 
-    ignore_on_grid: bool = False
+    used_modality: DataModality = DataModality.BOTH
 
 
 class SyntheticOOTGGenerator(DataGenerator):
@@ -26,7 +40,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         off_grid_generator: SyntheticGenerator,
         grid_range: Tuple[Tuple[float, float], ...], # so pair for each dimension
         points_per_unit: int,
-        ignore_on_grid: bool = False,
+        used_modality: DataModality = DataModality.BOTH,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -34,7 +48,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         self.otg_generator = off_grid_generator
         self.grid_range = torch.as_tensor(grid_range, dtype=torch.float)
         self.points_per_unit = torch.as_tensor(points_per_unit)
-        self.ignore_on_grid = ignore_on_grid
+        self.used_modality = used_modality
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
         """
@@ -82,8 +96,6 @@ class SyntheticOOTGGenerator(DataGenerator):
 
         offtg_xc = offtg_x[:, :num_ctx, :]
         offtg_yc = offtg_y[:, :num_ctx, :]
-        xc = torch.cat((offtg_xc, ontg_x), dim=-2)
-        yc = torch.cat((offtg_yc, ontg_y), dim=-2)
 
         xt = offtg_x[:, num_ctx:, :]
         yt = offtg_y[:, num_ctx:, :]
@@ -91,8 +103,8 @@ class SyntheticOOTGGenerator(DataGenerator):
         return OOTGBatch(
             x=x,
             y=y,
-            xc=offtg_xc if self.ignore_on_grid else xc,
-            yc=offtg_yc if self.ignore_on_grid else yc,
+            xc=self.used_modality.get(on_grid=ontg_x, off_grid=offtg_xc),
+            yc=self.used_modality.get(on_grid=ontg_y, off_grid=offtg_yc),
             xc_off_grid=offtg_xc,
             yc_off_grid=offtg_yc,
             xc_on_grid=unflatten_grid(ontg_x, grid_shape=grid_shape),
@@ -100,7 +112,7 @@ class SyntheticOOTGGenerator(DataGenerator):
             xt=xt,
             yt=yt,
             gt_pred=gt_pred,
-            ignore_on_grid=self.ignore_on_grid,
+            used_modality=self.used_modality,
         )
 
     

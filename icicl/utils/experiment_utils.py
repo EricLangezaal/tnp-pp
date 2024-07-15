@@ -16,6 +16,7 @@ from torch import nn
 from tqdm.auto import tqdm
 
 import wandb
+from icicl.data.on_off_grid import DataModality
 from icicl.data.base import Batch, DataGenerator
 from icicl.data.image import GriddedImageBatch
 from icicl.data.smoke import GriddedBatchWithInputs
@@ -131,7 +132,7 @@ def np_loss_fn(
             xc_on_grid = batch.xc_on_grid,
             yc_on_grid = batch.yc_on_grid,
             xt = batch.xt,
-            ignore_on_grid = batch.ignore_on_grid,
+            used_modality = batch.used_modality,
         )
     elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
@@ -168,7 +169,7 @@ def np_pred_fn(
             xc_on_grid = batch.xc_on_grid,
             yc_on_grid = batch.yc_on_grid,
             xt = batch.xt,
-            ignore_on_grid = batch.ignore_on_grid,
+            used_modality = batch.used_modality,
         )
     elif isinstance(model, GriddedConvCNP):
         assert isinstance(batch, GriddedImageBatch)
@@ -249,7 +250,7 @@ def val_epoch(
                     xc_on_grid = batch.xc_on_grid,
                     yc_on_grid = batch.yc_on_grid,
                     xt = batch.xt,
-                    ignore_on_grid = batch.ignore_on_grid,
+                    used_modality = batch.used_modality,
                 )
             elif isinstance(model, GriddedConvCNP):
                 assert isinstance(batch, GriddedImageBatch)
@@ -347,6 +348,8 @@ def extract_config(
     # Register eval.
     if not OmegaConf.has_resolver("eval"):
         OmegaConf.register_new_resolver("eval", eval)
+
+    OmegaConf.register_new_resolver("data_modality", lambda x: DataModality[str(x).upper()], replace=True)
 
     if isinstance(raw_config, str):
         config = OmegaConf.load(raw_config)

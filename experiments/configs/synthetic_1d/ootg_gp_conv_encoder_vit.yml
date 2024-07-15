@@ -6,7 +6,7 @@ generators:
     off_grid_generator: ${generators.off_grid_generator_train}
     grid_range: ${params.data_range}
     points_per_unit: ${params.points_per_unit}
-    ignore_on_grid: ${params.ignore_on_grid}
+    used_modality: ${params.used_modality}
     samples_per_epoch: 16000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -15,7 +15,7 @@ generators:
     off_grid_generator: ${generators.off_grid_generator_val}
     grid_range: ${params.data_range}
     points_per_unit: ${params.points_per_unit}
-    ignore_on_grid: ${params.ignore_on_grid}
+    used_modality: ${params.used_modality}
     samples_per_epoch: 4000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -129,7 +129,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  ignore_on_grid: False
+  used_modality: ${data_modality:BOTH}
 
   dim: 1
   data_range: [[-4.0, 4.0]]  # range * ppu is scaled to be power of 2 anyway, so make power of 2!
@@ -148,5 +148,5 @@ params:
 
 misc:
   project: ViT
-  name: convset_encoder_NoGrid=${params.ignore_on_grid}-taskCor=${params.task_correlation}
+  name: convset_encoder-${params.used_modality}-taskCor=${params.task_correlation}
   resume_from_checkpoint: null

@@ -20,6 +20,7 @@ generators:
     samples_per_epoch: 8_000
     batch_size: 16
     deterministic: ${params.deterministic}
+    used_modality: ${params.used_modality}
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
@@ -40,6 +41,7 @@ generators:
     samples_per_epoch: 2_000
     batch_size: 16
     deterministic: ${params.deterministic}
+    used_modality: ${params.used_modality}
     num_workers: 32
     
 model:
@@ -142,6 +144,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False
+  used_modality: ${data_modality:BOTH}
 
   x_dim: 2
   y_dim: 1
@@ -164,7 +167,7 @@ params:
 
 misc:
   project: era5-no-time
-  name: mhca_encoder-GridC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}
+  name: mhca_encoder-GridC-${params.used_modality}-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

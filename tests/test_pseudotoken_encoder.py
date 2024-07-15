@@ -2,6 +2,7 @@ import torch
 import einops
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
+from icicl.data.on_off_grid import DataModality
 from icicl.utils.grids import unflatten_grid, flatten_grid
 from icicl.networks.grid_encoders import PseudoTokenGridEncoder
 from icicl.networks.attention_layers import MultiHeadCrossAttentionLayer
@@ -27,7 +28,7 @@ def test_pt_grid_encoder(dim:int = 1, emb_dim=128):
 
         encoder = PseudoTokenGridEncoder(embed_dim=emb_dim, mhca_layer=layer,grid_range=[[-1,1]]* dim, points_per_unit= 8 // 2)
 
-        _, out_current = encoder(x_off_grid, x_on_grid, z_off_grid, z_on_grid, ignore_on_grid=False)
+        _, out_current = encoder(x_off_grid, x_on_grid, z_off_grid, z_on_grid, used_modality=DataModality.BOTH)
         out_old = old_pt_grid_encoder(layer, encoder.latents.view(-1, emb_dim), x_off_grid, x_on_grid, z_off_grid, z_on_grid)
 
     assert torch.equal(out_current, out_old)

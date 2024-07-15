@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from .tnp import EfficientTNPDEncoder
+from ..data.on_off_grid import DataModality
 from ..networks.attention_layers import MultiHeadCrossAttentionLayer
 from ..networks.attention import MultiHeadCrossAttention
 from ..networks.grid_encoders import mhca_to_grid
@@ -62,11 +63,13 @@ class OOTGSetConvTNPDEncoder(EfficientTNPDEncoder):
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor,
         xt: torch.Tensor,
-        ignore_on_grid: bool = False,
+        used_modality: DataModality = DataModality.BOTH,
     ) -> torch.Tensor:
         xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid)
-        if ignore_on_grid:
+        if used_modality == DataModality.OFF_GRID:
             yc = yc[..., 1:]
+        elif used_modality == DataModality.ON_GRID:
+            yc = yc[..., :1]
         return EfficientTNPDEncoder.forward(self, xc=xc, yc=yc, xt=xt)
     
 
@@ -92,7 +95,7 @@ class OOTG_MHCA_TNPDEncoder(EfficientTNPDEncoder):
             yc_off_grid: torch.Tensor, 
             xc_on_grid: torch.Tensor, 
             yc_on_grid: torch.Tensor,
-            ignore_on_grid: bool
+            used_modality: DataModality,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         latents = self.latents.expand(xc_on_grid.shape[0], *self.latents.shape)
 
@@ -100,7 +103,7 @@ class OOTG_MHCA_TNPDEncoder(EfficientTNPDEncoder):
                      xc_on_grid, yc_on_grid, 
                      latents, 
                      self.grid_mhca_layer, 
-                     self.fake_embedding if ignore_on_grid else None
+                     self.fake_embedding if used_modality == DataModality.OFF_GRID else None
         )
         return xc_on_grid, yc
 
@@ -111,7 +114,7 @@ class OOTG_MHCA_TNPDEncoder(EfficientTNPDEncoder):
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor,
         xt: torch.Tensor,
-        ignore_on_grid: bool = False,
+        used_modality: DataModality = DataModality.BOTH,
     ) -> torch.Tensor:
-        xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid, ignore_on_grid=ignore_on_grid)
+        xc, yc = self.grid_encode(xc_off_grid=xc_off_grid, yc_off_grid=yc_off_grid, xc_on_grid=xc_on_grid, yc_on_grid=yc_on_grid, used_modality=used_modality)
         return EfficientTNPDEncoder.forward(self, xc=xc, yc=yc, xt=xt)

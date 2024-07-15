@@ -1,6 +1,7 @@
 from abc import ABC
 
 import torch
+from ..data.on_off_grid import DataModality
 from check_shapes import check_shapes
 from torch import nn
 
@@ -37,9 +38,9 @@ class OOTGConditionalNeuralProcess(BaseNeuralProcess):
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor, 
         xt: torch.Tensor,
-        ignore_on_grid: bool = False,
+        used_modality: DataModality = DataModality.BOTH,
     ) -> torch.distributions.Distribution:
-        return self.likelihood(self.decoder(self.encoder(xc_off_grid, yc_off_grid, xc_on_grid, yc_on_grid, xt, ignore_on_grid), xt))
+        return self.likelihood(self.decoder(self.encoder(xc_off_grid, yc_off_grid, xc_on_grid, yc_on_grid, xt, used_modality), xt))
 
 
 class NeuralProcess(BaseNeuralProcess):

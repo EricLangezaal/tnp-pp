@@ -7,6 +7,7 @@ from check_shapes import check_shapes
 from .base import OOTGConditionalNeuralProcess
 from .tnp import TNPDDecoder
 
+from ..data.on_off_grid import DataModality
 from ..networks.grid_encoders import IdentityGridEncoder, SetConvGridEncoder, PseudoTokenGridEncoder
 from ..networks.grid_transformer import GridTransformerEncoder
 from ..utils.grids import coarsen_grid
@@ -49,7 +50,7 @@ class OOTG_TNPDEncoder(nn.Module):
         xc_on_grid: torch.Tensor,
         yc_on_grid: torch.Tensor,
         xt: torch.Tensor,
-        ignore_on_grid: bool = False,
+        used_modality: DataModality = DataModality.BOTH,
     ) -> torch.Tensor:
         # add flag dimensions to all y values
         yc_off_grid, yt = preprocess_observations(xt, yc_off_grid, on_grid=False)
@@ -89,7 +90,7 @@ class OOTG_TNPDEncoder(nn.Module):
         xc, zc = self.grid_encoder(
             xc_off_grid=xc_off_grid, xc_on_grid=xc_on_grid, 
             zc_off_grid=zc_off_grid, zc_on_grid=zc_on_grid,
-            ignore_on_grid=ignore_on_grid
+            used_modality=used_modality
         )
 
         zt = self.transformer_encoder(xc, zc, xt, zt)

@@ -15,7 +15,7 @@ import torch
 import xarray as xr
 
 from .base import Batch, DataGenerator
-from .on_off_grid import OOTGBatch
+from .on_off_grid import OOTGBatch, DataModality
 from ..utils.grids import flatten_grid, coarsen_grid
 
 
@@ -425,7 +425,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
     def __init__(
         self,
         coarsen_factors: Tuple[int, ...] = (4, 4),
-        ignore_on_grid: bool = False,
+        used_modality: DataModality = DataModality.BOTH,
         store_original_grid: bool = False,
         **kwargs,
     ):
@@ -436,7 +436,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
             "please specify a coarsing for each grid dimension"
         )
         self.coarsen_factors = tuple(coarsen_factors)
-        self.ignore_on_grid = ignore_on_grid
+        self.used_modality = used_modality
         self.store_original_grid = store_original_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
@@ -470,7 +470,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
            xc_off_grid=batch.xc,
            yc_off_grid=batch.yc,
            gt_pred=None,
-           ignore_on_grid=self.ignore_on_grid,
+           used_modality=self.used_modality,
         )
 
 class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):

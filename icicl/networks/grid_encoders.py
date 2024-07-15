@@ -6,6 +6,7 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 import einops
 from check_shapes import check_shapes
 
+from ..data.on_off_grid import DataModality
 from ..networks.attention_layers import MultiHeadCrossAttentionLayer
 from ..networks.attention import MultiHeadCrossAttention
 from ..utils.conv import compute_eq_weights
@@ -23,10 +24,12 @@ class IdentityGridEncoder(nn.Module):
         xc_on_grid: torch.Tensor, 
         zc_off_grid: torch.Tensor, 
         zc_on_grid: torch.Tensor, 
-        ignore_on_grid: bool,
+        used_modality: DataModality,
     ) -> torch.Tensor:
-        if ignore_on_grid:
+        if used_modality == DataModality.OFF_GRID:
             return xc_off_grid, zc_off_grid
+        elif used_modality == DataModality.ON_GRID:
+            return flatten_grid(xc_on_grid), flatten_grid(zc_on_grid)
         
         xc = torch.cat((xc_off_grid, flatten_grid(xc_on_grid)), dim=-2)
         zc = torch.cat((zc_off_grid, flatten_grid(zc_on_grid)), dim=-2)
@@ -73,7 +76,7 @@ class SetConvGridEncoder(IdentityGridEncoder):
         xc_on_grid: torch.Tensor, 
         zc_off_grid: torch.Tensor, 
         zc_on_grid: torch.Tensor, 
-        ignore_on_grid: bool
+        used_modality: DataModality,
     ) -> torch.Tensor:
         
         if self.grid_shape is None:
@@ -83,10 +86,10 @@ class SetConvGridEncoder(IdentityGridEncoder):
                 z=zc_off_grid, 
                 x_grid=x_grid, 
                 lengthscale=self.lengthscale,
-                z_grid=zc_on_grid if not ignore_on_grid else None, 
+                z_grid=None if used_modality == DataModality.OFF_GRID else zc_on_grid, 
                 dist_func=self.dist_fn)
         else:
-            xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, ignore_on_grid)
+            xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, used_modality)
 
             grid_shape = torch.as_tensor(xc_on_grid.shape[1:-1])
             assert torch.all(grid_shape % self.grid_shape == 0), (
@@ -130,7 +133,7 @@ def setconv_to_grid(
     return z_grid
     
 
-class PseudoTokenGridEncoder(nn.Module):
+class PseudoTokenGridEncoder(IdentityGridEncoder):
     FAKE_TOKEN = -torch.inf
 
     def __init__(
@@ -168,7 +171,7 @@ class PseudoTokenGridEncoder(nn.Module):
             xc_on_grid: torch.Tensor, 
             zc_off_grid: torch.Tensor, 
             zc_on_grid: torch.Tensor, 
-            ignore_on_grid: bool
+            used_modality: DataModality,
     ) -> torch.Tensor:
         grid_shape = torch.as_tensor(xc_on_grid.shape[1:-1])
         latents = self.latents.expand(xc_on_grid.shape[0], *self.latents.shape)
@@ -182,14 +185,14 @@ class PseudoTokenGridEncoder(nn.Module):
                 z_grid=zc_on_grid, 
                 latent_grid=latents, 
                 mhca=self.mhca_layer,
-                fake_embedding=self.fake_embedding if ignore_on_grid else None,
+                fake_embedding=self.fake_embedding if used_modality == DataModality.OFF_GRID else None,
             )
             return xc_on_grid, z_grid
         
         else:
             # coarsen grid by having smaller pseudogrid for neighbour mhca
-            xc = torch.cat((xc_off_grid, flatten_grid(xc_on_grid)), dim=-2)
-            zc = torch.cat((zc_off_grid, flatten_grid(zc_on_grid)), dim=-2)
+            # concat both modalities or just return either separately depending on ignoring.
+            xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, used_modality)
 
             assert torch.all(grid_shape % self.grid_shape == 0), (
                 "cannot properly coarsen incoming grid to match pseudo-grid."
@@ -202,7 +205,7 @@ class PseudoTokenGridEncoder(nn.Module):
                 z_grid=latents, 
                 latent_grid=latents, 
                 mhca=self.mhca_layer,
-                fake_embedding=self.fake_embedding if ignore_on_grid else None,
+                fake_embedding=None,
             )
             return x_grid, z_grid
 
