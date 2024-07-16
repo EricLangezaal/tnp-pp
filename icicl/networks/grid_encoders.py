@@ -80,6 +80,9 @@ class SetConvGridEncoder(IdentityGridEncoder):
     ) -> torch.Tensor:
         
         if self.grid_shape is None:
+            assert used_modality != DataModality.ON_GRID, (
+                "Without grid coarsening, an IdentityGridEncoder has to be used to ignore off-grid data."
+            )
             x_grid = xc_on_grid
             z_grid = setconv_to_grid(
                 x=xc_off_grid, 
@@ -177,6 +180,9 @@ class PseudoTokenGridEncoder(IdentityGridEncoder):
         latents = self.latents.expand(xc_on_grid.shape[0], *self.latents.shape)
 
         if torch.equal(grid_shape, self.grid_shape):
+            assert used_modality != DataModality.ON_GRID, (
+                "Without grid coarsening, an IdentityGridEncoder has to be used to ignore off-grid data."
+            )
             # do not coarsen grid.
             z_grid = mhca_to_grid(
                 x=xc_off_grid, 
@@ -217,7 +223,7 @@ def mhca_to_grid(
     z_grid: torch.Tensor,
     latent_grid: torch.Tensor,
     mhca: Union[MultiHeadCrossAttention, MultiHeadCrossAttentionLayer],
-    fake_embedding: torch.Tensor = None,
+    fake_embedding: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     B, U, E = z.shape # 'B'atch, 'U'nstructured, 'E'mbedding
 

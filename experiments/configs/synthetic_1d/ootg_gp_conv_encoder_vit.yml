@@ -129,7 +129,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  used_modality: ${data_modality:BOTH}
+  used_modality: BOTH
 
   dim: 1
   data_range: [[-4.0, 4.0]]  # range * ppu is scaled to be power of 2 anyway, so make power of 2!
@@ -148,5 +148,5 @@ params:
 
 misc:
   project: ViT
-  name: convset_encoder-${params.used_modality}-taskCor=${params.task_correlation}
+  name: convset_encoder-data=${params.used_modality}-taskCor=${params.task_correlation}
   resume_from_checkpoint: null

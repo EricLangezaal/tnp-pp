@@ -1,20 +1,31 @@
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
+from typing_extensions import Self
 from math import prod
 from enum import Enum, auto
 
 import torch
+import warnings
 
 from .base import DataGenerator
 from .synthetic import SyntheticGenerator, SyntheticBatch
 from ..utils.grids import unflatten_grid, flatten_grid, make_grid_from_range
 
 class DataModality(Enum):
-    ON_GRID = 1
-    OFF_GRID = 2
-    BOTH = 3
+    ON_GRID = auto()
+    OFF_GRID = auto()
+    BOTH = auto()
 
-    def get(self, on_grid, off_grid):
+    def parse(value: Union[str, Self]) -> Self:
+        if isinstance(value, DataModality):
+            return value
+        try:
+            return DataModality[str(value).upper()]
+        except KeyError:
+            warnings.warn(f"Invalid value for DataModality: {value}. Defaulting to BOTH!")
+            return DataModality.BOTH
+
+    def get(self, on_grid: torch.Tensor, off_grid: torch.Tensor) -> torch.Tensor:
         if self == DataModality.ON_GRID:
             return on_grid
         elif self == DataModality.OFF_GRID:
@@ -48,7 +59,7 @@ class SyntheticOOTGGenerator(DataGenerator):
         self.otg_generator = off_grid_generator
         self.grid_range = torch.as_tensor(grid_range, dtype=torch.float)
         self.points_per_unit = torch.as_tensor(points_per_unit)
-        self.used_modality = used_modality
+        self.used_modality = DataModality.parse(used_modality)
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
         """

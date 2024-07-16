@@ -436,7 +436,7 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
             "please specify a coarsing for each grid dimension"
         )
         self.coarsen_factors = tuple(coarsen_factors)
-        self.used_modality = used_modality
+        self.used_modality = DataModality.parse(used_modality)
         self.store_original_grid = store_original_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:

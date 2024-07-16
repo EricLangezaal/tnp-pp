@@ -349,8 +349,6 @@ def extract_config(
     if not OmegaConf.has_resolver("eval"):
         OmegaConf.register_new_resolver("eval", eval)
 
-    OmegaConf.register_new_resolver("data_modality", lambda x: DataModality[str(x).upper()], replace=True)
-
     if isinstance(raw_config, str):
         config = OmegaConf.load(raw_config)
     else:

@@ -121,7 +121,7 @@ optimiser:
 params:
   epochs: 200
   deterministic: False # makes it generate whole dataset up front and re-use over epochs
-  used_modality: ${data_modality:BOTH}
+  used_modality: BOTH
 
   dim: 1
   data_range: [[-4.0, 4.0]]
@@ -138,7 +138,7 @@ params:
 
 misc:
   project: plain-tnp
-  name: plain_tnp-${params.used_modality}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}
+  name: plain_tnp-data=${params.used_modality}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
