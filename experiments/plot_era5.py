@@ -92,7 +92,7 @@ def plot_era5(
                 ncols=3,
                 nrows=2,
                 constrained_layout=True,
-                subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+                subplot_kw={"projection": ccrs.PlateCarree()},
             )
 
             for ax in axes.flat:
@@ -147,7 +147,7 @@ def plot_era5(
             ):
                 fig = plt.figure(figsize=figsize)
 
-                ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=180))
+                ax = plt.axes(projection=ccrs.PlateCarree())
                 ax.add_feature(cfeature.COASTLINE)
                 ax.add_feature(cfeature.BORDERS)
                 ax.set_axisbelow(True)
