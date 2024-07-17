@@ -163,19 +163,6 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         else:
             raise ValueError("Grid size is too large!")
 
-
-
-        if self.batch_grid_size[1] > len(self.data["latitude"]) or (
-            self.batch_grid_size[2] > len(self.data["longitude"])
-        ):
-            raise ValueError("Grid size is too large!")
-
-        i = random.randint(0, len(self.data["latitude"]) - self.batch_grid_size[1])
-        lat_idx = list(range(i, i + self.batch_grid_size[1]))
-
-        i = random.randint(0, len(self.data["longitude"]) - self.batch_grid_size[2])
-        lon_idx = list(range(i, i + self.batch_grid_size[2]))
-
         time_idx: List[List] = []
         for _ in range(batch_size):
             i = random.randint(
@@ -449,8 +436,8 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
             y_grid = batch.y_grid
 
         # NOTE this modified batch.x_grid in place
-        xc_on_grid = coarsen_grid_era5(batch.x_grid.clone(), self.coarsen_factors, self.wrap_longitude, -1)
-        yc_on_grid = coarsen_grid_era5(batch.y_grid.clone(), self.coarsen_factors) 
+        xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
+        yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
         
         #xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
         #yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
@@ -477,6 +464,7 @@ class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):
     # Confirmed this actually works.
     pass
 
+
 def coarsen_grid_era5(
     grid: torch.Tensor,
     coarsen_factors: Tuple[int, ...],
@@ -485,7 +473,8 @@ def coarsen_grid_era5(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
 
     if wrap_longitude:
-        lon_min = grid[..., 0, 0, lon_dim].clone()
+        warnings.warn("Assumed that the minimum longitude occurs in the first element.")
+        lon_min = grid[..., 0, 0, lon_dim]
         grid = recenter_latlon_grid(grid, lon_dim)
 
     coarse_grid = coarsen_grid(grid, coarsen_factors)
@@ -501,15 +490,17 @@ def coarsen_grid_era5(
 
     return coarse_grid
 
+
 def recenter_latlon_grid(grid: torch.Tensor, lon_dim: int = -1):
     # Assumes first index contains smallest longitude value.
     lon_min = grid[..., 0, lon_dim]
 
-    grid[..., lon_dim] = torch.where(
+    recentered_grid = grid.clone()
+    recentered_grid[..., lon_dim] = torch.where(
         (grid[..., lon_dim] - lon_min[..., None]) < 0,
         (grid[..., lon_dim]) + 360,
         grid[..., lon_dim],
     )
 
-    grid[..., lon_dim] = grid[..., lon_dim] - lon_min[..., None]
-    return grid
+    recentered_grid[..., lon_dim] = recentered_grid[..., lon_dim] - lon_min[..., None]
+    return recentered_grid
