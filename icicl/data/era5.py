@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple, Union
 
 import dask
+import dask.config
 import numpy as np
 import torch
 import xarray as xr
@@ -32,7 +33,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         data_dir: Optional[str] = None,
         fnames: Optional[List[str]] = None,
         gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2",
-        date_range: Tuple[str, str] = ("2019-01-01", "2019-12-31"),
+        date_range: Tuple[str, str] = ("2018-01-01", "2020-12-31"),
         lat_range: Tuple[float, float] = (-90.0, 90.0),
         lon_range: Tuple[float, float] = (-180.0, 180.0),
         batch_grid_size: Tuple[int, int, int],
@@ -49,6 +50,9 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
     ):
         super().__init__(**kwargs)
 
+        dask.config.set(scheduler="synchronous")
+        self.all_input_vars = ["time", "latitude", "longitude"]
+
         if fnames is not None and data_dir is not None:
             dataset = xr.open_mfdataset(
                 [os.path.join(data_dir, fname) for fname in fnames],
@@ -58,8 +62,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         else:
             dataset = xr.open_zarr(
                 gcloud_url,
-                chunks={"time": 48},
-                consolidated=True,
+                chunks=dict(zip(self.all_input_vars, batch_grid_size)),
             )
 
         # Ensure longitudes and latitudes are in standard format.
@@ -72,11 +75,10 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         dataset = dataset.sortby(["latitude", "longitude"])
 
         dataset = dataset.sel(
+            time=slice(*sorted(date_range)),
             latitude=slice(*sorted(lat_range)),
             longitude=slice(*sorted(lon_range)),
         )
-        if use_time:
-            dataset = dataset.sel(time=slice(*sorted(date_range)))
 
         dataset = dataset[list(data_vars)]
 
@@ -90,7 +92,6 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.lat_range = lat_range
         self.lon_range = lon_range
         self.data_vars = data_vars
-        self.all_input_vars = ["time", "latitude", "longitude"]
 
         self.lazy_loading = lazy_loading
         self.data = {
@@ -99,8 +100,6 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             "latitude": dataset["latitude"],
             "longitude": dataset["longitude"],
         }
-        if self.deterministic and lazy_loading:
-            warnings.warn("Deterministic generation with lazy loading will not speed up performance")
         if not lazy_loading:
             self.data = dask.compute(self.data)[0]
 
@@ -142,24 +141,22 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         # to len(self.data["latitude"]) and truncate grid size.
         if len(self.data["latitude"]) >= self.batch_grid_size[1]:
             i = random.randint(0, len(self.data["latitude"]) - self.batch_grid_size[1])
-            lat_idx = list(range(i, i + self.batch_grid_size[1]))
+            lat_idx = slice(i, i + self.batch_grid_size[1])
         else:
             raise ValueError("Grid size is too large!")
 
         # Allow longitude to wrap around.
-        if len(self.data["longitude"]) == self.batch_grid_size[2]:
-            lon_idx = list(range(len(self.data["longitude"])))
 
-        elif (
+        if (
             len(self.data["longitude"]) > self.batch_grid_size[2]
             and self.wrap_longitude
         ):
             i = random.randint(0, len(self.data["longitude"]))
             lon_idx = list(range(i, i + self.batch_grid_size[2]))
             lon_idx = [idx % len(self.data["longitude"]) for idx in lon_idx]
-        elif len(self.data["longitude"]) > self.batch_grid_size[2]:
+        elif len(self.data["longitude"]) >= self.batch_grid_size[2]:
             i = random.randint(0, len(self.data["longitude"] - self.batch_grid_size[2]))
-            lon_idx = list(range(i, i + self.batch_grid_size[2]))
+            lon_idx = slice(i, i + self.batch_grid_size[2])
         else:
             raise ValueError("Grid size is too large!")
 
@@ -170,13 +167,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
                 len(self.data["time"]) - self.t_spacing * self.batch_grid_size[0],
             )
             time_idx.append(
-                list(
-                    range(
-                        i,
-                        i + self.t_spacing * self.batch_grid_size[0],
-                        self.t_spacing,
-                    )
-                )
+                slice(i, i + self.batch_grid_size[0] * self.t_spacing, self.t_spacing)
             )
 
         idx = [(time_idx[i], lat_idx, lon_idx) for i in range(len(time_idx))]
