@@ -81,10 +81,6 @@ def main():
                 name=eval_name,
                 savefig=experiment.misc.savefig,
                 logging=experiment.misc.logging,
-                y_lim=(-2.5, 2.5),
-                x_range=(-4 + experiment.misc.eps, 4 + experiment.misc.eps),
-                figsize=(10, 6),
-                plot_target=False,
             )
 
         return
