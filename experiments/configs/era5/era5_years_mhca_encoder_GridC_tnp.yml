@@ -3,7 +3,7 @@
 generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
-    data_vars: ["t2m"]
+    data_vars: ["2m_temperature"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
     y_mean: [279.0644808446564] # calculated previously
@@ -22,7 +22,7 @@ generators:
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
-    data_vars: ["t2m"]
+    data_vars: ["2m_temperature"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
     y_mean: [279.0644808446564] # calculated previously
@@ -145,7 +145,7 @@ params:
   x_dim: 2
   y_dim: 1
   
-  batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
+  batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 500
 

@@ -80,6 +80,7 @@ def main():
                 num_fig=min(5, len(batches)),
                 name=name,
             )
+    torch.multiprocessing.set_start_method('spawn', force=True)
 
     lit_model = LitWrapper(
         model=model,
@@ -97,6 +98,7 @@ def main():
         limit_train_batches=gen_train.num_batches,
         limit_val_batches=gen_val.num_batches,
         log_every_n_steps=1,
+        num_sanity_val_steps=0,
         devices=1, #more?
         # strategy="ddp",
         gradient_clip_val=experiment.misc.gradient_clip_val,
