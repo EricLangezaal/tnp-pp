@@ -64,7 +64,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
 
         # Ensure longitudes and latitudes are in standard format.
         if dataset["longitude"].max() > 180:
-            dataset = dataset.assign_coords(longitude=dataset["longitude"].values - 180)
+            dataset = dataset.assign_coords(longitude=(dataset["longitude"].values + 180) % 360 - 180)
         if dataset["latitude"].max() > 90:
             dataset = dataset.assign_coords(latitude=dataset["latitude"].values - 90)
 
@@ -445,12 +445,12 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
 
         x_grid, y_grid = None, None
         if self.store_original_grid:
-            x_grid = batch.x_grid.clone()
-            y_grid = batch.y_grid.clone()
+            x_grid = batch.x_grid
+            y_grid = batch.y_grid
 
         # NOTE this modified batch.x_grid in place
-        xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
-        yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
+        xc_on_grid = coarsen_grid_era5(batch.x_grid.clone(), self.coarsen_factors, self.wrap_longitude, -1)
+        yc_on_grid = coarsen_grid_era5(batch.y_grid.clone(), self.coarsen_factors) 
         
         #xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
         #yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
