@@ -473,7 +473,6 @@ def coarsen_grid_era5(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
 
     if wrap_longitude:
-        warnings.warn("Assumed that the minimum longitude occurs in the first element.")
         lon_min = grid[..., 0, 0, lon_dim]
         grid = recenter_latlon_grid(grid, lon_dim)
 

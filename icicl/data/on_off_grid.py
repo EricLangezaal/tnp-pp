@@ -25,13 +25,19 @@ class DataModality(Enum):
             warnings.warn(f"Invalid value for DataModality: {value}. Defaulting to BOTH!")
             return DataModality.BOTH
 
-    def get(self, on_grid: torch.Tensor, off_grid: torch.Tensor) -> torch.Tensor:
+    def get(
+            self, 
+            on_grid: torch.Tensor, 
+            off_grid: torch.Tensor, 
+            both: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         if self == DataModality.ON_GRID:
             return on_grid
         elif self == DataModality.OFF_GRID:
             return off_grid
-        else:
-            return torch.cat((off_grid, flatten_grid(on_grid)), dim=-2)
+        elif isinstance(both, torch.Tensor):
+            return both
+        return torch.cat((off_grid, flatten_grid(on_grid)), dim=-2)
 
 @dataclass
 class OOTGBatch(SyntheticBatch):
@@ -108,14 +114,17 @@ class SyntheticOOTGGenerator(DataGenerator):
         offtg_xc = offtg_x[:, :num_ctx, :]
         offtg_yc = offtg_y[:, :num_ctx, :]
 
+        xc = torch.cat((offtg_xc, ontg_x), dim=-2)
+        yc = torch.cat((offtg_yc, ontg_y), dim=-2)
+
         xt = offtg_x[:, num_ctx:, :]
         yt = offtg_y[:, num_ctx:, :]
 
         return OOTGBatch(
             x=x,
             y=y,
-            xc=self.used_modality.get(on_grid=ontg_x, off_grid=offtg_xc),
-            yc=self.used_modality.get(on_grid=ontg_y, off_grid=offtg_yc),
+            xc=xc,
+            yc=yc,
             xc_off_grid=offtg_xc,
             yc_off_grid=offtg_yc,
             xc_on_grid=unflatten_grid(ontg_x, grid_shape=grid_shape),

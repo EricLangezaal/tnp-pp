@@ -60,48 +60,42 @@ def plot(
 
     for i in range(num_fig):
         batch = batches[i]
-        xc = batch.xc[:1]
-        yc = batch.yc[:1]
-        xt = batch.xt[:1]
-        yt = batch.yt[:1]
 
-        if isinstance(batch, OOTGBatch):
-            batch.xc_on_grid = batch.xc_on_grid[:1]
-            batch.xc_off_grid = batch.xc_off_grid[:1]
-            batch.yc_on_grid = batch.yc_on_grid[:1]
-            batch.yc_off_grid = batch.yc_off_grid[:1]
-
-        batch.xc = xc
-        batch.yc = yc
-        batch.xt = xt
-        batch.yt = yt
+        for key, value in vars(batch).items():
+            if isinstance(value, torch.Tensor):
+                setattr(batch, key, value[:1])
 
         plot_batch = copy.deepcopy(batch)
         plot_batch.xt = x_plot
+
+        xc_plot, yc_plot = batch.xc, batch.yc
+        if isinstance(batch, OOTGBatch):
+            xc_plot = batch.used_modality.get(batch.xc_on_grid, batch.xc_off_grid, batch.xc)
+            yc_plot = batch.used_modality.get(batch.yc_on_grid, batch.yc_off_grid, batch.yc)
 
         with torch.no_grad():
             y_plot_pred_dist = pred_fn(model, plot_batch)
             yt_pred_dist = pred_fn(model, batch)
 
-        model_nll = -yt_pred_dist.log_prob(yt).sum() / batch.yt[..., 0].numel()
+        model_nll = -yt_pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         mean, std = y_plot_pred_dist.mean, y_plot_pred_dist.stddev
 
-        title_str = f"$N = {xc.shape[1]}$ NLL = {model_nll:.3f}"
+        title_str = f"$N = {xc_plot.shape[1]}$ NLL = {model_nll:.3f}"
 
         if dim == 1:
             fig = plt.figure(figsize=figsize)
              # Plot context and target points
             plt.scatter(
-                xc[0, :, 0].cpu().numpy(),
-                yc[0, :, 0].cpu().numpy(),
+                xc_plot[0, :, 0].cpu().numpy(),
+                yc_plot[0, :, 0].cpu().numpy(),
                 c="k",
                 label="Context",
                 s=30,
             )
             if plot_target:
                 plt.scatter(
-                    xt[0, :, 0].cpu().numpy(),
-                    yt[0, :, 0].cpu().numpy(),
+                    batch.xt[0, :, 0].cpu().numpy(),
+                    batch.yt[0, :, 0].cpu().numpy(),
                     c="r",
                     label="Target",
                     s=30,
@@ -128,16 +122,16 @@ def plot(
             ax = fig.add_subplot(projection='3d')
 
             ax.scatter(
-                *[t.cpu().numpy() for t in torch.unbind(xc[0], dim=-1)],
-                yc[0, :, 0].cpu().numpy(),
+                *[t.cpu().numpy() for t in torch.unbind(xc_plot[0], dim=-1)],
+                yc_plot[0, :, 0].cpu().numpy(),
                 c="k",
                 label="Context",
                 s=30,
             )
             if plot_target:
                 ax.scatter(
-                    *[t.cpu().numpy() for t in torch.unbind(xt[0], dim=-1)],
-                    yt[0, :, 0].cpu().numpy(),
+                    *[t.cpu().numpy() for t in torch.unbind(batch.xt[0], dim=-1)],
+                    batch.yt[0, :, 0].cpu().numpy(),
                     c="r",
                     label="Target",
                     s=30,
@@ -152,20 +146,19 @@ def plot(
                 label="Model",
             )
 
-        gt_mean, gt_std = None, None
         if isinstance(batch, SyntheticBatch) and batch.gt_pred is not None:
             with torch.no_grad():
                 gt_mean, gt_std, _ = batch.gt_pred(
-                    xc=xc[:1],
-                    yc=yc[:1],
+                    xc=batch.xc[:1],
+                    yc=batch.yc[:1],
                     xt=x_plot[:1],
                     batch=batch
                 )
                 _, _, gt_loglik = batch.gt_pred(
-                    xc=xc[:1],
-                    yc=yc[:1],
-                    xt=xt[:1],
-                    yt=yt[:1],
+                    xc=batch.xc[:1],
+                    yc=batch.yc[:1],
+                    xt=batch.xt[:1],
+                    yt=batch.yt[:1],
                     batch=batch
                 )
                 gt_nll = -gt_loglik.sum() / batch.yt[..., 0].numel()

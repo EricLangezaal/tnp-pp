@@ -323,11 +323,11 @@ class MultitaskGPGroundThruthPredictor(GPGroundTruthPredictor):
         likelihood.noise = self.noise_std ** 2
 
         # labelling technically doesn't matter, as long as off grid context and target have same label.
-        num_off_grid = 0 if batch.used_modality == DataModality.ON_GRID else batch.xc_off_grid.shape[-2]
+        num_off_grid = batch.xc_off_grid.shape[-2]
         xc_labels = torch.concat((
             torch.zeros(num_off_grid, 1, dtype=torch.long, device=xc.device),
-            torch.ones(xc.shape[-2] - num_off_grid, 1, dtype=torch.long, device=xc.device)), # to work when ignoring modalities
-        )
+            torch.ones(xc.shape[-2] - num_off_grid, 1, dtype=torch.long, device=xc.device)
+        ))
 
         # targets have to have one dimension less for exact GP!
         # can safely remove as generated data always had this as a 1-dimension anyway.
