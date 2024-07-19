@@ -28,6 +28,7 @@ def main():
         batch_size=None,
         worker_init_fn=adjust_num_batches,
         persistent_workers=True,
+        prefetch_factor=5,
     )
     val_loader = torch.utils.data.DataLoader(
         gen_val,
@@ -35,6 +36,7 @@ def main():
         batch_size=None,
         worker_init_fn=adjust_num_batches,
         persistent_workers=True,
+         prefetch_factor=4,
     )
 
     if isinstance(gen_val, ImageGenerator):
@@ -58,7 +60,7 @@ def main():
                     num_fig=min(5, len(batches)),
                     figsize=(15.0, 5.0),
                     name=name,
-                    subplots=True,
+                    subplots=False,
                 )
 
     elif isinstance(gen_val, KolmogorovGenerator):

@@ -82,7 +82,7 @@ def main():
                     num_fig=min(5, len(batches)),
                     figsize=(15.0, 5.0),
                     name=f"epoch-{epoch:04d}",
-                    subplots=True,
+                    subplots=False,
                 )
             elif isinstance(gen_train, KolmogorovGenerator):
                 plot_kolmogorov(

@@ -20,6 +20,7 @@ from .base import Batch, DataGenerator
 from .on_off_grid import OOTGBatch, DataModality
 from ..utils.grids import coarsen_grid
 
+dask.config.set(scheduler="synchronous")
 
 @dataclass
 class GriddedBatch(Batch):
@@ -89,7 +90,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             )
             self.data = None
         else:
-            self.load_data(date_range, data_dir, fnames, gcloud_url)
+            self.load_data(date_range, data_dir, fnames)
     
 
     def get_partial_date_range(self, i: int, num_splits: int):
@@ -447,8 +448,8 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
 
         x_grid, y_grid = None, None
         if self.store_original_grid:
-            x_grid = batch.x_grid
-            y_grid = batch.y_grid
+            x_grid = subsample(batch.x_grid, self.coarsen_factors)
+            y_grid = subsample(batch.y_grid, self.coarsen_factors)
 
         # NOTE this modified batch.x_grid in place
         xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
@@ -479,6 +480,17 @@ class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):
     # Confirmed this actually works.
     pass
 
+
+def subsample(
+        grid: torch.Tensor, 
+        coarsen_factors: Tuple[int, ...],
+) -> torch.Tensor:
+    assert len(coarsen_factors) == grid.ndim - 2
+    sgrid = grid[:,
+                  coarsen_factors[0] // 2::coarsen_factors[0], 
+                  coarsen_factors[1] // 2::coarsen_factors[1]
+            ]
+    return sgrid
 
 def coarsen_grid_era5(
     grid: torch.Tensor,

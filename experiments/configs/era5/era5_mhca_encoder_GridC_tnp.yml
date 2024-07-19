@@ -3,20 +3,19 @@
 generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
-    data_dir: ~/rds/hpc-work/data/era5/
-    fnames:
-      - 2019_2m_temperature.nc
-    data_vars: ["t2m"]
+    distributed: True
+    data_vars: ["2m_temperature"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
     y_mean: [279.0644808446564] # calculated previously
     y_std: [21.169963472302797]
+    date_range: ["1998-01-01", "2018-12-31"]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
     return_grid: True
-    lazy_loading: False
+    lazy_loading: True
     samples_per_epoch: 8_000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -24,20 +23,20 @@ generators:
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
-    data_dir: ~/rds/hpc-work/data/era5/
-    fnames:
-      - jan_2020_2m_temperature.nc
-    data_vars: ["t2m"]
+    distributed: True
+    data_vars: ["2m_temperature"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
     y_mean: [279.0644808446564] # calculated previously
     y_std: [21.169963472302797]
+    date_range: ["2019-01-01", "2019-12-31"]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
     return_grid: True
-    lazy_loading: False
+    lazy_loading: True
+    store_original_grid: True
     samples_per_epoch: 2_000
     batch_size: 16
     deterministic: ${params.deterministic}
@@ -149,7 +148,7 @@ params:
   x_dim: 2
   y_dim: 1
   
-  batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
+  batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 500
 
