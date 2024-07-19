@@ -201,7 +201,7 @@ class PseudoTokenGridEncoder(IdentityGridEncoder):
             xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, used_modality)
 
             assert torch.all(grid_shape % self.grid_shape == 0), (
-                "cannot properly coarsen incoming grid to match pseudo-grid."
+                f"cannot properly coarsen incoming grid of {grid_shape} to match pseudo-grid {self.grid_shape}."
                 )
             x_grid = self.coarsen_fn(xc_on_grid, (grid_shape // self.grid_shape).to(int).tolist())
             z_grid = mhca_to_grid(

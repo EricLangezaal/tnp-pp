@@ -122,7 +122,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
 
         # Ensure longitudes and latitudes are in standard format.
         if dataset["longitude"].max() > 180:
-            dataset = dataset.assign_coords(longitude=dataset["longitude"].values - 180)
+            dataset = dataset.assign_coords(longitude=(dataset["longitude"].values + 180) % 360 - 180)
         if dataset["latitude"].max() > 90:
             dataset = dataset.assign_coords(latitude=dataset["latitude"].values - 90)
 
@@ -179,7 +179,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             lon_idx = list(range(i, i + self.batch_grid_size[2]))
             lon_idx = [idx % len(self.data["longitude"]) for idx in lon_idx]
         elif len(self.data["longitude"]) >= self.batch_grid_size[2]:
-            i = random.randint(0, len(self.data["longitude"] - self.batch_grid_size[2]))
+            i = random.randint(0, len(self.data["longitude"]) - self.batch_grid_size[2])
             lon_idx = slice(i, i + self.batch_grid_size[2])
         else:
             raise ValueError("Grid size is too large!")
