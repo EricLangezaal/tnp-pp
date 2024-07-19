@@ -13,11 +13,12 @@ import dask
 import dask.config
 import numpy as np
 import torch
+import pandas as pd
 import xarray as xr
 
 from .base import Batch, DataGenerator
 from .on_off_grid import OOTGBatch, DataModality
-from ..utils.grids import flatten_grid, coarsen_grid
+from ..utils.grids import coarsen_grid
 
 
 @dataclass
@@ -30,6 +31,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
     def __init__(
         self,
         *,
+        distributed: bool = False,
         data_dir: Optional[str] = None,
         fnames: Optional[List[str]] = None,
         gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2",
@@ -42,66 +44,23 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         data_vars: Tuple[str] = ("t2m",),
         t_spacing: int = 1,
         use_time: bool = True,
-        y_mean: Optional[Tuple[float, ...]] = None,
-        y_std: Optional[Tuple[float, ...]] = None,
+        y_mean: Tuple[float, ...],
+        y_std: Tuple[float, ...],
         lazy_loading: bool = True,
         wrap_longitude: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
-        dask.config.set(scheduler="synchronous")
         self.all_input_vars = ["time", "latitude", "longitude"]
-
-        if fnames is not None and data_dir is not None:
-            dataset = xr.open_mfdataset(
-                [os.path.join(data_dir, fname) for fname in fnames],
-                chunks="auto",
-                mmap=False, # This is Scipy backend specific. Gives warnings otherwise about not being able to close the file.
-            )
-        else:
-            dataset = xr.open_zarr(
-                gcloud_url,
-                chunks=dict(zip(self.all_input_vars, batch_grid_size)),
-            )
-
-        # Ensure longitudes and latitudes are in standard format.
-        if dataset["longitude"].max() > 180:
-            dataset = dataset.assign_coords(longitude=(dataset["longitude"].values + 180) % 360 - 180)
-        if dataset["latitude"].max() > 90:
-            dataset = dataset.assign_coords(latitude=dataset["latitude"].values - 90)
-
-        # Sort latitude and longitude values.
-        dataset = dataset.sortby(["latitude", "longitude"])
-
-        dataset = dataset.sel(
-            time=slice(*sorted(date_range)),
-            latitude=slice(*sorted(lat_range)),
-            longitude=slice(*sorted(lon_range)),
-        )
-
-        dataset = dataset[list(data_vars)]
-
-        # Change time to hours since reference time.
-        ref_datetime = datetime.strptime(ref_date, "%Y-%m-%d")
-        ref_np_datetime = np.datetime64(ref_datetime)
-        hours = (dataset["time"][:].data - ref_np_datetime) / np.timedelta64(1, "h")
-        dataset = dataset.assign_coords(time=hours)
-        dataset = dataset.transpose("time", "latitude", "longitude")
-
         self.lat_range = lat_range
         self.lon_range = lon_range
-        self.data_vars = data_vars
+        self.date_range = date_range
 
+        self.data_vars = data_vars
         self.lazy_loading = lazy_loading
-        self.data = {
-            **{k: dataset[k] for k in data_vars},
-            "time": dataset["time"],
-            "latitude": dataset["latitude"],
-            "longitude": dataset["longitude"],
-        }
-        if not lazy_loading:
-            self.data = dask.compute(self.data)[0]
+        self.distributed = distributed
+        self.ref_date = ref_date
 
         # How large each sampled grid should be (in indicies).
         self.batch_grid_size = batch_grid_size
@@ -117,16 +76,81 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         else:
             self.input_vars = ["time", "latitude", "longitude"]
 
-        if y_mean is None or y_std is None:
-            warnings.warn("Computing mean and standard deviation of observations.")
-            y_mean = tuple(self.data[k][:].mean().values.item() for k in self.data_vars)
-            y_std = tuple(self.data[k][:].std().values.item() for k in self.data_vars)
-
         self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
         self.y_std = torch.as_tensor(y_std, dtype=torch.float)
 
         # Whether we allow batches to wrap around longitudinally.
         self.wrap_longitude = wrap_longitude
+
+        self.url = gcloud_url
+        if distributed:
+            assert fnames is None or data_dir is None, (
+                "Cannot do distributed loading with files, use a cloud url instead."
+            )
+            self.data = None
+        else:
+            self.load_data(date_range, data_dir, fnames, gcloud_url)
+    
+
+    def get_partial_date_range(self, i: int, num_splits: int):
+        periods = pd.date_range(start=self.date_range[0], end=self.date_range[1], periods=num_splits + 1)
+        format = "%Y-%m-%d"
+        return periods[i].strftime(format), periods[i + 1].strftime(format)
+
+
+    def load_data(
+        self,
+        date_range: Tuple[str, str],
+        data_dir: Optional[str] = None,
+        fnames: Optional[List[str]] = None,
+    ):
+        # Load datasets.
+        if fnames is not None and data_dir is not None:
+            dataset = xr.open_mfdataset(
+                [os.path.join(data_dir, fname) for fname in fnames],
+                chunks="auto",
+            )
+        else:
+            dataset = xr.open_zarr(
+                self.url,
+            )
+        
+        # do this as soon as possible to save overhead.
+        dataset = dataset.sel(
+            time=slice(*sorted(date_range)),
+        )
+
+        # Ensure longitudes and latitudes are in standard format.
+        if dataset["longitude"].max() > 180:
+            dataset = dataset.assign_coords(longitude=dataset["longitude"].values - 180)
+        if dataset["latitude"].max() > 90:
+            dataset = dataset.assign_coords(latitude=dataset["latitude"].values - 90)
+
+        # Sort latitude and longitude values.
+        dataset = dataset.sortby(["latitude", "longitude"])
+
+        dataset = dataset.sel(
+            latitude=slice(*sorted(self.lat_range)),
+            longitude=slice(*sorted(self.lon_range)),
+        )
+        dataset = dataset[list(self.data_vars)]
+
+        # Change time to hours since reference time.
+        ref_datetime = datetime.strptime(self.ref_date, "%Y-%m-%d")
+        ref_np_datetime = np.datetime64(ref_datetime)
+        hours = (dataset["time"][:].data - ref_np_datetime) / np.timedelta64(1, "h")
+        dataset = dataset.assign_coords(time=hours)
+        dataset = dataset.transpose("time", "latitude", "longitude")
+
+        self.data = {
+            **{k: dataset[k] for k in self.data_vars},
+            "time": dataset["time"],
+            "latitude": dataset["latitude"],
+            "longitude": dataset["longitude"],
+        }
+        if not self.lazy_loading:
+            self.data = dask.compute(self.data)[0]
+
         
     def sample_idx(self, batch_size: int) -> List[Tuple[List, List, List]]:
         """Samples indices used to sample dataframe.

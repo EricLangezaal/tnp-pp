@@ -3,6 +3,7 @@
 generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    distributed: True
     data_vars: ["2m_temperature"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
@@ -22,6 +23,7 @@ generators:
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    distributed: True
     data_vars: ["2m_temperature"]
     min_pc: 0.0005
     max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
@@ -38,7 +40,7 @@ generators:
     batch_size: 16
     deterministic: ${params.deterministic}
     used_modality: ${params.used_modality}
-    num_workers: 32
+    num_workers: 16
     
 model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD

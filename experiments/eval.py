@@ -25,6 +25,7 @@ def main():
         num_workers=gen_test.num_workers,
         batch_size=None,
         worker_init_fn=adjust_num_batches,
+        persistent_workers=True,
     )
 
     model.eval()
