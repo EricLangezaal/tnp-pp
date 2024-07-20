@@ -109,7 +109,7 @@ def make_grid_from_range(
                 torch.linspace(
                     grid_range[i, 0],
                     grid_range[i, 1],
-                    steps=int(grid_range[i, 1] - grid_range[i, 0]) * points_per_unit,
+                    steps=int((grid_range[i, 1] - grid_range[i, 0]) * points_per_unit),
                     dtype=torch.float,
                 )
                 for i in range(len(grid_range))

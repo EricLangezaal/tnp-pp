@@ -138,12 +138,17 @@ class SyntheticOOTGGenerator(DataGenerator):
     
 class RandomOOTGGenerator(DataGenerator):
 
-    def __init__(self, *, num_off_grid_context: int, grid_shape: Tuple[int, ...], num_targets: int, dim: int =1, **kwargs):
+    def __init__(self, *, num_off_grid_context: int, grid_shape: Tuple[int, ...], num_targets: int, dim: int=1, **kwargs):
         super().__init__(**kwargs)
         self.num_off_grid_context = num_off_grid_context
-        self.grid_shape = tuple(grid_shape)
         self.num_targets = num_targets
         self.dim = dim
+
+        max_gs = max(grid_shape)
+        self.grid = make_grid_from_range(
+            tuple((-i / max_gs * 4, i / max_gs * 4) for i in grid_shape),
+            points_per_unit=max_gs / 8,
+        )
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
         if batch_shape is None:
@@ -157,7 +162,7 @@ class RandomOOTGGenerator(DataGenerator):
         x_off_grid = torch.randn(*batch_shape, num_ctx + num_trg, self.dim)
         y_off_grid = torch.randn(x_off_grid.shape[:-1] + (1,))
 
-        x_on_grid = torch.randn(*batch_shape, prod(self.grid_shape), self.dim)
+        x_on_grid = self.grid.expand(*batch_shape, *self.grid.shape)
         y_on_grid = torch.randn(x_on_grid.shape[:-1] + (1,))
 
         return OOTGBatch(
@@ -167,8 +172,8 @@ class RandomOOTGGenerator(DataGenerator):
             yc=None,
             xc_off_grid=x_off_grid[:, :num_ctx, :],
             yc_off_grid=y_off_grid[:, :num_ctx, :],
-            xc_on_grid=unflatten_grid(x_on_grid, self.grid_shape),
-            yc_on_grid=unflatten_grid(y_on_grid, self.grid_shape),
+            xc_on_grid=x_on_grid,
+            yc_on_grid=y_on_grid,
             xt=x_off_grid[:, num_ctx:, :],
             yt=y_off_grid[:, num_ctx:, :],
             gt_pred=None,
