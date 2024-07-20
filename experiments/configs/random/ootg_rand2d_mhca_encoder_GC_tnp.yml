@@ -1,23 +1,21 @@
-# File inspired from 'efficient-tnpd-synthetic-1d.yml'
-
 generators:
   train:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
-    num_off_grid_context: ${params.num_off_the_grid}
+    num_off_grid_context: ${params.num_off_the_grid_context}
     grid_shape: ${params.grid_shape}
-    num_targets: ${params.num_off_the_grid}
+    num_targets: ${params.num_targets}
     dim: ${params.dim}
-    samples_per_epoch: 16000
-    batch_size: 8
+    samples_per_epoch: 8000
+    batch_size: 16
     deterministic: ${params.deterministic}
   val:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
-    num_off_grid_context: ${params.num_off_the_grid}
+    num_off_grid_context: ${params.num_off_the_grid_context}
     grid_shape: ${params.grid_shape}
-    num_targets: ${params.num_off_the_grid}
+    num_targets: ${params.num_targets}
     dim: ${params.dim}
-    samples_per_epoch: 4000
-    batch_size: 8
+    samples_per_epoch: 2000
+    batch_size: 16
     deterministic: ${params.deterministic}
     
 model:
@@ -31,12 +29,14 @@ tnpd_encoder:
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
+  x_encoder: ${siren_net}
 
 grid_encoder: 
   _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
-  embed_dim: ${params.embed_dim}
   grid_shape: ${params.coarse_grid_shape}
+  embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
+  coarsen_fn: ${coarsen_fn}
 
 grid_mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -51,6 +51,8 @@ transformer_encoder:
   mhca_layer: ${mhca_layer}
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
+  roll_dims: ${params.roll_dims}
+  top_k_ctot: ${params.top_k_ctot}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -70,10 +72,30 @@ mhsa_layer:
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
-  in_dim: ${eval:'3 + ${params.dim}'} # 2 flag dimensions (preprocessing) and ydim=1
+  # 2 from preprocessing y, ydim, and output of sirennet
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
+
+siren_net:
+  _target_: icicl.networks.mlp.MLPWithEmbedding
+  embedding: ${spherical_harmonics}
+  in_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  out_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  num_layers: 2
+  width: ${eval:'${params.num_legendre_polys} ** 2'}
+  ignore_dims: ${params.siren_net_ignore_dims}
+
+spherical_harmonics:
+  _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
+  num_legendre_polys: ${params.num_legendre_polys}
+
+coarsen_fn:
+  _target_: icicl.data.era5.coarsen_grid_era5
+  _partial_: True
+  wrap_longitude: True
+  lon_dim: -1
 
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder
@@ -82,7 +104,7 @@ tnpd_decoder:
 z_decoder:
   _target_: icicl.networks.mlp.MLP
   in_dim: ${params.embed_dim}
-  out_dim: 2 # 1 for std and 1 for means
+  out_dim: ${eval:'2 * ${params.y_dim}'}
   num_layers: 2
   width: ${params.embed_dim}
 
@@ -95,12 +117,13 @@ optimiser:
   lr: 5.0e-4
 
 params:
-  epochs: 200
-  deterministic: False # makes it generate whole dataset up front and re-use over epochs
+  epochs: 2
 
+  roll_dims: [-1,] # longitude
   dim: 2
   grid_shape: [120, 240]
-  num_off_the_grid: 200
+  num_off_the_grid_context: 1250
+  num_targets: 500
   
   # grid encoder moves it to this
   coarse_grid_shape: [30, 60]
@@ -111,6 +134,12 @@ params:
   norm_first: True
   num_layers: 5
 
+  top_k_ctot: 9
+
+  siren_net_ignore_dims: null
+  num_legendre_polys: 10
+
 misc:
   logging: False
+  gradient_clip_val: 0.5
   resume_from_checkpoint: null

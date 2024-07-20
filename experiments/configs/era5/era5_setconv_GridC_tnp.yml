@@ -70,6 +70,7 @@ transformer_encoder:
   mhca_layer: ${mhca_layer}
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
+  roll_dims: ${params.roll_dims}
   top_k_ctot: ${params.top_k_ctot}
 
 mhca_layer:
@@ -138,6 +139,7 @@ params:
   epochs: 200
   deterministic: False
 
+  roll_dims: [-1,] # longitude
   x_dim: 2
   y_dim: 1
   
