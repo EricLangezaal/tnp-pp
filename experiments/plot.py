@@ -40,14 +40,14 @@ def plot(
     pred_fn: Callable = np_pred_fn,
 ):
     # Get dimension of input data
-    dim = batches[0].xc.shape[-1]
+    dim = batches[0].xt.shape[-1]
     if dim not in [1,2]:
         warnings.warn("Plotting only supported for 1D and 2D data.")
         return
     
     if dim == 1:
         x_plot = torch.linspace(x_range[0], x_range[1], points_per_dim).to(
-            batches[0].xc
+            batches[0].xt
         )[None, :, None]
     else:
         x_plot = torch.stack(
@@ -56,7 +56,7 @@ def plot(
                 indexing='ij'
             ),
             axis=-1,
-        ).view(-1, dim).unsqueeze(0).to(batches[0].xc)
+        ).view(-1, dim).unsqueeze(0).to(batches[0].xt)
 
     for i in range(num_fig):
         batch = batches[i]

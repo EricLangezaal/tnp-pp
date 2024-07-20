@@ -5,6 +5,7 @@ from plot_era5 import plot_era5
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
 
+from icicl.data.on_off_grid import RandomOOTGGenerator
 from icicl.utils.data import adjust_num_batches
 from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.image import ImageGenerator
@@ -94,7 +95,8 @@ def main():
                     logging=False,
                     subplots=False,
                 )
-            else:
+            
+            elif not isinstance(gen_train, RandomOOTGGenerator):
                 plot(
                     model=model,
                     batches=batches,
