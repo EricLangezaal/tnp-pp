@@ -4,7 +4,7 @@ generators:
     num_off_grid_context: ${params.num_off_the_grid_context}
     grid_shape: ${params.grid_shape}
     num_targets: ${params.num_targets}
-    dim: ${params.dim}
+    dim: ${params.x_dim}
     samples_per_epoch: 8000
     batch_size: 16
   val:
@@ -12,7 +12,7 @@ generators:
     num_off_grid_context: ${params.num_off_the_grid_context}
     grid_shape: ${params.grid_shape}
     num_targets: ${params.num_targets}
-    dim: ${params.dim}
+    dim: ${params.x_dim}
     samples_per_epoch: 2000
     batch_size: 16
     
@@ -118,7 +118,8 @@ params:
   epochs: 2
 
   roll_dims: [-1,] # longitude
-  dim: 2
+  x_dim: 2
+  y_dim: 1
   grid_shape: [120, 240]
   num_off_the_grid_context: 1250
   num_targets: 500
