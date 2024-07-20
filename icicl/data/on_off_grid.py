@@ -161,10 +161,10 @@ class RandomOOTGGenerator(DataGenerator):
         y_on_grid = torch.randn(x_on_grid.shape[:-1] + (1,))
 
         return OOTGBatch(
-            x=torch.cat((x_off_grid, x_on_grid), dim=-2),
-            y=torch.cat((y_off_grid, y_on_grid), dim=-2),
-            xc=torch.cat((x_off_grid[:, :num_ctx, :], x_on_grid), dim=-2),
-            yc=torch.cat((y_off_grid[:, :num_ctx, :], y_on_grid), dim=-2),
+            x=None,
+            y=None,
+            xc=None,
+            yc=None,
             xc_off_grid=x_off_grid[:, :num_ctx, :],
             yc_off_grid=y_off_grid[:, :num_ctx, :],
             xc_on_grid=unflatten_grid(x_on_grid, self.grid_shape),

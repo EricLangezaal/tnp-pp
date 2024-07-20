@@ -31,14 +31,14 @@ def main():
         num_workers=gen_train.num_workers,
         batch_size=None,
         worker_init_fn=adjust_num_batches,
-        persistent_workers=True,
+        persistent_workers=gen_train.num_workers > 1,
     )
     val_loader = torch.utils.data.DataLoader(
         gen_val,
         num_workers=gen_val.num_workers,
         batch_size=None,
         worker_init_fn=adjust_num_batches,
-        persistent_workers=True,
+        persistent_workers=gen_val.num_workers > 1,
     )
 
     step = 0
