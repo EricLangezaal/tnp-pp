@@ -7,7 +7,6 @@ generators:
     dim: ${params.dim}
     samples_per_epoch: 8000
     batch_size: 16
-    deterministic: ${params.deterministic}
   val:
     _target_: icicl.data.on_off_grid.RandomOOTGGenerator
     num_off_grid_context: ${params.num_off_the_grid_context}
@@ -16,7 +15,6 @@ generators:
     dim: ${params.dim}
     samples_per_epoch: 2000
     batch_size: 16
-    deterministic: ${params.deterministic}
     
 model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD
