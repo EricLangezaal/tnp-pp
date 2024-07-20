@@ -241,15 +241,30 @@ def mhca_to_grid(
     u_batch_idx = torch.arange(B).unsqueeze(-1).repeat(1, U)
     u_range_idx = torch.arange(U).repeat(B, 1)
 
-    # construct temporary mask that links each off-grid point to its closest on_grid point
-    nearest_mask = torch.zeros(B, U, S, dtype=torch.int, device=z_grid.device)
-    nearest_mask[u_batch_idx, u_range_idx, nearest_idx] = 1
+    _, inverse_indices = torch.unique(nearest_idx, return_inverse=True)
 
-    # maximum nearest neigbours + add one for the on the grid point itself (or the placeholder)
-    max_patch = nearest_mask.sum(dim=1).amax() + 1
-    # batched cumulative count (i.e. add one if element has occured before)
-    # So [0, 0, 2, 0, 1, 2] -> [0, 1, 0, 2, 0, 1] along each batch
-    cumcount_idx = (nearest_mask.cumsum(dim=1) - 1)[u_batch_idx, u_range_idx, nearest_idx]
+    sorted_indices = nearest_idx.argsort(dim=1, stable=True)
+    inverse_indices_sorted = inverse_indices.gather(1, sorted_indices).type(torch.long)
+    unsorted_indices = sorted_indices.argsort(dim=1, stable=True)
+
+    # Store changes in value.
+    inverse_indices_diff = inverse_indices_sorted - inverse_indices_sorted.roll(
+        1, dims=1
+    )
+    inverse_indices_diff = torch.where(
+        inverse_indices_diff == 0,
+        torch.ones_like(inverse_indices_diff),
+        torch.zeros_like(inverse_indices_diff),
+    )
+    inverse_indices_diff[:, 0] = torch.zeros_like(inverse_indices_diff[:, 0])
+
+    adjusted_cumsum = associative_scan(
+        inverse_indices_diff, inverse_indices_diff, dim=1
+    )
+    adjusted_cumsum = adjusted_cumsum.round().int()
+    cumcount_idx = adjusted_cumsum.gather(1, unsorted_indices)
+
+    max_patch = cumcount_idx.amax() + 2
 
     # create tensor with for each grid-token all nearest off-grid + itself in third axis
     grid_stacked = torch.full((B * S, max_patch, E), -torch.inf, device=z_grid.device)
@@ -286,3 +301,22 @@ def mhca_to_grid(
     out_grid_flat = einops.rearrange(out_grid_flat, "(b s) 1 e -> b s e", b=B)
     return unflatten_grid(out_grid_flat, grid_shape)
 
+
+def complex_log(float_input: torch.Tensor, eps=1e-6) -> torch.ComplexType:
+    eps = float_input.new_tensor(eps)
+    real = float_input.abs().maximum(eps).log()
+    imag = (float_input < 0).to(float_input.dtype) * torch.pi
+
+    return torch.complex(real, imag)
+
+
+def associative_scan(
+    values: torch.Tensor, coeffs: torch.Tensor, dim: int
+) -> torch.Tensor:
+    log_values = complex_log(values.float())
+    log_coeffs = complex_log(coeffs.float())
+    a_star = torch.cumsum(log_coeffs, dim=dim)
+    log_x0_plus_b_star = torch.logcumsumexp(log_values - a_star, dim=dim)
+    log_x = a_star + log_x0_plus_b_star
+
+    return torch.exp(log_x).real
