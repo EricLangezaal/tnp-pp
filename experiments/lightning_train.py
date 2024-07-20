@@ -28,7 +28,7 @@ def main():
         batch_size=None,
         worker_init_fn=adjust_num_batches,
         persistent_workers=True,
-        prefetch_factor=5,
+        prefetch_factor=5 if gen_train.num_workers > 1 else None,
     )
     val_loader = torch.utils.data.DataLoader(
         gen_val,
@@ -36,7 +36,7 @@ def main():
         batch_size=None,
         worker_init_fn=adjust_num_batches,
         persistent_workers=True,
-         prefetch_factor=4,
+        prefetch_factor=4 if gen_train.num_workers > 1 else None,
     )
 
     if isinstance(gen_val, ImageGenerator):
