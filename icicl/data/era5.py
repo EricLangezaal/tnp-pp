@@ -162,6 +162,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         Returns:
             Tuple[List, List, List]: Indicies.
         """
+        assert self.data is not None, "Data has not been loaded."
         # TODO: if using same location for each batch, let lat_idx starting index extend
         # to len(self.data["latitude"]) and truncate grid size.
         if len(self.data["latitude"]) >= self.batch_grid_size[1]:
@@ -220,6 +221,7 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         self.return_grid = return_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
+        assert self.data is not None, "Data has not been loaded."
         batch_size = self.batch_size if batch_shape is None else batch_shape[0]
 
         # (batch_size, n, 3).

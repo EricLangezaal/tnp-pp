@@ -55,7 +55,7 @@ def main():
                 y_mean=gen_test.y_mean,
                 y_std=gen_test.y_std,
                 num_fig=min(experiment.misc.num_plots, len(batches)),
-                figsize=(15.0, 5.0),
+                figsize=(12.0, 5.0),
                 name=eval_name,
                 subplots=experiment.misc.subplots,
                 savefig=experiment.misc.savefig,

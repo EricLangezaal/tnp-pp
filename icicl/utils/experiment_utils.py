@@ -316,7 +316,7 @@ def create_default_config() -> DictConfig:
             "gradient_clip_val": None,
             "only_plots": False,
             "savefig": False,
-            "subplots": True,
+            "subplots": False,
             "loss_fn": {
                 "_target_": "icicl.utils.experiment_utils.np_loss_fn",
                 "_partial_": True,

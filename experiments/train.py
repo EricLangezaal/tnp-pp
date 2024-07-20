@@ -80,7 +80,7 @@ def main():
                     y_mean=gen_val.y_mean,
                     y_std=gen_val.y_std,
                     num_fig=min(5, len(batches)),
-                    figsize=(15.0, 5.0),
+                    figsize=(12.0, 5.0),
                     name=f"epoch-{epoch:04d}",
                     subplots=False,
                 )

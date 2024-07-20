@@ -29,7 +29,7 @@ def plot_era5(
     subplots: bool = True,
     savefig: bool = False,
     logging: bool = True,
-    colorbar: bool = False,
+    colorbar: bool = True,
     pred_fn: Callable = np_pred_fn,
 ):
     for i in range(num_fig):
@@ -77,13 +77,13 @@ def plot_era5(
         vmin, vmax = y_grid.min(), y_grid.max()
         scatter_kwargs = {
             "s": 15,
-            "marker": "s",
+            "marker": "o",
             "alpha": 1.0,
             "vmin": vmin,
             "vmax": vmax,
             "lw": 0,
         }
-        grid_args = scatter_kwargs | {"s": 2 if len(x_grid) < 50000 else 0.3}
+        grid_args = scatter_kwargs | {"s": 2 if len(x_grid) < 50000 else 0.3, "marker": "s"}
         diff_args = grid_args | {"vmin": diff_grid.min(), "vmax": diff_grid.max(), "cmap": "seismic"}
 
         if subplots:
@@ -139,15 +139,20 @@ def plot_era5(
             plt.close()
 
         else:
-            scatter_kwargs["s"] = 10
-            for fig_name, x_plot, y_plot in zip(
-                ("Target predictions", "Target true values", "Off grid context", "Global predictions", "Global true values", "Global difference", "Normalised global difference"),
-                (xt, xt, xc_off_grid, x_grid, x_grid, x_grid, x_grid),
-                (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, diff_grid_norm),
+            grid_args["s"] = figsize[1] + 1.5
+            diff_args["s"] = figsize[1] + 1.5
+            std_args = grid_args | {"vmin": pred_std_grid.min(), "vmax": pred_std_grid.max()}
+
+            for fig_name, x_plot, y_plot, sargs, in zip(
+                ("Target predictions", "Target true values", "Off grid context", "Global predicted average", "Global true values", "Global error", "Global predicted uncertainty", "Normalised global error"),
+                (xt, xt, xc_off_grid, x_grid, x_grid, x_grid, x_grid, x_grid),
+                (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, pred_std_grid, diff_grid_norm),
+                (scatter_kwargs, scatter_kwargs, scatter_kwargs, grid_args, grid_args, diff_args, std_args, diff_args),
             ):
                 fig = plt.figure(figsize=figsize)
 
                 ax = plt.axes(projection=ccrs.PlateCarree())
+                ax.set_title(fig_name, fontsize=20)
                 ax.add_feature(cfeature.COASTLINE)
                 ax.add_feature(cfeature.BORDERS)
                 ax.set_axisbelow(True)
@@ -157,22 +162,14 @@ def plot_era5(
                 gl.ylabel_style = {"size": 15}
                 # ax.tick_params(axis="both", which="major", labelsize=20)
 
-                if "difference" in fig_name.lower():
-                    diff_scatter_kwargs = scatter_kwargs
-                    diff_scatter_kwargs["vmin"] = y_plot.min()
-                    diff_scatter_kwargs["vmax"] = y_plot.max()
-                    diff_scatter_kwargs["cmap"] = "seismic"
-                    sc = ax.scatter(
-                        x_plot[:, -1], x_plot[:, -2], c=y_plot, **diff_scatter_kwargs
-                    )
-                else:
-                    sc = ax.scatter(
-                        x_plot[:, -1], x_plot[:, -2], c=y_plot, **scatter_kwargs
+                sc = ax.scatter(
+                        x_plot[:, -1], x_plot[:, -2], c=y_plot, **sargs
                     )
 
                 # Add colourbar.
                 if colorbar:
-                    cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.09)
+                    cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.07)
+                    cbar.ax.set_title("K")
                     cbar.solids.set(alpha=1)
 
                 plt.tight_layout()
