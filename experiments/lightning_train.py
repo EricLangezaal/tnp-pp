@@ -91,6 +91,7 @@ def main():
     lit_model = LitWrapper(
         model=model,
         optimiser=optimiser,
+        val_generator=gen_val,
         loss_fn=experiment.misc.loss_fn,
         pred_fn=experiment.misc.pred_fn,
         plot_fn=plot_fn,

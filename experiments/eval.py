@@ -91,7 +91,7 @@ def main():
     wandb.run.summary["num_params"] = num_params
 
     if experiment.misc.lightning_eval:
-        lit_model = LitWrapper(model)
+        lit_model = LitWrapper(model,  val_generator=gen_test)
         trainer = pl.Trainer(devices=1)
         trainer.test(model=lit_model, dataloaders=val_loader)
         test_result = {

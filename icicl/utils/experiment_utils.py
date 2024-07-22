@@ -17,6 +17,7 @@ from tqdm.auto import tqdm
 
 import wandb
 from icicl.data.on_off_grid import DataModality
+from icicl.data.era5 import ERA5DataGenerator
 from icicl.data.base import Batch, DataGenerator
 from icicl.data.image import GriddedImageBatch
 from icicl.data.smoke import GriddedBatchWithInputs
@@ -281,7 +282,9 @@ def val_epoch(
             result["gt_loglik"].append(gt_loglik)
 
         result["loglik"].append(loglik)
-        result["rmse"].append(nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu())
+        if isinstance(generator, ERA5DataGenerator):
+            rmse = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
+            result["rmse"].append(generator.y_std[0] * rmse)
 
 
     loglik = torch.stack(result["loglik"])
@@ -290,7 +293,8 @@ def val_epoch(
     result["mean_loss"] = -loglik.mean()
     result["std_loss"] = loglik.std() / (len(loglik) ** 0.5)
 
-    result["rmse"] = torch.stack(result["rmse"]).mean()
+    if "rmse" in result:
+        result["rmse"] = torch.stack(result["rmse"]).mean()
 
     if "gt_loglik" in result:
         gt_loglik = torch.stack(result["gt_loglik"])
@@ -421,8 +425,8 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
     torch.set_float32_matmul_precision('high')
 
     # apparently this can also crash it 'RuntimeError: error executing torch_shm_manager'
-    #if experiment.generators.train.num_workers > 1:
-    #   torch.multiprocessing.set_sharing_strategy("file_system")
+    if experiment.generators.train.num_workers > 1:
+       torch.multiprocessing.set_sharing_strategy("file_system")
 
     if isinstance(experiment.model, nn.Module):
         if experiment.misc.resume_from_checkpoint:

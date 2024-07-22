@@ -5,7 +5,8 @@ import lightning.pytorch as pl
 import torch
 from torch import nn
 
-from icicl.data.base import Batch
+from icicl.data.base import Batch, DataGenerator
+from icicl.data.era5 import ERA5DataGenerator
 from icicl.utils.experiment_utils import ModelCheckpointer, np_loss_fn, np_pred_fn
 
 
@@ -13,6 +14,7 @@ class LitWrapper(pl.LightningModule):
     def __init__(
         self,
         model: nn.Module,
+        val_generator: DataGenerator,
         optimiser: Optional[torch.optim.Optimizer] = None,
         loss_fn: Callable = np_loss_fn,
         pred_fn: Callable = np_pred_fn,
@@ -31,6 +33,7 @@ class LitWrapper(pl.LightningModule):
         self.plot_fn = plot_fn
         self.checkpointer = checkpointer
         self.plot_interval = plot_interval
+        self.val_generator = val_generator
         self.val_outputs: List[Any] = []
         self.test_outputs: List[Any] = []
         self.train_losses: List[Any] = []
@@ -55,7 +58,10 @@ class LitWrapper(pl.LightningModule):
         pred_dist = self.pred_fn(self.model, batch)
         loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
-        result["rmse"] = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
+
+        if isinstance(self.val_generator, ERA5DataGenerator):
+            rmse = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
+            result["rmse"].append(self.val_generator.y_std[0] * rmse)
 
         if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(
@@ -114,7 +120,8 @@ class LitWrapper(pl.LightningModule):
         self.log("val/loglik", mean_loglik)
         self.log("val/std_loglik", std_loglik)
 
-        self.log("val/rmse", torch.stack(results["rmse"]).mean())
+        if "rmse" in results:
+            self.log("val/rmse", torch.stack(results["rmse"]).mean())
 
         if self.checkpointer is not None:
             # For checkpointing.
