@@ -75,6 +75,7 @@ transformer_encoder:
   mhca_layer: ${mhca_layer}
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
+  top_k_ctot: ${params.top_k_ctot}
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -135,10 +136,12 @@ params:
   norm_first: True
   num_layers: 5
 
+  top_k_ctot: 9 # null # to disable
+
 
 misc:
   project: tnp-2d-data
-  name: plain_tnp-Data=${params.used_modality}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}
+  name: plain_tnp-Data=${params.used_modality}-taskCor=${params.task_correlation}-ppu=${params.points_per_unit}-KCA=${params.top_k_ctot}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
