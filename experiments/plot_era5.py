@@ -110,7 +110,7 @@ def plot_era5(
             axes[0, 1].scatter(xt[:, -1], xt[:, -2], c=yt, **scatter_kwargs)
             axes[0, 1].set_title("Target true values", fontsize=18)
 
-            row1 = axes[0, 2].scatter(xc_off_grid[:, -1], xc_off_grid[:, -2], c=yc_off_grid, **scatter_kwargs)
+            row1 = axes[0, 2].scatter(xc_off_grid[:, -1], xc_off_grid[:, -2], c=yc_off_grid, **scatter_kwargs | {"s": 5})
             axes[0, 2].set_title("Off grid context", fontsize=18)
 
             row2_col1 = axes[1, 0].scatter(x_grid[:, -1], x_grid[:, -2], c=pred_mean_grid, **grid_args)
@@ -149,7 +149,7 @@ def plot_era5(
                 ("Target predictions", "Target true values", "Off grid context", "Global predicted average", "Global true values", "Global error", "Global predicted uncertainty", "Normalised global error"),
                 (xt, xt, xc_off_grid, x_grid, x_grid, x_grid, x_grid, x_grid),
                 (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, pred_std_grid, diff_grid_norm),
-                (scatter_kwargs, scatter_kwargs, scatter_kwargs, grid_args, grid_args, diff_args, std_args, diff_args),
+                (scatter_kwargs, scatter_kwargs, scatter_kwargs | {"s": 5}, grid_args, grid_args, diff_args, std_args, diff_args),
             ):
                 fig = plt.figure(figsize=figsize, dpi=200)
 
