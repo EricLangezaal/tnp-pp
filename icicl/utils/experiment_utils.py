@@ -1,7 +1,6 @@
-"""https://github.com/cambridge-mlg/dpconvcnp/blob/main/experiments/utils.py"""
-
 import argparse
 import os
+import resource
 from collections import OrderedDict, defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from functools import partialmethod
@@ -423,6 +422,10 @@ def initialize_experiment() -> Tuple[DictConfig, ModelCheckpointer]:
 
     # use tensor cores effectively
     torch.set_float32_matmul_precision('high')
+
+    # allow opening crazy number of files
+    _, hard_lim = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE,(hard_lim, hard_lim))
 
     if isinstance(experiment.model, nn.Module):
         if experiment.misc.resume_from_checkpoint:

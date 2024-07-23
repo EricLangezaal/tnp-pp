@@ -6,6 +6,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import torch
 from torch import nn
 
@@ -84,7 +85,8 @@ def plot_era5(
             "lw": 0,
         }
         grid_args = scatter_kwargs | {"s": 2 if len(x_grid) < 50000 else 0.3, "marker": "s"}
-        diff_args = grid_args | {"vmin": diff_grid.min(), "vmax": diff_grid.max(), "cmap": "seismic"}
+        divnorm=colors.TwoSlopeNorm(vmin=diff_grid.min(), vcenter=0, vmax=diff_grid.max())
+        diff_args = grid_args | {"norm":divnorm, "vmin": None, "vmax": None, "cmap": "seismic"}
 
         if subplots:
             fig, axes = plt.subplots(
@@ -149,7 +151,7 @@ def plot_era5(
                 (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, pred_std_grid, diff_grid_norm),
                 (scatter_kwargs, scatter_kwargs, scatter_kwargs, grid_args, grid_args, diff_args, std_args, diff_args),
             ):
-                fig = plt.figure(figsize=figsize, dpi=600)
+                fig = plt.figure(figsize=figsize, dpi=200)
 
                 ax = plt.axes(projection=ccrs.PlateCarree())
                 #ax.set_title(fig_name, fontsize=20)
