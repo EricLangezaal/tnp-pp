@@ -101,8 +101,9 @@ def main():
         loglik = torch.stack(test_result["loglik"])
         test_result["mean_loglik"] = loglik.mean()
         test_result["std_loglik"] = loglik.std() / (len(loglik) ** 0.5)
-
-        test_result["rmse"] = torch.stack(test_result["rmse"]).mean()
+       
+        if "rmse" in test_result:
+            test_result["rmse"] = torch.stack(test_result["rmse"]).mean()
 
         if "gt_loglik" in test_result:
             gt_loglik = torch.stack(test_result["gt_loglik"])
@@ -116,7 +117,8 @@ def main():
 
     wandb.run.summary[f"test/{eval_name}/loglik"] = test_result["mean_loglik"]
     wandb.run.summary[f"test/{eval_name}/std_loglik"] = test_result["std_loglik"]
-    wandb.run.summary[f"test/{eval_name}/rmse"] = test_result["rmse"]
+    if "rmse" in test_result:
+        wandb.run.summary[f"test/{eval_name}/rmse"] = test_result["rmse"]
     if "mean_gt_loglik" in test_result:
         wandb.run.summary[f"test/{eval_name}/gt_loglik"] = test_result["mean_gt_loglik"]
         wandb.run.summary[f"test/{eval_name}/std_gt_loglik"] = test_result[

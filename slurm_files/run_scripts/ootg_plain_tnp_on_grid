@@ -57,7 +57,7 @@ workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to t
 
 #! Your_python your_code, args
 DIMENSION=1
-CMD="python experiments/lightning_train.py --config experiments/configs/synthetic_${DIMENSION}d/ootg_gp_plain_tnp.yml params.used_modality=ON_GRID misc.progress_bars=False"
+CMD="python experiments/lightning_train.py --config experiments/configs/synthetic_${DIMENSION}d/ootg_gp_plain_tnp.yml params.used_modality=ON_GRID misc.progress_bars=False params.task_correlation=1.0"
 
 ###############################################################
 ### You should not have to change anything below this line ####

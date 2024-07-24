@@ -4,6 +4,7 @@ import einops
 import warnings
 import torch
 from torch import nn
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from check_shapes import check_shapes
 
 from .attention_layers import MultiHeadCrossAttentionLayer, MultiHeadSelfAttentionLayer
@@ -98,10 +99,12 @@ class GridTransformerEncoder(nn.Module):
                 mask = einops.rearrange(mask, "b n e -> (b n) 1 e")
 
                 # Do the MHCA operation, reshape and return.
-                zt = mhca_layer(zt, nearest_zc, mask=mask)
+                with sdpa_kernel(SDPBackend.MATH): 
+                   zt = mhca_layer(zt, nearest_zc, mask=mask)
 
                 zt = einops.rearrange(zt, "(b n) 1 e -> b n e", b=num_batches)
             else:
-                zt = mhca_layer(zt, zc)
+                with sdpa_kernel(SDPBackend.MATH):
+                   zt = mhca_layer(zt, zc)
 
         return zt
