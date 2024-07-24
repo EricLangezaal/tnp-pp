@@ -152,7 +152,7 @@ params:
   
   batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
-  num_targets: 500
+  num_targets: 3000
   min_context_pc: 0.01 # so 10k+
   max_context_pc: 0.02 # max percentage context points out of total (product of batch_grid_size)
 
@@ -170,7 +170,7 @@ params:
 
 misc:
   project: era5-no-time
-  name: mhca_encoder-GridC-data=${params.used_modality}-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}-OFF_C=${params.min_context_pc}-${params.max_context_pc}
+  name: mhca_encoder-GridC-data=${params.used_modality}-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}-OFF_C=${params.min_context_pc}-${params.max_context_pc}_NT=${params.num_targets}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

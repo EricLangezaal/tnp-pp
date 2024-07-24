@@ -199,7 +199,7 @@ class PseudoTokenGridEncoder(IdentityGridEncoder):
             # coarsen grid by having smaller pseudogrid for neighbour mhca
             # concat both modalities or just return either separately depending on ignoring.
             xc, zc = super().forward(xc_off_grid, xc_on_grid, zc_off_grid, zc_on_grid, used_modality)
-
+            
             assert torch.all(grid_shape % self.grid_shape == 0), (
                 f"cannot properly coarsen incoming grid of {grid_shape} to match pseudo-grid {self.grid_shape}."
                 )
