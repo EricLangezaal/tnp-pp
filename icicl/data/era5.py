@@ -35,7 +35,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         distributed: bool = False,
         data_dir: Optional[str] = None,
         fnames: Optional[List[str]] = None,
-        gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/1959-2022-full_37-1h-0p25deg-chunk-1.zarr-v2",
+        gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3",
         date_range: Tuple[str, str] = ("2018-01-01", "2020-12-31"),
         lat_range: Tuple[float, float] = (-90.0, 90.0),
         lon_range: Tuple[float, float] = (-180.0, 180.0),
@@ -45,8 +45,8 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         data_vars: Tuple[str] = ("t2m",),
         t_spacing: int = 1,
         use_time: bool = True,
-        y_mean: Tuple[float, ...],
-        y_std: Tuple[float, ...],
+        y_mean: Optional[Tuple[float, ...]] = None,
+        y_std: Optional[Tuple[float, ...]] = None,
         lazy_loading: bool = True,
         wrap_longitude: bool = False,
         **kwargs,
@@ -77,8 +77,8 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         else:
             self.input_vars = ["time", "latitude", "longitude"]
 
-        self.y_mean = torch.as_tensor(y_mean, dtype=torch.float)
-        self.y_std = torch.as_tensor(y_std, dtype=torch.float)
+        self.y_mean = y_mean
+        self.y_std = y_std
 
         # Whether we allow batches to wrap around longitudinally.
         self.wrap_longitude = wrap_longitude
@@ -149,6 +149,16 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             "latitude": dataset["latitude"],
             "longitude": dataset["longitude"],
         }
+
+        if self.y_mean is None or self.y_std is None:
+            warnings.warn("Computing mean and standard deviation of observations.")
+            self.y_mean = tuple(self.data[k][:].mean().values.item() for k in self.data_vars)
+            self.y_std = tuple(self.data[k][:].std().values.item() for k in self.data_vars)
+            print("y_mean: ", self.y_mean, "y_std: ", self.y_std)
+       
+        self.y_mean = torch.as_tensor(self.y_mean, dtype=torch.float)
+        self.y_std = torch.as_tensor(self.y_std, dtype=torch.float)
+
         if not self.lazy_loading:
             self.data = dask.compute(self.data)[0]
 
@@ -229,7 +239,7 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
 
         # Sample context proportion.
         pc = self.pc_dist.sample()
-
+        
         # Get batch.
         batch = self.sample_batch(pc=pc, idxs=idxs)
         return batch
