@@ -10,28 +10,25 @@
 
 #! sbatch directives begin here ###############################
 #! Name of the job:
-#SBATCH -J e5cmgct
+#SBATCH -J download
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
-#SBATCH -A TURNER-MASTERS-PROJECTS-SL2-GPU
+#SBATCH -A MLMI-erl50-SL2-CPU
 
-#SBATCH --output=slurm_files/logs/era5_mhca_GridC_tnp_more_context_%A.out
+#SBATCH --output=slurm_files/logs/download_%A.out
 
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
 #! How many (MPI) tasks will there be in total?
 #! Note probably this should not exceed the total number of GPUs in use.
 #SBATCH --ntasks=1
-#! Specify the number of GPUs per node (between 1 and 4; must be 4 if nodes>1).
-#! Note that the job submission script will enforce no more than 3 cpus per GPU.
-#SBATCH --gres=gpu:1
 #! How much wallclock time will be required?
-#SBATCH --time=20:00:00
+#SBATCH --time=10:00:00
 
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
 
 #! Do not change:
-#SBATCH -p ampere
+#SBATCH -p icelake
 
 #! sbatch directives end here (put any additional directives above this line)
 
@@ -52,12 +49,12 @@ module load slurm
 conda activate tnp
 
 #! Work directory (i.e. where the job will run):
-workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
+workdir="/home/$USER/rds/hpc-work/data/era5/train/"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
                              # in which sbatch is run.
                            
 ulimit -n 100000
 #! Your_python your_code, args
-CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_mhca_encoder_GridC_tnp_more_context.yml misc.progress_bars=False"
+CMD="python /home/$USER/tnp-pp/experiments/download_era5.py '2013-08' '2018-12' -m 2"
 
 ###############################################################
 ### You should not have to change anything below this line ####
