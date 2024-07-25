@@ -265,13 +265,22 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
 
         y_grid_list = [[self.data[k][idx].data for k in self.data_vars] for idx in idxs]
 
-        if self.lazy_loading:
-            y_grid_list = dask.compute(y_grid_list)[0]
+        #if self.lazy_loading:
+        #    y_grid_list = dask.compute(y_grid_list)[0]
+        # y_grid = torch.stack(
+        #     [
+        #         torch.stack(
+        #             [torch.as_tensor(y, dtype=torch.float32) for y in y_grid_], dim=-1
+        #         )
+        #         for y_grid_ in y_grid_list
+        #     ],
+        #     dim=0,
+        # )
 
-        y_grid = torch.stack(
+        y_grid = dask.delayed(torch.stack)(
             [
-                torch.stack(
-                    [torch.as_tensor(y, dtype=torch.float32) for y in y_grid_], dim=-1
+                dask.delayed(torch.stack)(
+                    [dask.delayed(torch.as_tensor)(y, dtype=torch.float32) for y in y_grid_], dim=-1
                 )
                 for y_grid_ in y_grid_list
             ],
@@ -287,9 +296,14 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
     
     def sample_from_grids(self, pc: float, x_grid: torch.Tensor, y_grid: torch.Tensor) -> Batch:
         # Assumes same masking pattern for each grid.
-        y_mask = torch.isnan(y_grid[0].sum(-1)).flatten()
-        nc = math.ceil(pc * (~y_mask).sum())
-        m_idx_list = [torch.where(~y_mask)[0] for _ in range(x_grid.shape[0])]
+        #y_mask = torch.isnan(y_grid[0].sum(-1)).flatten()
+        #nc = math.ceil(pc * (~y_mask).sum())
+        #m_idx_list = [torch.where(~y_mask)[0] for _ in range(x_grid.shape[0])]
+
+        # Assumes NO masking which is valid for ERA5 skin and 2m temperature
+        nc = math.ceil(pc * x_grid[0,...,0].numel())
+        m_idx_list = [torch.arange(x_grid[0,...,0].numel()) for _ in range(x_grid.shape[0])]
+
         m_idx = torch.stack(
             [m_idx_[torch.randperm(len(m_idx_))] for m_idx_ in m_idx_list], dim=0
         )
@@ -300,9 +314,9 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
             mt_idx = m_idx[:, nc : nc + self.max_nt]
 
         # Unravel into gridded form.
-        mc_grid_idx = torch.unravel_index(mc_idx, y_grid.shape[1:-1])
-        mt_grid_idx = torch.unravel_index(mt_idx, y_grid.shape[1:-1])
-        m_grid_idx = torch.unravel_index(m_idx, y_grid.shape[1:-1])
+        mc_grid_idx = torch.unravel_index(mc_idx, x_grid.shape[1:-1])
+        mt_grid_idx = torch.unravel_index(mt_idx, x_grid.shape[1:-1])
+        m_grid_idx = torch.unravel_index(m_idx, x_grid.shape[1:-1])
         batch_idx = torch.arange(x_grid.shape[0]).unsqueeze(-1)
 
         # Get flattened versions.
@@ -322,6 +336,9 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
 
     def sample_batch(self, pc: float, idxs: List[Tuple[List, ...]]) -> Batch:
         x_grid, y_grid = self.sample_grids(idxs=idxs)
+
+        if self.lazy_loading:
+            y_grid = dask.compute(y_grid)[0]
 
         return self.sample_from_grids(pc, x_grid, y_grid)
 
@@ -463,17 +480,22 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         self.used_modality = DataModality.parse(used_modality)
         self.store_original_grid = store_original_grid
 
-    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
+    def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> OOTGBatch:
         assert self.data is not None, "Data has not been loaded."
         batch_size = self.batch_size if batch_shape is None else batch_shape[0]
         # (batch_size, n, 3).
         idxs = self.sample_idx(batch_size=batch_size)
         x_grid, y_grids = self.sample_grids(idxs)
         on_grid_ys = y_grids[..., list(self.on_grid_vars)]
+        if self.lazy_loading:
+            on_grid_ys = dask.compute(on_grid_ys)[0]
 
         off_grid_ys = y_grids[..., [not var for var in self.on_grid_vars]]
         pc = self.pc_dist.sample()
         batch = self.sample_from_grids(pc, x_grid, off_grid_ys)
+        if self.lazy_loading:
+            batch.x, batch.y = None, None # so we don't unnecessarily compute these
+            batch = dask.compute(batch)[0]
 
         x_grid_plot, y_grid_plot = None, None
         if self.store_original_grid:
