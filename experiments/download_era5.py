@@ -1,15 +1,18 @@
 import cdsapi
 from argparse import ArgumentParser
+import multiprocessing
 
 # Example usage: to download 64 months in 32 files for 5years4months
 # python experiments/download_era5.py "2013-08" "2018-12" -m 2
 
-c = cdsapi.Client()
+client = cdsapi.Client()
 
-def retrieve(year, months):
-    c.retrieve(
-        'reanalysis-era5-single-levels',
-        {
+def cdsapi_worker(query: dict):
+  result = client.retrieve('reanalysis-era5-single-levels', query)
+  result.download(query["filename"])
+
+def get_query(year, months):
+    return {
             'product_type': 'reanalysis',
             'format': 'netcdf',
             'variable': [
@@ -41,9 +44,8 @@ def retrieve(year, months):
                 '18:00', '19:00', '20:00',
                 '21:00', '22:00', '23:00',
             ],
-        },
-        f'era5_{year}_{months.join("-")}.nc'
-        )
+            "filename": f"era5_{year}_{'-'.join(months)}.nc",
+        }
     
 def get_year_month(start_year, start_month, increments):
     new_year = start_year + (start_month + increments) // 12
@@ -62,13 +64,19 @@ if __name__ == "__main__":
     assert 12 % args.months_per_file == 0, "Year should be divible by months per file"
 
     num_chunks = ((end_year * 12 + end_month) - (start_year * 12 + start_month)) / args.months_per_file
-    print(num_chunks)
+    print("num_files: ", num_chunks)
     assert num_chunks.is_integer(), (
         "The date range must be a multiple of the number of months per file"
     )
+
+    queries = []
     for chunk in range(int(num_chunks)):
         year, month = get_year_month(start_year, start_month, chunk * args.months_per_file)
         
         months = [str(m).zfill(2) for m in range(month, month + args.months_per_file)]
         print(str(year), months)
-        retrieve(str(year), month)
+        queries.append(get_query(str(year), months))
+    
+    pool = multiprocessing.Pool(processes=32)
+    pool.map(cdsapi_worker, queries)
+    
