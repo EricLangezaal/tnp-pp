@@ -53,7 +53,6 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
     ):
         super().__init__(**kwargs)
 
-        self.all_input_vars = ["time", "latitude", "longitude"]
         self.lat_range = lat_range
         self.lon_range = lon_range
         self.date_range = date_range
@@ -243,18 +242,17 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         # Get batch.
         batch = self.sample_batch(pc=pc, idxs=idxs)
         return batch
-
-    def sample_batch(self, pc: float, idxs: List[Tuple[List, ...]]) -> Batch:
+    
+    def sample_grids(self, idxs: List[Tuple[List, ...]]) -> Tuple[torch.Tensor, torch.Tensor]:
         x_grid = torch.stack(
             [
                 torch.stack(
                     torch.meshgrid(
                         *[
                             torch.as_tensor(
-                                self.data[k][idx[i]].data, dtype=torch.float
+                                self.data[k][idx[i + (not self.use_time)]].data, dtype=torch.float
                             )
-                            for i, k in enumerate(self.all_input_vars)
-                            if k in self.input_vars
+                            for i, k in enumerate(self.input_vars)
                         ],
                         indexing="ij",
                     ),
@@ -285,10 +283,13 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
 
         y_grid = (y_grid - self.y_mean) / self.y_std
 
+        return x_grid, y_grid
+    
+    def sample_from_grids(self, pc: float, x_grid: torch.Tensor, y_grid: torch.Tensor) -> Batch:
         # Assumes same masking pattern for each grid.
         y_mask = torch.isnan(y_grid[0].sum(-1)).flatten()
         nc = math.ceil(pc * (~y_mask).sum())
-        m_idx_list = [torch.where(~y_mask)[0] for _ in range(len(idxs))]
+        m_idx_list = [torch.where(~y_mask)[0] for _ in range(x_grid.shape[0])]
         m_idx = torch.stack(
             [m_idx_[torch.randperm(len(m_idx_))] for m_idx_ in m_idx_list], dim=0
         )
@@ -302,7 +303,7 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
         mc_grid_idx = torch.unravel_index(mc_idx, y_grid.shape[1:-1])
         mt_grid_idx = torch.unravel_index(mt_idx, y_grid.shape[1:-1])
         m_grid_idx = torch.unravel_index(m_idx, y_grid.shape[1:-1])
-        batch_idx = torch.arange(len(idxs)).unsqueeze(-1)
+        batch_idx = torch.arange(x_grid.shape[0]).unsqueeze(-1)
 
         # Get flattened versions.
         x = x_grid[(batch_idx,) + m_grid_idx]
@@ -318,6 +319,11 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
             )
 
         return Batch(x=x, y=y, xc=xc, yc=yc, xt=xt, yt=yt)
+
+    def sample_batch(self, pc: float, idxs: List[Tuple[List, ...]]) -> Batch:
+        x_grid, y_grid = self.sample_grids(idxs=idxs)
+
+        return self.sample_from_grids(pc, x_grid, y_grid)
 
 
 class ERA5DataGeneratorFRF(ERA5DataGenerator):
@@ -338,10 +344,9 @@ class ERA5DataGeneratorFRF(ERA5DataGenerator):
                     torch.meshgrid(
                         *[
                             torch.as_tensor(
-                                self.data[k][idx[i]].data, dtype=torch.float
+                                self.data[k][idx[i + (not self.use_time)]].data, dtype=torch.float
                             )
-                            for i, k in enumerate(self.all_input_vars)
-                            if k in self.input_vars
+                            for i, k in enumerate(self.input_vars)
                         ],
                         indexing="ij",
                     ),
@@ -439,13 +444,17 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
     
     def __init__(
         self,
+        on_grid_vars: Tuple[bool] = (True,),
         coarsen_factors: Tuple[int, ...] = (4, 4),
         used_modality: DataModality = DataModality.BOTH,
         store_original_grid: bool = False,
         **kwargs,
     ):
-        kwargs["return_grid"] = True
+        kwargs["return_grid"] = store_original_grid
         super().__init__(**kwargs)
+
+        assert len(on_grid_vars) == len(self.data_vars)
+        self.on_grid_vars = on_grid_vars
 
         assert len(coarsen_factors) + (not self.use_time) == len(self.batch_grid_size),  (
             "please specify a coarsing for each grid dimension"
@@ -455,27 +464,29 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         self.store_original_grid = store_original_grid
 
     def generate_batch(self, batch_shape: Optional[torch.Size] = None) -> Batch:
-        batch = super().generate_batch(batch_shape)
-        assert isinstance(batch, GriddedBatch), "batch must be gridded."
+        assert self.data is not None, "Data has not been loaded."
+        batch_size = self.batch_size if batch_shape is None else batch_shape[0]
+        # (batch_size, n, 3).
+        idxs = self.sample_idx(batch_size=batch_size)
+        x_grid, y_grids = self.sample_grids(idxs)
+        on_grid_ys = y_grids[..., list(self.on_grid_vars)]
 
-        x_grid, y_grid = None, None
+        off_grid_ys = y_grids[..., [not var for var in self.on_grid_vars]]
+        pc = self.pc_dist.sample()
+        batch = self.sample_from_grids(pc, x_grid, off_grid_ys)
+
+        x_grid_plot, y_grid_plot = None, None
         if self.store_original_grid:
-            x_grid = subsample(batch.x_grid, self.coarsen_factors)
-            y_grid = subsample(batch.y_grid, self.coarsen_factors)
+            assert isinstance(batch, GriddedBatch)
+            x_grid_plot = subsample(batch.x_grid, self.coarsen_factors)
+            y_grid_plot = subsample(batch.y_grid, self.coarsen_factors)
 
-        # NOTE this modified batch.x_grid in place
-        xc_on_grid = coarsen_grid_era5(batch.x_grid, self.coarsen_factors, self.wrap_longitude, -1)
-        yc_on_grid = coarsen_grid_era5(batch.y_grid, self.coarsen_factors) 
-        
-        #xc = torch.cat((batch.xc, flatten_grid(xc_on_grid)), dim=-2)
-        #yc = torch.cat((batch.yc, flatten_grid(yc_on_grid)), dim=-2)
-        # NOTE: order here is different from synthetic.
-        #x = torch.cat((xc, batch.xt), dim=-2)
-        #y = torch.cat((yc, batch.yt), dim=-2)
+        xc_on_grid = coarsen_grid_era5(x_grid, self.coarsen_factors, self.wrap_longitude, -1)
+        yc_on_grid = coarsen_grid_era5(on_grid_ys, self.coarsen_factors) 
 
         return OOTGBatch(
-           x=x_grid,
-           y=y_grid,
+           x=x_grid_plot,
+           y=y_grid_plot,
            xc=None,
            yc=None,
            xt=batch.xt,
@@ -487,10 +498,6 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
            gt_pred=None,
            used_modality=self.used_modality,
         )
-
-class ERA5OOTGDataGeneratorFRF(ERA5OOTGDataGenerator, ERA5DataGeneratorFRF):
-    # Confirmed this actually works.
-    pass
 
 
 def subsample(
