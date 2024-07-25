@@ -83,31 +83,42 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.wrap_longitude = wrap_longitude
 
         self.url = gcloud_url
+
+        self.data_dir = data_dir
+        self.fnames = fnames
+        if data_dir is not None and fnames is None:
+            self.fnames = [f for f in os.listdir(data_dir) if f.endswith(".nc")]
+
         if distributed:
-            assert fnames is None or data_dir is None, (
-                "Cannot do distributed loading with files, use a cloud url instead."
-            )
             self.data = None
         else:
             self.load_data(date_range, data_dir, fnames)
+
+
+    def get_data_loader_args(self, i:int, num_splits: int):
+        if self.fnames is None or self.data_dir is None:
+            periods = pd.date_range(start=self.date_range[0], end=self.date_range[1], periods=num_splits + 1)
+            format = "%Y-%m-%d"
+            return {"date_range": (periods[i].strftime(format), periods[i + 1].strftime(format))}
+        
+        if num_splits % len(self.fnames) != 0:
+            warnings.warn("Some data files will be loaded by more workers than others")
+        if len(self.fnames) > num_splits:
+            warnings.warn("More data files than workers, this is unlikely to be desired")
+        
+        f_per_split = math.ceil(len(self.fnames) / num_splits)
+        return {"fnames": self.fnames[i % len(self.fnames): (i % len(self.fnames)) + f_per_split]}
     
-
-    def get_partial_date_range(self, i: int, num_splits: int):
-        periods = pd.date_range(start=self.date_range[0], end=self.date_range[1], periods=num_splits + 1)
-        format = "%Y-%m-%d"
-        return periods[i].strftime(format), periods[i + 1].strftime(format)
-
 
     def load_data(
         self,
-        date_range: Tuple[str, str],
-        data_dir: Optional[str] = None,
+        date_range: Optional[Tuple[str, str]] = None,
         fnames: Optional[List[str]] = None,
     ):
         # Load datasets.
-        if fnames is not None and data_dir is not None:
+        if fnames is not None and self.data_dir is not None:
             dataset = xr.open_mfdataset(
-                [os.path.join(data_dir, fname) for fname in fnames],
+                [os.path.join(self.data_dir, fname) for fname in fnames],
                 chunks="auto",
             )
         else:

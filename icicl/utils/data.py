@@ -18,6 +18,6 @@ def adjust_num_batches(worker_id: int):
     dataset.num_batches = adjusted_num_batches
 
     if isinstance(dataset, BaseERA5DataGenerator) and dataset.distributed:
-        date_range = dataset.get_partial_date_range(worker_id, num_workers)
-        print(f"Worker {worker_id} has date range {date_range}.")
-        dataset.load_data(date_range)
+        args = dataset.get_data_loader_args(worker_id, num_workers)
+        print(f"Worker {worker_id} has config {args}.")
+        dataset.load_data(**args)
