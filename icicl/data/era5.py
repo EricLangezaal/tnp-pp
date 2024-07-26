@@ -37,7 +37,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         data_dir: Optional[str] = None,
         fnames: Optional[List[str]] = None,
         gcloud_url: str = "gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3",
-        date_range: Tuple[str, str] = ("2018-01-01", "2020-12-31"),
+        date_range: Tuple[str, str] = ("2000-01-01", "2020-12-31"),
         lat_range: Tuple[float, float] = (-90.0, 90.0),
         lon_range: Tuple[float, float] = (-180.0, 180.0),
         batch_grid_size: Tuple[int, int, int],
@@ -179,7 +179,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
             self.y_mean = tuple(self.data[k][:].mean().values.item() for k in self.data_vars)
             self.y_std = tuple(self.data[k][:].std().values.item() for k in self.data_vars)
             print("y_mean: ", self.y_mean, "y_std: ", self.y_std)
-       
+
         self.y_mean = torch.as_tensor(self.y_mean, dtype=torch.float)
         self.y_std = torch.as_tensor(self.y_std, dtype=torch.float)
 

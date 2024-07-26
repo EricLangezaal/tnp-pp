@@ -24,6 +24,7 @@ def plot_era5(
     batches: List[OOTGBatch],
     y_mean: torch.Tensor,
     y_std: torch.Tensor,
+    grid_idx: int = 1,
     num_fig: int = 5,
     figsize: Tuple[float, float] = (8.0, 6.0),
     name: str = "plot",
@@ -33,6 +34,7 @@ def plot_era5(
     colorbar: bool = True,
     pred_fn: Callable = np_pred_fn,
 ):
+
     for i in range(num_fig):
         batch = batches[i]
 
@@ -58,19 +60,21 @@ def plot_era5(
                 yplot_pred_dist.stddev.cpu(),
             )
 
+        y_mean_off, y_std_off = y_mean[grid_idx - 1], y_std[grid_idx - 1]
+        y_mean_on, y_std_on = y_mean[grid_idx], y_std[grid_idx]
         # Rescale inputs and outputs.
         xc_off_grid = batch.xc_off_grid[0].cpu()
-        yc_off_grid = (batch.yc_off_grid[0].cpu() * y_std) + y_mean
+        yc_off_grid = (batch.yc_off_grid[0].cpu() * y_std_off) + y_mean_off
 
         xt = batch.xt[0].cpu()
-        yt = (batch.yt[0].cpu() * y_std) + y_mean
-        pred_mean_t = (pred_mean_t[0] * y_std) + y_mean
-        pred_std_t = pred_std_t[0] * y_std
+        yt = (batch.yt[0].cpu() * y_std_off) + y_mean_off
+        pred_mean_t = (pred_mean_t[0] * y_std_off) + y_mean_off
+        pred_std_t = pred_std_t[0] * y_std_off
 
         x_grid = flatten_grid(x_grid)[0].cpu()
-        y_grid = flatten_grid(y_grid)[0].cpu() * y_std + y_mean
-        pred_mean_grid = (pred_mean_grid[0] * y_std) + y_mean
-        pred_std_grid = pred_std_grid[0] * y_std
+        y_grid = flatten_grid(y_grid)[0].cpu() * y_std_on + y_mean_on
+        pred_mean_grid = (pred_mean_grid[0] * y_std_on) + y_mean_on
+        pred_std_grid = pred_std_grid[0] * y_std_on
 
         diff_grid = y_grid - pred_mean_grid
         diff_grid_norm = diff_grid / pred_std_grid
