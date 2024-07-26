@@ -5,7 +5,7 @@ generators:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/train/"
-    data_vars: ["2m_temperature", "skin_temperature"]
+    data_vars: ["t2m", "skt"]
     on_grid_vars: [False, True]
     min_pc: ${params.min_context_pc}
     max_pc: ${params.max_context_pc}
@@ -25,7 +25,7 @@ generators:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/val/"
-    data_vars: ["2m_temperature", "skin_temperature"]
+    data_vars: ["t2m", "skt"]
     on_grid_vars: [False, True]
     min_pc: ${params.min_context_pc}
     max_pc: ${params.max_context_pc}

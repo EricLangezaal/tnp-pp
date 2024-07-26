@@ -87,12 +87,13 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.data_dir = data_dir
         self.fnames = fnames
         if data_dir is not None and fnames is None:
-            self.fnames = [f for f in os.listdir(data_dir) if f.endswith(".nc")]
+            full_dir = os.path.expanduser(data_dir)
+            self.fnames = [f for f in os.listdir(full_dir) if f.endswith(".nc")]
 
         if distributed:
             self.data = None
         else:
-            self.load_data(date_range, data_dir, fnames)
+            self.load_data(date_range, fnames)
 
 
     def get_data_loader_args(self, i:int, num_splits: int):
@@ -126,6 +127,8 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
                 self.url,
             )
         
+        if date_range is None:
+           date_range = self.date_range     
         # do this as soon as possible to save overhead.
         dataset = dataset.sel(
             time=slice(*sorted(date_range)),
@@ -276,24 +279,15 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
 
         y_grid_list = [[self.data[k][idx].data for k in self.data_vars] for idx in idxs]
 
-        #if self.lazy_loading:
-        #    y_grid_list = dask.compute(y_grid_list)[0]
-        # y_grid = torch.stack(
-        #     [
-        #         torch.stack(
-        #             [torch.as_tensor(y, dtype=torch.float32) for y in y_grid_], dim=-1
-        #         )
-        #         for y_grid_ in y_grid_list
-        #     ],
-        #     dim=0,
-        # )
-
-        y_grid = dask.delayed(torch.stack)(
+        if self.lazy_loading:
+            y_grid_list = dask.compute(y_grid_list)[0]
+        
+        y_grid = torch.stack(
             [
-                dask.delayed(torch.stack)(
-                    [dask.delayed(torch.as_tensor)(y, dtype=torch.float32) for y in y_grid_], dim=-1
-                )
-                for y_grid_ in y_grid_list
+               torch.stack(
+                 [torch.as_tensor(y, dtype=torch.float32) for y in y_grid_], dim=-1
+               )
+            for y_grid_ in y_grid_list
             ],
             dim=0,
         )
@@ -347,9 +341,6 @@ class ERA5DataGenerator(BaseERA5DataGenerator):
 
     def sample_batch(self, pc: float, idxs: List[Tuple[List, ...]]) -> Batch:
         x_grid, y_grid = self.sample_grids(idxs=idxs)
-
-        if self.lazy_loading:
-            y_grid = dask.compute(y_grid)[0]
 
         return self.sample_from_grids(pc, x_grid, y_grid)
 
@@ -498,15 +489,10 @@ class ERA5OOTGDataGenerator(ERA5DataGenerator):
         idxs = self.sample_idx(batch_size=batch_size)
         x_grid, y_grids = self.sample_grids(idxs)
         on_grid_ys = y_grids[..., list(self.on_grid_vars)]
-        if self.lazy_loading:
-            on_grid_ys = dask.compute(on_grid_ys)[0]
 
         off_grid_ys = y_grids[..., [not var for var in self.on_grid_vars]]
         pc = self.pc_dist.sample()
         batch = self.sample_from_grids(pc, x_grid, off_grid_ys)
-        if self.lazy_loading:
-            batch.x, batch.y = None, None # so we don't unnecessarily compute these
-            batch = dask.compute(batch)[0]
 
         x_grid_plot, y_grid_plot = None, None
         if self.store_original_grid:
