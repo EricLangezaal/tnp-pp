@@ -111,7 +111,6 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
 
     def load_data(
         self,
-        dask_worker: Optional[List] = None,
         date_range: Optional[Tuple[str, str]] = None,
         fnames: Optional[List[str]] = None,
     ):
@@ -172,7 +171,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.y_std = torch.as_tensor(self.y_std, dtype=torch.float)
 
         if not self.lazy_loading:
-            self.data = dask.compute(self.data, workers=dask_worker)[0]
+            self.data = dask.compute(self.data)[0]
 
         
     def sample_idx(self, batch_size: int) -> List[Tuple[List, List, List]]:

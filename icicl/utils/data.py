@@ -1,8 +1,7 @@
-from typing import List
 import torch
 from icicl.data.era5 import BaseERA5DataGenerator
 
-def adjust_num_batches(dask_workers: List, worker_id: int):
+def adjust_num_batches(worker_id: int):
     worker_info = torch.utils.data.get_worker_info()
     num_workers = worker_info.num_workers
     num_batches = worker_info.dataset.num_batches
@@ -21,5 +20,4 @@ def adjust_num_batches(dask_workers: List, worker_id: int):
     if isinstance(dataset, BaseERA5DataGenerator) and dataset.distributed:
         args = dataset.get_data_loader_args(worker_id, num_workers)
         print(f"Worker {worker_id} has config {args}.")
-        print(dask_workers[worker_id])
-        dataset.load_data(dask_worker=dask_workers[worker_id], **args)
+        dataset.load_data(**args)
