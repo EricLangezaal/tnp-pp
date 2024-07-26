@@ -4,18 +4,19 @@ generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     distributed: True
+    data_dir: "~/rds/hpc-work/data/era5/train/"
     data_vars: ["2m_temperature", "skin_temperature"]
     on_grid_vars: [False, True]
     min_pc: ${params.min_context_pc}
     max_pc: ${params.max_context_pc}
     y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
     y_std: [21.169963472302797, 22.154462898350793]
-    date_range: ["1998-01-01", "2018-12-31"]
+    date_range: ["1998-01-01", "2018-12-31"] # keep large so files are not actually sliced
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
-    lazy_loading: True
+    lazy_loading: False
     samples_per_epoch: 8_000
     batch_size: 16
     used_modality: ${params.used_modality}
@@ -23,6 +24,7 @@ generators:
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     distributed: True
+    data_dir: "~/rds/hpc-work/data/era5/val/"
     data_vars: ["2m_temperature", "skin_temperature"]
     on_grid_vars: [False, True]
     min_pc: ${params.min_context_pc}
@@ -34,12 +36,12 @@ generators:
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
-    lazy_loading: True
+    lazy_loading: False
     store_original_grid: True
     samples_per_epoch: 2_000
     batch_size: 16
     used_modality: ${params.used_modality}
-    num_workers: 32
+    num_workers: 24 # i.e. two per month
     
 model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD
