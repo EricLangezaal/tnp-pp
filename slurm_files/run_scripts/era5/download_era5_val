@@ -22,7 +22,7 @@
 #! Note probably this should not exceed the total number of GPUs in use.
 #SBATCH --ntasks=1
 #! How much wallclock time will be required?
-#SBATCH --time=5:00:00
+#SBATCH --time=7:00:00
 
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
@@ -49,12 +49,12 @@ module load slurm
 conda activate tnp
 
 #! Work directory (i.e. where the job will run):
-workdir="/home/$USER/rds/hpc-work/data/era5/train/"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
+workdir="/home/$USER/rds/hpc-work/data/era5/val/"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
                              # in which sbatch is run.
                            
 ulimit -n 100000
 #! Your_python your_code, args
-CMD="python /home/$USER/tnp-pp/experiments/download_era5.py --overwrite '2014-01_12' '2015-01_12' '2016-01_12' '2017-01_12' '2018-01_12'"
+CMD="python /home/$USER/tnp-pp/experiments/download_era5.py '2019-01' '2019-12' -m 1"
 
 ###############################################################
 ### You should not have to change anything below this line ####
