@@ -1,9 +1,13 @@
+from functools import partial
+
 import lightning.pytorch as pl
 import torch
 from plot import plot
 from plot_era5 import plot_era5
 from plot_image import plot_image
 from plot_kolmogorov import plot_kolmogorov
+
+from dask.distributed import Client
 
 from icicl.data.on_off_grid import RandomOOTGGenerator
 from icicl.data.era5 import ERA5DataGenerator
@@ -23,11 +27,14 @@ def main():
     optimiser = experiment.optimiser(model.parameters())
     epochs = experiment.params.epochs
 
+    client = Client(n_workers=gen_train.num_workers, threads_per_worker=1)
+    all_dask_workers = list(client.scheduler_info()['workers'])
+
     train_loader = torch.utils.data.DataLoader(
         gen_train,
         num_workers=gen_train.num_workers,
         batch_size=None,
-        worker_init_fn=adjust_num_batches,
+        worker_init_fn=partial(adjust_num_batches, all_dask_workers),
         persistent_workers=gen_train.num_workers > 1,
         prefetch_factor=5 if gen_train.num_workers > 1 else None,
     )
@@ -35,7 +42,7 @@ def main():
         gen_val,
         num_workers=gen_val.num_workers,
         batch_size=None,
-        worker_init_fn=adjust_num_batches,
+        worker_init_fn=partial(adjust_num_batches, all_dask_workers),
         persistent_workers=gen_val.num_workers > 1,
         prefetch_factor=4 if gen_val.num_workers > 1 else None,
     )

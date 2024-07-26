@@ -20,8 +20,6 @@ from .base import Batch, DataGenerator
 from .on_off_grid import OOTGBatch, DataModality
 from ..utils.grids import coarsen_grid
 
-dask.config.set(scheduler="synchronous")
-
 @dataclass
 class GriddedBatch(Batch):
     x_grid: torch.Tensor
@@ -93,7 +91,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         if distributed:
             self.data = None
         else:
-            self.load_data(date_range, fnames)
+            self.load_data(date_range=date_range, fnames=fnames)
 
 
     def get_data_loader_args(self, i:int, num_splits: int):
@@ -113,6 +111,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
 
     def load_data(
         self,
+        dask_worker: Optional[List] = None,
         date_range: Optional[Tuple[str, str]] = None,
         fnames: Optional[List[str]] = None,
     ):
@@ -173,7 +172,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.y_std = torch.as_tensor(self.y_std, dtype=torch.float)
 
         if not self.lazy_loading:
-            self.data = dask.compute(self.data)[0]
+            self.data = dask.compute(self.data, workers=dask_worker)[0]
 
         
     def sample_idx(self, batch_size: int) -> List[Tuple[List, List, List]]:
