@@ -11,6 +11,7 @@ from typing import List, Optional, Tuple, Union
 
 import dask
 import dask.config
+import dask.config
 import numpy as np
 import torch
 import pandas as pd
@@ -19,6 +20,8 @@ import xarray as xr
 from .base import Batch, DataGenerator
 from .on_off_grid import OOTGBatch, DataModality
 from ..utils.grids import coarsen_grid
+
+dask.config.set(scheduler="synchronous")
 
 @dataclass
 class GriddedBatch(Batch):
@@ -56,8 +59,6 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.date_range = date_range
 
         self.data_vars = data_vars
-        self.lazy_loading = lazy_loading
-        self.distributed = distributed
         self.ref_date = ref_date
 
         # How large each sampled grid should be (in indicies).
@@ -81,12 +82,19 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.wrap_longitude = wrap_longitude
 
         self.url = gcloud_url
-
         self.data_dir = data_dir
         self.fnames = fnames
-        if data_dir is not None and fnames is None:
-            full_dir = os.path.expanduser(data_dir)
-            self.fnames = [f for f in os.listdir(full_dir) if f.endswith(".nc")]
+
+        self.lazy_loading = lazy_loading
+        self.distributed = distributed
+
+        if data_dir is not None:
+            if self.lazy_loading:
+                warnings.warn("Files will never be lazy loaded.")
+                self.lazy_loading = False
+            if fnames is None:
+                full_dir = os.path.expanduser(data_dir)
+                self.fnames = [f for f in os.listdir(full_dir) if f.endswith(".nc")]
 
         if distributed:
             self.data = None
@@ -116,21 +124,26 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
     ):
         # Load datasets.
         if fnames is not None and self.data_dir is not None:
-            dataset = xr.open_mfdataset(
-                [os.path.join(self.data_dir, fname) for fname in fnames],
-                chunks="auto",
-            )
+            datasets = [
+                xr.open_dataset(
+                    os.path.join(self.data_dir, fname),
+                    engine="netcdf4"
+                )
+                for fname in fnames  # pylint: disable=no-member
+            ]
+            dataset = datasets[0]
+            if len(datasets) > 1: # very slow on single dataset for some reason
+                dataset = xr.concat(datasets, "time")
         else:
             dataset = xr.open_zarr(
                 self.url,
             )
         
-        if date_range is None:
-           date_range = self.date_range     
-        # do this as soon as possible to save overhead.
-        dataset = dataset.sel(
-            time=slice(*sorted(date_range)),
-        )
+        if date_range is not None:
+            # do this as soon as possible to save overhead.
+            dataset = dataset.sel(
+                time=slice(*sorted(date_range)),
+            )
 
         # Ensure longitudes and latitudes are in standard format.
         if dataset["longitude"].max() > 180:
@@ -170,7 +183,7 @@ class BaseERA5DataGenerator(DataGenerator, ABC):
         self.y_mean = torch.as_tensor(self.y_mean, dtype=torch.float)
         self.y_std = torch.as_tensor(self.y_std, dtype=torch.float)
 
-        if not self.lazy_loading:
+        if not self.lazy_loading and fnames is None:
             self.data = dask.compute(self.data)[0]
 
         

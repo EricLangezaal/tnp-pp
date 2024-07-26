@@ -11,7 +11,6 @@ generators:
     max_pc: ${params.max_context_pc}
     y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
     y_std: [21.169963472302797, 22.154462898350793]
-    date_range: ["1998-01-01", "2018-12-31"] # keep large so files are not actually sliced
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
@@ -31,7 +30,6 @@ generators:
     max_pc: ${params.max_context_pc}
     y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
     y_std: [21.169963472302797, 22.154462898350793]
-    date_range: ["2019-01-01", "2019-12-31"]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
