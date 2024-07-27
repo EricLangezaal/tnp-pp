@@ -155,7 +155,7 @@ def plot_era5(
                 (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, pred_std_grid, diff_grid_norm),
                 (scatter_kwargs, scatter_kwargs, scatter_kwargs | {"s": 5}, grid_args, grid_args, diff_args, std_args, diff_args),
             ):
-                fig = plt.figure(figsize=figsize, dpi=200)
+                fig = plt.figure(figsize=figsize, dpi=100)
 
                 ax = plt.axes(projection=ccrs.PlateCarree())
                 #ax.set_title(fig_name, fontsize=20)

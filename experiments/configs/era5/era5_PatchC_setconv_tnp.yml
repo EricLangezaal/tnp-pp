@@ -4,42 +4,42 @@ generators:
   train:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     distributed: True
-    data_vars: ["2m_temperature"]
-    min_pc: 0.0005
-    max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
-    y_mean: [279.0644808446564] # calculated previously
-    y_std: [21.169963472302797]
-    date_range: ["1998-01-01", "2018-12-31"]
+    data_dir: "~/rds/hpc-work/data/era5/train/"
+    data_vars: ["t2m", "skt"]
+    on_grid_vars: [False, True]
+    min_pc: ${params.min_context_pc}
+    max_pc: ${params.max_context_pc}
+    y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
+    y_std: [21.169963472302797, 22.154462898350793]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
-    return_grid: True
-    lazy_loading: True
+    lazy_loading: False
     samples_per_epoch: 8_000
     batch_size: 16
-    deterministic: ${params.deterministic}
+    used_modality: ${params.used_modality}
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
     distributed: True
-    data_vars: ["2m_temperature"]
-    min_pc: 0.0005
-    max_pc: 0.002 # max percentage context points out of total (product of batch_grid_size)
-    y_mean: [279.0644808446564] # calculated previously
-    y_std: [21.169963472302797]
-    date_range: ["2019-01-01", "2019-12-31"]
+    data_dir: "~/rds/hpc-work/data/era5/val/"
+    data_vars: ["t2m", "skt"]
+    on_grid_vars: [False, True]
+    min_pc: ${params.min_context_pc}
+    max_pc: ${params.max_context_pc}
+    y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
+    y_std: [21.169963472302797, 22.154462898350793]
     batch_grid_size: ${params.batch_grid_size}
     coarsen_factors: ${params.coarsen_factors}
     max_nt: ${params.num_targets}
     use_time: False
-    return_grid: True
-    lazy_loading: True
+    lazy_loading: False
     store_original_grid: True
     samples_per_epoch: 2_000
     batch_size: 16
-    deterministic: ${params.deterministic}
-    num_workers: 32
+    used_modality: ${params.used_modality}
+    num_workers: 24 # i.e. two per month
     
 model:
   _target_: icicl.models.ootg_tnp.OOTG_TNPD
@@ -148,9 +148,11 @@ params:
   x_dim: 2
   y_dim: 1
   
-  batch_grid_size: [1, 720, 1440] # time, lat, lon. Exact 0.25° grid this way.
+  batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
-  num_targets: 500
+  num_targets: 3000
+  min_context_pc: 0.01 # so 10k+
+  max_context_pc: 0.02 # max percentage of product of batch_grid_size
 
   embed_dim: 128
   num_heads: 8
@@ -169,5 +171,5 @@ misc:
   project: era5-no-time
   name: PatchC-setconv-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-KCA=${params.top_k_ctot}
   gradient_clip_val: 0.5
-  plot_interval: 10
+  plot_interval: 20
   resume_from_checkpoint: null
