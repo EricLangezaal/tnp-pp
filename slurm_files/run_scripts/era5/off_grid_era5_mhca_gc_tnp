@@ -57,7 +57,7 @@ workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to t
 
 ulimit -n 21000
 #! Your_python your_code, args
-CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_mhca_encoder_GridC_tnp.yml params.used_modality=OFF_GRID misc.progress_bars=False"
+CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_mhca_encoder_GridC_tnp.yml params.used_modality=OFF_GRID misc.progress_bars=False params.min_context_pc=0.001 params.max_context_pc=0.02"
 
 ###############################################################
 ### You should not have to change anything below this line ####

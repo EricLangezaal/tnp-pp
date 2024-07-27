@@ -18,7 +18,6 @@ generators:
     lazy_loading: False
     samples_per_epoch: 8_000
     batch_size: 16
-    used_modality: ${params.used_modality}
     num_workers: 32
   val:
     _target_: icicl.data.era5.ERA5OOTGDataGenerator
@@ -38,7 +37,6 @@ generators:
     store_original_grid: True
     samples_per_epoch: 2_000
     batch_size: 16
-    used_modality: ${params.used_modality}
     num_workers: 24 # i.e. two per month
     
 model:
@@ -151,7 +149,7 @@ params:
   batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 3000
-  min_context_pc: 0.01 # so 10k+
+  min_context_pc: 0.001 # so 1k
   max_context_pc: 0.02 # max percentage of product of batch_grid_size
 
   embed_dim: 128

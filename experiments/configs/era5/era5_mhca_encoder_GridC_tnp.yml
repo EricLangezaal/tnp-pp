@@ -150,7 +150,7 @@ params:
   batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 3000
-  min_context_pc: 0.01 # so 10k+
+  min_context_pc: 0.001 # so 1k+
   max_context_pc: 0.02 # max percentage of product of batch_grid_size
 
   embed_dim: 128
@@ -167,7 +167,8 @@ params:
 
 misc:
   project: era5-dual-modality
-  name: mhca_encoder-GridC-data=${params.used_modality}-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
+  name: mhca_encoder-GridC-data=${params.used_modality}-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}-OFFC=${misc.context_info}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null
