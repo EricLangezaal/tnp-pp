@@ -1,0 +1,53 @@
+
+generators:
+  val:
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    distributed: True
+    data_dir: "~/rds/hpc-work/data/era5/val/"
+    data_vars: ["t2m", "skt"]
+    on_grid_vars: [False, True]
+    min_pc: ${params.min_context_pc}
+    max_pc: ${params.max_context_pc}
+    y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
+    y_std: [21.169963472302797, 22.154462898350793]
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    use_time: False
+    lazy_loading: False
+    store_original_grid: True
+    samples_per_epoch: 2_000
+    batch_size: 16
+    num_workers: 24 # i.e. two per month
+
+model:
+  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  encoder: ${tnpd_encoder}
+  decoder: ${tnpd_decoder}
+  likelihood: ${likelihood}
+
+tnpd_encoder:
+  _target_: icicl.models.baseline.InterpBaselineEncoder
+  interpolation_factors: ${params.interpolation_factors}
+
+tnpd_decoder:
+  _target_: icicl.models.baseline.IdentityBaselineDecoder
+
+likelihood:
+  _target_: icicl.likelihoods.dirac_delta.DeltaLikelihood
+
+params:
+  x_dim: 2
+  y_dim: 1
+  
+  batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
+  coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
+  num_targets: 3000
+  min_context_pc: 0.001 # so 1k
+  max_context_pc: 0.02 # max percentage of product of batch_grid_size
+
+  interpolation_factors: [4, 4]
+
+misc:
+  only_plots: False
+  logging: False
