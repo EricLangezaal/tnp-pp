@@ -57,7 +57,6 @@ grid_encoder:
   grid_shape: ${eval:'(${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1])'}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
-  coarsen_fn: ${coarsen_fn}
 
 grid_mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -74,6 +73,7 @@ transformer_encoder:
   num_layers: ${params.num_layers}
   roll_dims: ${params.roll_dims}
   patch_encoder: ${patch_encoder}
+  coarsen_fn: ${coarsen_fn}
   top_k_ctot: ${params.top_k_ctot}
 
 
@@ -172,8 +172,9 @@ params:
 
 
 misc:
-  project: era5-no-time
-  name: mhca_encoder-PatchC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}
+  project: era5-dual-modality
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
+  name: mhca_encoder-PatchC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-GEGS=${grid_encoder.grid_shape}-KCA=${params.top_k_ctot}-OFFC=${misc.context_info}
   gradient_clip_val: 0.5
   plot_interval: 20
   resume_from_checkpoint: null

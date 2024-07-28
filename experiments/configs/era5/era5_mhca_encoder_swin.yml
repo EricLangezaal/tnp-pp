@@ -57,7 +57,6 @@ grid_encoder:
   grid_shape: ${eval:'(${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1])'}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
-  coarsen_fn: ${coarsen_fn}
 
 grid_mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -114,12 +113,6 @@ spherical_harmonics:
   _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
   num_legendre_polys: ${params.num_legendre_polys}
 
-coarsen_fn:
-  _target_: icicl.data.era5.coarsen_grid_era5
-  _partial_: True
-  wrap_longitude: True
-  lon_dim: -1
-
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder
   z_decoder: ${z_decoder}
@@ -167,8 +160,9 @@ params:
 
 
 misc:
-  project: era5-no-time
-  name: mhca_encoder-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}
+  project: era5-dual-modality
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
+  name: mhca_encoder-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}-OFFC=${misc.context_info}
   gradient_clip_val: 0.5
   plot_interval: 10
   resume_from_checkpoint: null

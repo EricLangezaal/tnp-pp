@@ -67,6 +67,7 @@ transformer_encoder:
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
   patch_encoder: ${patch_encoder}
+  coarsen_fn: ${coarsen_fn}
   roll_dims: ${params.roll_dims}
   top_k_ctot: ${params.top_k_ctot}
 
@@ -86,11 +87,16 @@ mhsa_layer:
   feedforward_dim: ${params.embed_dim}
   norm_first: ${params.norm_first}
 
-
 patch_encoder:
   _target_: icicl.networks.patch_encoders.PatchEncoder
   embed_dim: ${params.embed_dim}
   patch_size: ${params.patch_size}
+
+coarsen_fn:
+  _target_: icicl.data.era5.coarsen_grid_era5
+  _partial_: True
+  wrap_longitude: True
+  lon_dim: -1
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
@@ -160,8 +166,9 @@ params:
 
 
 misc:
-  project: era5-no-time
-  name: setconv-PatchC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-KCA=${params.top_k_ctot}
+  project: era5-dual-modality
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
+  name: setconv-PatchC-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-KCA=${params.top_k_ctot}-OFFC=${misc.context_info}
   gradient_clip_val: 0.5
   plot_interval: 20
   resume_from_checkpoint: null

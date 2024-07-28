@@ -166,8 +166,9 @@ params:
 
 
 misc:
-  project: era5-no-time
-  name: PatchC-setconv-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-KCA=${params.top_k_ctot}
+  project: era5-dual-modality
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
+  name: PatchC-setconv-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_PS=${params.patch_size}-KCA=${params.top_k_ctot}-OFFC=${misc.context_info}
   gradient_clip_val: 0.5
   plot_interval: 20
   resume_from_checkpoint: null

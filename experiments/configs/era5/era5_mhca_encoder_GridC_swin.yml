@@ -167,7 +167,8 @@ params:
 
 
 misc:
-  project: era5-no-time
+  project: era5-dual-modality
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
   name: mhca_encoder-GridC-SWIN_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}_WS=${params.window_sizes}-GEGS=${grid_encoder.grid_shape}
   gradient_clip_val: 0.5
   plot_interval: 10
