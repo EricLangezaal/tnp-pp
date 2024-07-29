@@ -53,7 +53,7 @@ params:
 misc:
   project: era5-dual-modality
   context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
-  name: interpolation_baseline-GI=${params.interpolation_factors}-OFFC=${misc.context_info}
+  name: baseline-BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GI=${params.interpolation_factors}-OFFC=${misc.context_info}
   only_plots: False
   fake_train_steps: 500
   logging: True

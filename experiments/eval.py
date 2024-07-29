@@ -128,9 +128,7 @@ def main():
     if experiment.misc.fake_train_steps is not None:
         for epoch in range(1, experiment.params.epochs + 1):
             step = epoch * experiment.misc.fake_train_steps
-            for key, value in test_result.items():
-                if isinstance(value, torch.Tensor):
-                    wandb.log({f"val/{key.replace('mean_', '')}": value}, step=step, commit=False)
+            wandb.log({f"val/rmse": test_result["rmse"]}, step=step, commit=False)
         wandb.log({}, commit=True)            
 
     if isinstance(gen_test, ImageGenerator):
