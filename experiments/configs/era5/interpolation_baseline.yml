@@ -17,6 +17,7 @@ generators:
     lazy_loading: False
     store_original_grid: True
     samples_per_epoch: 2_000
+    used_modality: ${params.used_modality}
     batch_size: 16
     num_workers: 24 # i.e. two per month
 
@@ -28,7 +29,6 @@ model:
 
 tnpd_encoder:
   _target_: icicl.models.baseline.InterpBaselineEncoder
-  interpolation_factors: ${params.interpolation_factors}
 
 tnpd_decoder:
   _target_: icicl.models.baseline.IdentityBaselineDecoder
@@ -38,6 +38,7 @@ likelihood:
 
 params:
   epochs: 200
+  used_modality: BOTH
 
   x_dim: 2
   y_dim: 1
@@ -46,14 +47,12 @@ params:
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 3000
   min_context_pc: 0.001 # so 1k
-  max_context_pc: 0.02 # max percentage of product of batch_grid_size
-
-  interpolation_factors: [4, 4]
+  max_context_pc: 0.002 # max percentage of product of batch_grid_size
 
 misc:
   project: era5-dual-modality
   context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
-  name: baseline-BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-GI=${params.interpolation_factors}-OFFC=${misc.context_info}
+  name: baseline-BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-data=${params.used_modality}-OFFC=${misc.context_info}
   only_plots: False
   fake_train_steps: 500
   logging: True
