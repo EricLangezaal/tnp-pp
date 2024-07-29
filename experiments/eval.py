@@ -125,6 +125,13 @@ def main():
             "std_gt_loglik"
         ]
 
+    if experiment.misc.fake_epochs:
+        for epoch in range(1, experiment.params.epochs + 1):
+            step = epoch * gen_test.num_batches
+            for key, value in test_result.items():
+                wandb.log({f"val/{key.replace('mean_', '')}": value}, step=step, commit=False)
+        wandb.log({}, commit=True)            
+
     if isinstance(gen_test, ImageGenerator):
         plot_image(
             model=model,
@@ -133,18 +140,18 @@ def main():
             name=f"test/{eval_name}",
         )
     elif isinstance(gen_test, ERA5DataGenerator):
-            plot_era5(
-                model=model,
-                batches=batches,
-                y_mean=gen_test.y_mean,
-                y_std=gen_test.y_std,
-                num_fig=min(experiment.misc.num_plots, len(batches)),
-                figsize=(15.0, 5.0),
-                name=eval_name,
-                subplots=experiment.misc.subplots,
-                savefig=experiment.misc.savefig,
-                logging=experiment.misc.logging,
-            )
+        plot_era5(
+            model=model,
+            batches=batches,
+            y_mean=gen_test.y_mean,
+            y_std=gen_test.y_std,
+            num_fig=min(experiment.misc.num_plots, len(batches)),
+            figsize=(15.0, 5.0),
+            name=eval_name,
+            subplots=experiment.misc.subplots,
+            savefig=experiment.misc.savefig,
+            logging=experiment.misc.logging,
+        )
     elif isinstance(gen_test, KolmogorovGenerator):
         plot_kolmogorov(
             model=model,

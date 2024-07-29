@@ -318,6 +318,7 @@ def create_default_config() -> DictConfig:
             "num_plots": 5,
             "gradient_clip_val": None,
             "only_plots": False,
+            "fake_epochs": False,
             "savefig": False,
             "subplots": False,
             "loss_fn": {
@@ -470,14 +471,17 @@ def initialize_evaluation() -> DictConfig:
     )
     args, config_changes = parser.parse_known_args()
 
-    api = wandb.Api()
-    run = api.run(args.run_path)
+    # only do this if previous run specified
+    if args.run_path is not None:
+        api = wandb.Api()
+        run = api.run(args.run_path)
 
     # Initialise evaluation, make path.
-    config, _ = extract_config(args.config, config_changes)
+    config, config_dict = extract_config(args.config, config_changes)
 
     # Set model to run.config.model.
-    config.model = run.config["model"]
+    if args.run_path is not None:
+        config.model = run.config["model"]
 
     # Set random seed.
     pl.seed_everything(config.misc.seed)
@@ -488,21 +492,26 @@ def initialize_evaluation() -> DictConfig:
     # Set random seed.
     pl.seed_everything(config.misc.seed)
 
-    # Downloads to "./checkpoints/last.ckpt"
-    ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
-    ckpt_file.download(replace=True)
+    if args.run_path is not None:
+        # Downloads to "./checkpoints/last.ckpt"
+        ckpt_file = run.files(f"checkpoints/{args.ckpt}.ckpt")[0]
+        ckpt_file.download(replace=True)
 
-    experiment.model.load_state_dict(
-        torch.load(f"checkpoints/{args.ckpt}.ckpt", map_location="cpu"), strict=True
-    )
-
-    # Initialise wandb.
-    wandb.init(
-        resume="must",
-        project=run.project,
-        name=run.name,
-        id=run.id,
-    )
+        experiment.model.load_state_dict(
+            torch.load(f"checkpoints/{args.ckpt}.ckpt", map_location="cpu"), strict=True
+        )
+        wandb.init(
+            resume="must",
+            project=run.project,
+            name=run.name,
+            id=run.id,
+        )
+    else:
+        wandb.init(
+            project=experiment.misc.project,
+            name=experiment.misc.name,
+            config=config_dict
+        )
 
     return experiment
 
