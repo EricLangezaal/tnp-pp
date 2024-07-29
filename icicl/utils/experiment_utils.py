@@ -318,7 +318,7 @@ def create_default_config() -> DictConfig:
             "num_plots": 5,
             "gradient_clip_val": None,
             "only_plots": False,
-            "fake_epochs": False,
+            "fake_train_steps": None,
             "savefig": False,
             "subplots": False,
             "loss_fn": {

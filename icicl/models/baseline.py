@@ -41,13 +41,13 @@ class InterpBaselineEncoder(nn.Module):
             u_batch_idx = torch.arange(B).unsqueeze(-1).repeat(1, U)
             s_range_idx = torch.arange(S).repeat(B, 1)
             u_range_idx = torch.arange(U).repeat(B, 1)
-            nearest_mask = torch.zeros(B, U, S, dtype=torch.int)
+            nearest_mask = torch.zeros(B, U, S, dtype=torch.int, device=xc_off_grid.device)
             nearest_mask[u_batch_idx, u_range_idx, nearest_idx] = 1
             
             max_patch = nearest_mask.sum(dim=1).amax() + (used_modality == DataModality.BOTH)
             cumcount_idx = (nearest_mask.cumsum(dim=1) - 1)[u_batch_idx, u_range_idx, nearest_idx]
 
-            joint_grid = torch.full((B, S, max_patch, Ydim), torch.nan)
+            joint_grid = torch.full((B, S, max_patch, Ydim), torch.nan, device=xc_off_grid.device)
             joint_grid[u_batch_idx, nearest_idx, cumcount_idx] = yc_off_grid
             if used_modality == DataModality.BOTH:
                 joint_grid[s_batch_idx, s_range_idx, -1] = grid_values

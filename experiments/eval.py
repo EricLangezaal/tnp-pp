@@ -91,7 +91,7 @@ def main():
     wandb.run.summary["num_params"] = num_params
 
     if experiment.misc.lightning_eval:
-        lit_model = LitWrapper(model,  val_generator=gen_test)
+        lit_model = LitWrapper(model,  val_generator=gen_test, optimiser=False)
         trainer = pl.Trainer(devices=1)
         trainer.test(model=lit_model, dataloaders=val_loader)
         test_result = {
@@ -125,11 +125,12 @@ def main():
             "std_gt_loglik"
         ]
 
-    if experiment.misc.fake_epochs:
+    if experiment.misc.fake_train_steps is not None:
         for epoch in range(1, experiment.params.epochs + 1):
-            step = epoch * gen_test.num_batches
+            step = epoch * experiment.misc.fake_train_steps
             for key, value in test_result.items():
-                wandb.log({f"val/{key.replace('mean_', '')}": value}, step=step, commit=False)
+                if isinstance(value, torch.Tensor):
+                    wandb.log({f"val/{key.replace('mean_', '')}": value}, step=step, commit=False)
         wandb.log({}, commit=True)            
 
     if isinstance(gen_test, ImageGenerator):

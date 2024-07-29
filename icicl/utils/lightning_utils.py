@@ -80,6 +80,10 @@ class LitWrapper(pl.LightningModule):
         pred_dist = self.pred_fn(self.model, batch)
         loglik = pred_dist.log_prob(batch.yt).sum() / batch.yt[..., 0].numel()
         result["loglik"] = loglik.cpu()
+        
+        if isinstance(self.val_generator, ERA5DataGenerator):
+            rmse = nn.functional.mse_loss(pred_dist.mean, batch.yt).sqrt().cpu()
+            result["rmse"] = self.val_generator.y_std[0] * rmse
 
         if hasattr(batch, "gt_pred") and batch.gt_pred is not None:
             _, _, gt_loglik = batch.gt_pred(

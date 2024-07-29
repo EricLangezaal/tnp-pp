@@ -55,6 +55,6 @@ misc:
   context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
   name: interpolation_baseline-GI=${params.interpolation_factors}-OFFC=${misc.context_info}
   only_plots: False
-  fake_epochs: True
+  fake_train_steps: 500
   logging: True
 
