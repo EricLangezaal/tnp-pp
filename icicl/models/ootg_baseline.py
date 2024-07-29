@@ -26,7 +26,7 @@ class InterpBaselineEncoder(nn.Module):
 
         yts = []
         for xc_b, yc_b, xt_b in zip(xc, yc, xt):
-            interp = LinearNDInterpolator(xc_b, yc_b, fill_value=yc.mean())
+            interp = LinearNDInterpolator(xc_b, yc_b, fill_value=yc_b.mean())
             yts.append(interp(xt_b))
         yt = torch.tensor(np.stack(yts, axis=0), device=xc_on_grid.device)
         return yt

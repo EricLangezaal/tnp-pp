@@ -28,10 +28,10 @@ model:
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.baseline.InterpBaselineEncoder
+  _target_: icicl.models.ootg_baseline.InterpBaselineEncoder
 
 tnpd_decoder:
-  _target_: icicl.models.baseline.IdentityBaselineDecoder
+  _target_: icicl.models.ootg_baseline.IdentityBaselineDecoder
 
 likelihood:
   _target_: icicl.likelihoods.dirac_delta.DeltaLikelihood
