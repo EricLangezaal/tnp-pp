@@ -73,9 +73,7 @@ transformer_encoder:
   num_layers: ${params.num_layers}
   roll_dims: ${params.roll_dims}
   patch_encoder: ${patch_encoder}
-  coarsen_fn: ${coarsen_fn}
   top_k_ctot: ${params.top_k_ctot}
-
 
 mhca_layer:
   _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
@@ -118,12 +116,6 @@ siren_net:
 spherical_harmonics:
   _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
   num_legendre_polys: ${params.num_legendre_polys}
-
-coarsen_fn:
-  _target_: icicl.data.era5.coarsen_grid_era5
-  _partial_: True
-  wrap_longitude: True
-  lon_dim: -1
 
 tnpd_decoder:
   _target_: icicl.models.tnp.TNPDDecoder

@@ -67,7 +67,6 @@ transformer_encoder:
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
   patch_encoder: ${patch_encoder}
-  coarsen_fn: ${coarsen_fn}
   roll_dims: ${params.roll_dims}
   top_k_ctot: ${params.top_k_ctot}
 
@@ -91,12 +90,6 @@ patch_encoder:
   _target_: icicl.networks.patch_encoders.PatchEncoder
   embed_dim: ${params.embed_dim}
   patch_size: ${params.patch_size}
-
-coarsen_fn:
-  _target_: icicl.data.era5.coarsen_grid_era5
-  _partial_: True
-  wrap_longitude: True
-  lon_dim: -1
 
 xy_encoder:
   _target_: icicl.networks.mlp.MLP
