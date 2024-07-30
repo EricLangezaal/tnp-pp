@@ -163,7 +163,7 @@ params:
   num_legendre_polys: 10
 
   top_k_ctot: 9
-  window_sizes: [6, 6]
+  window_sizes: [5, 5]
 
 
 misc:

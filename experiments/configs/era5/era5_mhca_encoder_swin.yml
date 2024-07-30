@@ -144,7 +144,7 @@ params:
   coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
   num_targets: 3000
   min_context_pc: 0.001 # so 1k
-  max_context_pc: 0.02 # max percentage of product of batch_grid_size
+  max_context_pc: 0.002 # max percentage of product of batch_grid_size
 
   embed_dim: 128
   num_heads: 8
@@ -156,7 +156,7 @@ params:
   num_legendre_polys: 10
 
   top_k_ctot: 9
-  window_sizes: [8, 8]
+  window_sizes: [5, 5]
 
 
 misc:

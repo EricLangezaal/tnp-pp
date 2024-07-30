@@ -10,11 +10,11 @@
 
 #! sbatch directives begin here ###############################
 #! Name of the job:
-#SBATCH -J e5lmgct
+#SBATCH -J e5m_swin
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
 #SBATCH -A TURNER-MASTERS-PROJECTS-SL2-GPU
 
-#SBATCH --output=slurm_files/logs/era5_mhca_GridC_tnp_%A.out
+#SBATCH --output=slurm_files/logs/era5_mhca_encoder_swin_%A.out
 
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
@@ -25,7 +25,7 @@
 #! Note that the job submission script will enforce no more than 3 cpus per GPU.
 #SBATCH --gres=gpu:1
 #! How much wallclock time will be required?
-#SBATCH --time=17:00:00
+#SBATCH --time=32:00:00
 
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=NONE
@@ -54,10 +54,10 @@ conda activate tnp
 #! Work directory (i.e. where the job will run):
 workdir="/home/$USER/tnp-pp/"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
                              # in which sbatch is run.
-                           
-ulimit -n 100000
+
+ulimit -n 21000
 #! Your_python your_code, args
-CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_mhca_encoder_GridC_tnp.yml misc.progress_bars=False params.min_context_pc=0.001 params.max_context_pc=0.002"
+CMD="python experiments/lightning_train.py --config experiments/configs/era5/era5_mhca_encoder_swin.yml params.min_context_pc=0.01 params.max_context_pc=0.02  misc.progress_bars=False"
 
 ###############################################################
 ### You should not have to change anything below this line ####
