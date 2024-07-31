@@ -1,0 +1,160 @@
+# Latent Bottlenecked Attention Neural Process
+# only hparam we need to choose is num_latents!
+
+generators:
+  train:
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    distributed: True
+    data_dir: "~/rds/hpc-work/data/era5/train/"
+    data_vars: ["t2m", "skt"]
+    on_grid_vars: [False, True]
+    min_pc: ${params.min_context_pc}
+    max_pc: ${params.max_context_pc}
+    y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
+    y_std: [21.169963472302797, 22.154462898350793]
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    use_time: False
+    lazy_loading: False
+    samples_per_epoch: 8_000
+    batch_size: 16
+    used_modality: ${params.used_modality}
+    num_workers: 32
+  val:
+    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    distributed: True
+    data_dir: "~/rds/hpc-work/data/era5/val/"
+    data_vars: ["t2m", "skt"]
+    on_grid_vars: [False, True]
+    min_pc: ${params.min_context_pc}
+    max_pc: ${params.max_context_pc}
+    y_mean: [279.0644808446564, 279.4750849396393] # calculated on 2019
+    y_std: [21.169963472302797, 22.154462898350793]
+    batch_grid_size: ${params.batch_grid_size}
+    coarsen_factors: ${params.coarsen_factors}
+    max_nt: ${params.num_targets}
+    use_time: False
+    lazy_loading: False
+    store_original_grid: True
+    samples_per_epoch: 2_000
+    batch_size: 16
+    used_modality: ${params.used_modality}
+    num_workers: 24 # i.e. two per month
+
+model:
+  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  encoder: ${lbanp_encoder}
+  decoder: ${lbanp_decoder}
+  likelihood: ${likelihood}
+
+lbanp_encoder:
+  _target_: icicl.models.lbanp.OOTGNestedLBANPEncoder
+  perceiver_encoder: ${perceiver_encoder}
+  xy_encoder: ${xy_encoder}
+  x_encoder: ${siren_net}
+
+perceiver_encoder:
+  _target_: icicl.networks.transformer.NestedPerceiverEncoder
+  num_latents: ${params.num_latents}
+  mhsa_layer: ${mhsa_layer}
+  mhca_ctoq_layer: ${mhca_ctoq_layer}
+  mhca_qtot_layer: ${mhca_qtot_layer}
+  num_layers: ${params.num_layers}
+
+mhsa_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhca_ctoq_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+mhca_qtot_layer:
+  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  embed_dim: ${params.embed_dim}
+  num_heads: ${params.num_heads}
+  head_dim: ${params.head_dim}
+  feedforward_dim: ${params.embed_dim}
+  norm_first: ${params.norm_first}
+
+xy_encoder:
+  _target_: icicl.networks.mlp.MLP
+  # 2 from preprocessing y, ydim, and output of sirennet
+  in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
+  out_dim: ${params.embed_dim}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+siren_net:
+  _target_: icicl.networks.mlp.MLPWithEmbedding
+  embedding: ${spherical_harmonics}
+  in_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  out_dim: ${eval:'${params.num_legendre_polys} ** 2'}
+  num_layers: 2
+  width: ${eval:'${params.num_legendre_polys} ** 2'}
+  ignore_dims: ${params.siren_net_ignore_dims}
+
+spherical_harmonics:
+  _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
+  num_legendre_polys: ${params.num_legendre_polys}
+
+lbanp_decoder:
+  _target_: icicl.models.lbanp.NestedLBANPDecoder
+  z_decoder: ${z_decoder}
+
+z_decoder:
+  _target_: icicl.networks.mlp.MLP
+  in_dim: ${params.embed_dim}
+  out_dim: ${eval:'2 * ${params.dim_y}'}
+  num_layers: 2
+  width: ${params.embed_dim}
+
+likelihood:
+  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+
+optimiser:
+  _target_: torch.optim.AdamW
+  _partial_: True
+  lr: 5.0e-4
+
+params:
+  epochs: 200
+  used_modality: BOTH
+
+  x_dim: 2
+  y_dim: 1
+  
+  batch_grid_size: [1, 721, 1440] # time, lat, lon. Exact 0.25° grid this way.
+  coarsen_factors: [6, 6] # so 120x240 grid, similar to Aardvark. 
+  num_targets: 3000
+  min_context_pc: 0.001 # so 1k+
+  max_context_pc: 0.002 # max percentage of product of batch_grid_size
+
+  embed_dim: 128
+  num_heads: 8
+  head_dim: 16
+  norm_first: True
+  num_layers: 5
+
+  num_latents: 128
+
+  siren_net_ignore_dims: null
+  num_legendre_polys: 10
+
+
+misc:
+  project: era5-dual-modality
+  context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
+  name: LBANP-data=${params.used_modality}-TNP_BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-L=${params.num_latents}-OFFC=${misc.context_info}
+  gradient_clip_val: 0.5
+  plot_interval: 10
+  resume_from_checkpoint: null

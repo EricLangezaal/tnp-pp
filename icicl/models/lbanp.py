@@ -15,6 +15,8 @@ from ..networks.transformer import (
     PerceiverDecoder,
     PerceiverEncoder,
 )
+
+from ..data.on_off_grid import DataModality
 from ..utils.helpers import preprocess_observations
 from .base import ConditionalNeuralProcess, NeuralProcess
 
@@ -41,6 +43,55 @@ class NestedLBANPEncoder(nn.Module):
     ) -> torch.Tensor:
         yc, yt = preprocess_observations(xt, yc)
 
+        zc = torch.cat((xc, yc), dim=-1)
+        zc = self.xy_encoder(zc)
+
+        zt = torch.cat((xt, yt), dim=-1)
+        zt = self.xy_encoder(zt)
+
+        zt = self.perceiver_encoder(zc, zt)
+        return zt
+
+
+class OOTGNestedLBANPEncoder(NestedLBANPEncoder):
+    def __init__(
+            self,
+            x_encoder: nn.Module = nn.Identity(),
+            y_encoder: nn.Module = nn.Identity(),
+            **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.x_encoder = x_encoder
+        self.y_encoder = y_encoder
+
+    @check_shapes(
+        "xc_off_grid: [b, n, dx]", "yc_off_grid: [b, n, dy]", "xc_on_grid: [b, ..., dx]", "yc_on_grid: [b, ..., dy]", "xt: [b, nt, dx]"
+    )
+    def forward(
+        self, 
+        xc_off_grid: torch.Tensor,
+        yc_off_grid: torch.Tensor,
+        xc_on_grid: torch.Tensor,
+        yc_on_grid: torch.Tensor,
+        xt: torch.Tensor,
+        used_modality: DataModality = DataModality.BOTH,
+    ) -> torch.Tensor:
+         # add flag dimensions to all y values
+        yc_off_grid, yt = preprocess_observations(xt, yc_off_grid, on_grid=False)
+        yc_on_grid, _ = preprocess_observations(xt, yc_on_grid, on_grid=True)
+
+        # join modalities and encode (i.e. Sirennet etc)
+        xc = used_modality.get(xc_on_grid, xc_off_grid)
+        xc = self.x_encoder(xc)
+
+        yc = used_modality.get(yc_on_grid, yc_off_grid)
+        yc = self.y_encoder(yc)
+
+        xt = self.x_encoder(xt)
+        yt = self.y_encoder(yt)
+
+        # --- copied from NestedLBANPEncoder ---
         zc = torch.cat((xc, yc), dim=-1)
         zc = self.xy_encoder(zc)
 
