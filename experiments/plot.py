@@ -11,10 +11,10 @@ import torch
 from torch import nn
 
 import wandb
-from icicl.data.base import Batch
-from icicl.data.on_off_grid import OOTGBatch
-from icicl.data.synthetic import SyntheticBatch
-from icicl.utils.experiment_utils import np_pred_fn
+from tnp.data.base import Batch
+from tnp.data.on_off_grid import OOTGBatch
+from tnp.data.synthetic import SyntheticBatch
+from tnp.utils.experiment_utils import np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"

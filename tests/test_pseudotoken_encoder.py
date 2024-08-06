@@ -2,10 +2,10 @@ import torch
 import einops
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
-from icicl.data.on_off_grid import DataModality
-from icicl.utils.grids import unflatten_grid, flatten_grid
-from icicl.networks.grid_encoders import PseudoTokenGridEncoder
-from icicl.networks.attention_layers import MultiHeadCrossAttentionLayer
+from tnp.data.on_off_grid import DataModality
+from tnp.utils.grids import unflatten_grid, flatten_grid
+from tnp.networks.grid_encoders import PseudoTokenGridEncoder
+from tnp.networks.attention_layers import MultiHeadCrossAttentionLayer
 
 
 def test_pt_grid_encoder(dim:int = 1, emb_dim=128):

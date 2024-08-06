@@ -2,15 +2,11 @@ import torch
 
 from plot import plot
 from plot_era5 import plot_era5
-from plot_image import plot_image
-from plot_kolmogorov import plot_kolmogorov
 
-from icicl.data.on_off_grid import RandomOOTGGenerator
-from icicl.utils.data import adjust_num_batches
-from icicl.data.era5 import ERA5DataGenerator
-from icicl.data.image import ImageGenerator
-from icicl.data.kolmogorov import KolmogorovGenerator
-from icicl.utils.experiment_utils import (
+from tnp.data.on_off_grid import RandomOOTGGenerator
+from tnp.utils.data import adjust_num_batches
+from tnp.data.era5 import ERA5DataGenerator
+from tnp.utils.experiment_utils import (
     evaluation_summary,
     initialize_experiment,
     train_epoch,
@@ -67,14 +63,7 @@ def main():
         )
 
         if epoch % experiment.misc.plot_interval == 0:
-            if isinstance(gen_train, ImageGenerator):
-                plot_image(
-                    model=model,
-                    batches=batches,
-                    num_fig=min(5, len(batches)),
-                    name=f"epoch-{epoch:04d}",
-                )
-            elif isinstance(gen_val, ERA5DataGenerator):
+            if isinstance(gen_val, ERA5DataGenerator):
                 plot_era5(
                     model=model,
                     batches=batches,
@@ -85,17 +74,6 @@ def main():
                     name=f"epoch-{epoch:04d}",
                     subplots=False,
                 )
-            elif isinstance(gen_train, KolmogorovGenerator):
-                plot_kolmogorov(
-                    model=model,
-                    batches=batches,
-                    num_fig=min(5, len(batches)),
-                    figsize=(18.0, 5.0),
-                    savefig=False,
-                    logging=False,
-                    subplots=False,
-                )
-            
             elif not isinstance(gen_train, RandomOOTGGenerator):
                 plot(
                     model=model,

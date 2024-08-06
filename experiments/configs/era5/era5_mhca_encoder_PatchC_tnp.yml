@@ -2,7 +2,7 @@
 
 generators:
   train:
-    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    _target_: tnp.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/train/"
     data_vars: ["t2m", "skt"]
@@ -20,7 +20,7 @@ generators:
     batch_size: 16
     num_workers: 32
   val:
-    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    _target_: tnp.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/val/"
     data_vars: ["t2m", "skt"]
@@ -40,26 +40,26 @@ generators:
     num_workers: 24 # i.e. two per month
     
 model:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  _target_: tnp.models.ootg_tnp.OOTG_TNPD
   encoder: ${tnpd_encoder}
   decoder: ${tnpd_decoder}
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
+  _target_: tnp.models.ootg_tnp.OOTG_TNPDEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
   x_encoder: ${siren_net}
 
 grid_encoder: 
-  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
+  _target_: tnp.networks.grid_encoders.PseudoTokenGridEncoder
   grid_shape: ${eval:'(${params.batch_grid_size}[1] // ${params.coarsen_factors}[0], ${params.batch_grid_size}[2] // ${params.coarsen_factors}[1])'}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -67,7 +67,7 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
+  _target_: tnp.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
@@ -76,7 +76,7 @@ transformer_encoder:
   top_k_ctot: ${params.top_k_ctot}
 
 mhca_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -84,7 +84,7 @@ mhca_layer:
   norm_first: ${params.norm_first}
 
 mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -92,12 +92,12 @@ mhsa_layer:
   norm_first: ${params.norm_first}
 
 patch_encoder:
-  _target_: icicl.networks.patch_encoders.PatchEncoder
+  _target_: tnp.networks.patch_encoders.PatchEncoder
   embed_dim: ${params.embed_dim}
   patch_size: ${params.patch_size}
 
 xy_encoder:
-  _target_: icicl.networks.mlp.MLP
+  _target_: tnp.networks.mlp.MLP
   # 2 from preprocessing y, ydim, and output of sirennet
   in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
   out_dim: ${params.embed_dim}
@@ -105,7 +105,7 @@ xy_encoder:
   width: ${params.embed_dim}
 
 siren_net:
-  _target_: icicl.networks.mlp.MLPWithEmbedding
+  _target_: tnp.networks.mlp.MLPWithEmbedding
   embedding: ${spherical_harmonics}
   in_dim: ${eval:'${params.num_legendre_polys} ** 2'}
   out_dim: ${eval:'${params.num_legendre_polys} ** 2'}
@@ -114,22 +114,22 @@ siren_net:
   ignore_dims: ${params.siren_net_ignore_dims}
 
 spherical_harmonics:
-  _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
+  _target_: tnp.networks.embeddings.SphericalHarmonicsEmbedding
   num_legendre_polys: ${params.num_legendre_polys}
 
 tnpd_decoder:
-  _target_: icicl.models.tnp.TNPDDecoder
+  _target_: tnp.models.tnp.TNPDDecoder
   z_decoder: ${z_decoder}
 
 z_decoder:
-  _target_: icicl.networks.mlp.MLP
+  _target_: tnp.networks.mlp.MLP
   in_dim: ${params.embed_dim}
   out_dim: ${eval:'2 * ${params.y_dim}'}
   num_layers: 2
   width: ${params.embed_dim}
 
 likelihood:
-  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+  _target_: tnp.likelihoods.gaussian.HeteroscedasticNormalLikelihood
 
 optimiser:
   _target_: torch.optim.AdamW

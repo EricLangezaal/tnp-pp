@@ -3,7 +3,7 @@
 
 generators:
   train:
-    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    _target_: tnp.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/train/"
     data_vars: ["t2m", "skt"]
@@ -22,7 +22,7 @@ generators:
     used_modality: ${params.used_modality}
     num_workers: 32
   val:
-    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    _target_: tnp.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/val/"
     data_vars: ["t2m", "skt"]
@@ -43,19 +43,19 @@ generators:
     num_workers: 24 # i.e. two per month
 
 model:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  _target_: tnp.models.ootg_tnp.OOTG_TNPD
   encoder: ${lbanp_encoder}
   decoder: ${lbanp_decoder}
   likelihood: ${likelihood}
 
 lbanp_encoder:
-  _target_: icicl.models.lbanp.OOTGNestedLBANPEncoder
+  _target_: tnp.models.lbanp.OOTGNestedLBANPEncoder
   perceiver_encoder: ${perceiver_encoder}
   xy_encoder: ${xy_encoder}
   x_encoder: ${siren_net}
 
 perceiver_encoder:
-  _target_: icicl.networks.transformer.NestedPerceiverEncoder
+  _target_: tnp.networks.transformer.NestedPerceiverEncoder
   num_latents: ${params.num_latents}
   mhsa_layer: ${mhsa_layer}
   mhca_ctoq_layer: ${mhca_ctoq_layer}
@@ -63,7 +63,7 @@ perceiver_encoder:
   num_layers: ${params.num_layers}
 
 mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -71,7 +71,7 @@ mhsa_layer:
   norm_first: ${params.norm_first}
 
 mhca_ctoq_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -79,7 +79,7 @@ mhca_ctoq_layer:
   norm_first: ${params.norm_first}
 
 mhca_qtot_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -87,7 +87,7 @@ mhca_qtot_layer:
   norm_first: ${params.norm_first}
 
 xy_encoder:
-  _target_: icicl.networks.mlp.MLP
+  _target_: tnp.networks.mlp.MLP
   # 2 from preprocessing y, ydim, and output of sirennet
   in_dim: ${eval:'2 + ${params.y_dim} + ${params.num_legendre_polys} ** 2 + ${params.x_dim} - 2'} 
   out_dim: ${params.embed_dim}
@@ -95,7 +95,7 @@ xy_encoder:
   width: ${params.embed_dim}
 
 siren_net:
-  _target_: icicl.networks.mlp.MLPWithEmbedding
+  _target_: tnp.networks.mlp.MLPWithEmbedding
   embedding: ${spherical_harmonics}
   in_dim: ${eval:'${params.num_legendre_polys} ** 2'}
   out_dim: ${eval:'${params.num_legendre_polys} ** 2'}
@@ -104,22 +104,22 @@ siren_net:
   ignore_dims: ${params.siren_net_ignore_dims}
 
 spherical_harmonics:
-  _target_: icicl.networks.embeddings.SphericalHarmonicsEmbedding
+  _target_: tnp.networks.embeddings.SphericalHarmonicsEmbedding
   num_legendre_polys: ${params.num_legendre_polys}
 
 lbanp_decoder:
-  _target_: icicl.models.lbanp.NestedLBANPDecoder
+  _target_: tnp.models.lbanp.NestedLBANPDecoder
   z_decoder: ${z_decoder}
 
 z_decoder:
-  _target_: icicl.networks.mlp.MLP
+  _target_: tnp.networks.mlp.MLP
   in_dim: ${params.embed_dim}
   out_dim: ${eval:'2 * ${params.dim_y}'}
   num_layers: 2
   width: ${params.embed_dim}
 
 likelihood:
-  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+  _target_: tnp.likelihoods.gaussian.HeteroscedasticNormalLikelihood
 
 optimiser:
   _target_: torch.optim.AdamW

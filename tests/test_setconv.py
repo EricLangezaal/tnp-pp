@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from icicl.networks.setconv import SetConvDecoder, SetConvEncoder
+from tnp.networks.setconv import SetConvDecoder, SetConvEncoder
 
 
 @pytest.mark.parametrize("ndim", [1, 2])

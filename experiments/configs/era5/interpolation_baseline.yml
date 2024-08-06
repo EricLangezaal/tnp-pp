@@ -1,7 +1,7 @@
 
 generators:
   val:
-    _target_: icicl.data.era5.ERA5OOTGDataGenerator
+    _target_: tnp.data.era5.ERA5OOTGDataGenerator
     distributed: True
     data_dir: "~/rds/hpc-work/data/era5/val/"
     data_vars: ["t2m", "skt"]
@@ -22,19 +22,19 @@ generators:
     num_workers: 24 # i.e. two per month
 
 model:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  _target_: tnp.models.ootg_tnp.OOTG_TNPD
   encoder: ${tnpd_encoder}
   decoder: ${tnpd_decoder}
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_baseline.InterpBaselineEncoder
+  _target_: tnp.models.ootg_baseline.InterpBaselineEncoder
 
 tnpd_decoder:
-  _target_: icicl.models.ootg_baseline.IdentityBaselineDecoder
+  _target_: tnp.models.ootg_baseline.IdentityBaselineDecoder
 
 likelihood:
-  _target_: icicl.likelihoods.dirac_delta.DeltaLikelihood
+  _target_: tnp.likelihoods.dirac_delta.DeltaLikelihood
 
 params:
   epochs: 200

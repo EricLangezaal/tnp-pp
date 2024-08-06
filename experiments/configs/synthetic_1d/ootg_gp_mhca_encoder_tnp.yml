@@ -1,8 +1,6 @@
-# File inspired from 'efficient-tnpd-synthetic-1d.yml'
-
 generators:
   train:
-    _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
+    _target_: tnp.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_train}
     grid_range: ${params.data_range}
     points_per_unit: ${params.points_per_unit}
@@ -11,7 +9,7 @@ generators:
     batch_size: 16
     deterministic: ${params.deterministic}
   val:
-    _target_: icicl.data.on_off_grid.SyntheticOOTGGenerator
+    _target_: tnp.data.on_off_grid.SyntheticOOTGGenerator
     off_grid_generator: ${generators.off_grid_generator_val}
     grid_range: ${params.data_range}
     points_per_unit: ${params.points_per_unit}
@@ -21,7 +19,7 @@ generators:
     deterministic: ${params.deterministic}
     
   off_grid_generator_train:
-    _target_: icicl.data.gp.RandomScaleGPGenerator
+    _target_: tnp.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
@@ -38,7 +36,7 @@ generators:
     samples_per_epoch: ${generators.train.samples_per_epoch}
     batch_size: ${generators.train.batch_size}
   off_grid_generator_val:
-    _target_: icicl.data.gp.RandomScaleGPGenerator
+    _target_: tnp.data.gp.RandomScaleGPGenerator
     dim: ${params.dim}
     kernel_type: eq
     min_log10_lengthscale: -0.602
@@ -56,26 +54,26 @@ generators:
     batch_size: ${generators.val.batch_size}
 
 model:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPD
+  _target_: tnp.models.ootg_tnp.OOTG_TNPD
   encoder: ${tnpd_encoder}
   decoder: ${tnpd_decoder}
   likelihood: ${likelihood}
 
 tnpd_encoder:
-  _target_: icicl.models.ootg_tnp.OOTG_TNPDEncoder
+  _target_: tnp.models.ootg_tnp.OOTG_TNPDEncoder
   grid_encoder: ${grid_encoder}
   transformer_encoder: ${transformer_encoder}
   xy_encoder: ${xy_encoder}
 
 grid_encoder: 
-  _target_: icicl.networks.grid_encoders.PseudoTokenGridEncoder
+  _target_: tnp.networks.grid_encoders.PseudoTokenGridEncoder
   grid_range: ${params.data_range}
   points_per_unit: ${params.points_per_unit}
   embed_dim: ${params.embed_dim}
   mhca_layer: ${grid_mhca_layer}
 
 grid_mhca_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -83,13 +81,13 @@ grid_mhca_layer:
   norm_first: ${params.norm_first}
 
 transformer_encoder:
-  _target_: icicl.networks.grid_transformer.GridTransformerEncoder
+  _target_: tnp.networks.grid_transformer.GridTransformerEncoder
   mhca_layer: ${mhca_layer}
   mhsa_layer: ${mhsa_layer}
   num_layers: ${params.num_layers}
 
 mhca_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadCrossAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadCrossAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -97,7 +95,7 @@ mhca_layer:
   norm_first: ${params.norm_first}
 
 mhsa_layer:
-  _target_: icicl.networks.attention_layers.MultiHeadSelfAttentionLayer
+  _target_: tnp.networks.attention_layers.MultiHeadSelfAttentionLayer
   embed_dim: ${params.embed_dim}
   num_heads: ${params.num_heads}
   head_dim: ${params.head_dim}
@@ -105,25 +103,25 @@ mhsa_layer:
   norm_first: ${params.norm_first}
 
 xy_encoder:
-  _target_: icicl.networks.mlp.MLP
+  _target_: tnp.networks.mlp.MLP
   in_dim: ${eval:'3 + ${params.dim}'} # two from preprocessing, one from y
   out_dim: ${params.embed_dim}
   num_layers: 2
   width: ${params.embed_dim}
 
 tnpd_decoder:
-  _target_: icicl.models.tnp.TNPDDecoder
+  _target_: tnp.models.tnp.TNPDDecoder
   z_decoder: ${z_decoder}
 
 z_decoder:
-  _target_: icicl.networks.mlp.MLP
+  _target_: tnp.networks.mlp.MLP
   in_dim: ${params.embed_dim}
   out_dim: 2 # 1 for std and 1 for means
   num_layers: 2
   width: ${params.embed_dim}
 
 likelihood:
-  _target_: icicl.likelihoods.gaussian.HeteroscedasticNormalLikelihood
+  _target_: tnp.likelihoods.gaussian.HeteroscedasticNormalLikelihood
 
 optimiser:
   _target_: torch.optim.AdamW

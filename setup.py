@@ -1,11 +1,11 @@
 import setuptools
 
 setuptools.setup(
-    name="icicl",
+    name="tnp",
     version="0.0.1",
-    author="Matthew Ashman",
+    author="Matthew Ashman & Eric Langezaal",
     author_email="mca39@cam.ac.uk",
-    description="In-context In-context Learning",
+    description="Dual modality PT-TNPs",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

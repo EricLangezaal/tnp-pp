@@ -1,7 +1,7 @@
 import torch
 
-from icicl.networks.attention_layers import MultiHeadSelfAttentionLayer
-from icicl.networks.transformer import TransformerEncoder
+from tnp.networks.attention_layers import MultiHeadSelfAttentionLayer
+from tnp.networks.transformer import TransformerEncoder
 
 
 def test_transformer():

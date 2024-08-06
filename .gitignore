@@ -1,8 +1,10 @@
 /data/
 lightning_logs
 checkpoints
-slurm_files/logs/
+slurm_files
 wandb
+
+tryout.ipynb
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

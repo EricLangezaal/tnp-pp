@@ -1,17 +1,14 @@
 import lightning.pytorch as pl
 import torch
+
 from plot import plot
 from plot_era5 import plot_era5
-from plot_image import plot_image
-from plot_kolmogorov import plot_kolmogorov
 
-from icicl.data.on_off_grid import RandomOOTGGenerator
-from icicl.data.era5 import ERA5DataGenerator
-from icicl.data.image import ImageGenerator
-from icicl.data.kolmogorov import KolmogorovGenerator
-from icicl.utils.data import adjust_num_batches
-from icicl.utils.experiment_utils import initialize_experiment
-from icicl.utils.lightning_utils import LitWrapper
+from tnp.data.on_off_grid import RandomOOTGGenerator
+from tnp.data.era5 import ERA5DataGenerator
+from tnp.utils.data import adjust_num_batches
+from tnp.utils.experiment_utils import initialize_experiment
+from tnp.utils.lightning_utils import LitWrapper
 
 
 def main():
@@ -40,17 +37,7 @@ def main():
         prefetch_factor=4 if gen_val.num_workers > 1 else None,
     )
 
-    if isinstance(gen_val, ImageGenerator):
-
-        def plot_fn(model, batches, name):
-            plot_image(
-                model=model,
-                batches=batches,
-                num_fig=min(5, len(batches)),
-                name=name,
-            )
-
-    elif isinstance(gen_val, ERA5DataGenerator):
+    if isinstance(gen_val, ERA5DataGenerator):
                 
         def plot_fn(model, batches, name):
                 plot_era5(
@@ -63,18 +50,6 @@ def main():
                     name=name,
                     subplots=False,
                 )
-
-    elif isinstance(gen_val, KolmogorovGenerator):
-
-        def plot_fn(model, batches, name):
-            plot_kolmogorov(
-                model=model,
-                batches=batches,
-                num_fig=min(5, len(batches)),
-                figsize=(18.0, 5.0),
-                subplots=True,
-                name=name,
-            )
     elif isinstance(gen_val, RandomOOTGGenerator):
         plot_fn = None
     else:

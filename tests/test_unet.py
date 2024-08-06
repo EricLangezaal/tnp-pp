@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from icicl.networks.cnn import UNet
+from tnp.networks.cnn import UNet
 
 
 @pytest.mark.parametrize("ndim", [1, 2])

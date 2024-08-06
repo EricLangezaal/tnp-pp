@@ -11,9 +11,9 @@ import torch
 from torch import nn
 
 import wandb
-from icicl.data.on_off_grid import OOTGBatch
-from icicl.utils.grids import flatten_grid
-from icicl.utils.experiment_utils import np_pred_fn
+from tnp.data.on_off_grid import OOTGBatch
+from tnp.utils.grids import flatten_grid
+from tnp.utils.experiment_utils import np_pred_fn
 
 matplotlib.rcParams["mathtext.fontset"] = "stix"
 matplotlib.rcParams["font.family"] = "STIXGeneral"

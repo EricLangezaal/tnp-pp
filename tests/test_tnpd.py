@@ -1,11 +1,11 @@
 import pytest
 import torch
 
-from icicl.likelihoods.gaussian import NormalLikelihood
-from icicl.models.tnp import TNPD, EfficientTNPDEncoder, TNPDDecoder, gen_tnpd_mask
-from icicl.networks.attention_layers import MultiHeadCrossAttentionLayer
-from icicl.networks.mlp import MLP
-from icicl.networks.transformer import TNPDTransformerEncoder
+from tnp.likelihoods.gaussian import NormalLikelihood
+from tnp.models.tnp import TNPD, TNPDEncoder, TNPDDecoder
+from tnp.networks.attention_layers import MultiHeadCrossAttentionLayer
+from tnp.networks.mlp import MLP
+from tnp.networks.transformer import TNPDTransformerEncoder
 
 
 @pytest.mark.parametrize("ndim", [1, 2])
@@ -39,7 +39,7 @@ def test_tnpd(ndim: int):
     xy_encoder = MLP(dy + ndim + 1, embed_dim, num_layers=2, width=64)
     z_decoder = MLP(embed_dim, dy, num_layers=2, width=64)
 
-    tnpd_encoder = EfficientTNPDEncoder(
+    tnpd_encoder = TNPDEncoder(
         transformer_encoder=transformer_encoder, xy_encoder=xy_encoder
     )
     tnpd_decoder = TNPDDecoder(z_decoder=z_decoder)
@@ -48,29 +48,3 @@ def test_tnpd(ndim: int):
     tnpd = TNPD(encoder=tnpd_encoder, decoder=tnpd_decoder, likelihood=likelihood)
 
     tnpd(xc, yc, xt)
-
-
-def test_gen_tnpd_mask():
-    nc = 2
-    nt = 3
-    m = 2
-    ndim = 1
-
-    xc = torch.randn(m, nc, ndim)
-    xt = torch.randn(m, nt, ndim)
-    mask = gen_tnpd_mask(xc, xt)
-
-    for mask_ in mask:
-        for i in range(nc):
-            for j in range(nc):
-                assert mask_[i, j] == False
-
-            for j in range(nt):
-                assert mask_[i, nc + j] == True
-
-        for i in range(nt):
-            for j in range(nc):
-                assert mask_[nc + i, j] == False
-
-            for j in range(nt):
-                assert mask_[nc + i, nc + j] == True

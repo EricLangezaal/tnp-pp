@@ -1,7 +1,7 @@
 import pytest
 from tqdm.auto import tqdm
 
-from icicl.data.gp import RandomScaleGPGenerator
+from tnp.data.gp import RandomScaleGPGenerator
 
 
 @pytest.mark.parametrize(

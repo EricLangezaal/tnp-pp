@@ -1,8 +1,8 @@
 import pytest
 from tqdm.auto import tqdm
 
-from icicl.data.gp import RandomScaleGPGenerator, RandomScaleGPGeneratorBimodalInput
-from icicl.data.synthetic import SyntheticGeneratorMixture
+from tnp.data.gp import RandomScaleGPGenerator, RandomScaleGPGeneratorBimodalInput
+from tnp.data.synthetic import SyntheticGeneratorMixture
 
 
 def test_mixture():

@@ -1,10 +1,10 @@
 import torch
 
-from icicl.networks.attention_layers import (
+from tnp.networks.attention_layers import (
     MultiHeadCrossAttentionLayer,
     MultiHeadSelfAttentionLayer,
 )
-from icicl.networks.transformer import (
+from tnp.networks.transformer import (
     NestedPerceiverEncoder,
     PerceiverDecoder,
     PerceiverEncoder,

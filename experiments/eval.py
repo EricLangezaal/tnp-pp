@@ -2,16 +2,12 @@ import lightning.pytorch as pl
 import torch
 from plot import plot
 from plot_era5 import plot_era5
-from plot_image import plot_image
-from plot_kolmogorov import plot_kolmogorov
 
 import wandb
-from icicl.data.era5 import ERA5DataGenerator
-from icicl.data.image import ImageGenerator
-from icicl.data.kolmogorov import KolmogorovGenerator
-from icicl.utils.data import adjust_num_batches
-from icicl.utils.experiment_utils import initialize_evaluation, val_epoch
-from icicl.utils.lightning_utils import LitWrapper
+from tnp.data.era5 import ERA5DataGenerator
+from tnp.utils.data import adjust_num_batches
+from tnp.utils.experiment_utils import initialize_evaluation, val_epoch
+from tnp.utils.lightning_utils import LitWrapper
 
 
 def main():
@@ -37,18 +33,7 @@ def main():
 
         eval_name = wandb.run.name + "/" + eval_name
 
-        if isinstance(gen_test, ImageGenerator):
-            plot_image(
-                model=model,
-                batches=batches,
-                num_fig=min(experiment.misc.num_plots, len(batches)),
-                figsize=(6, 6),
-                name=eval_name,
-                subplots=experiment.misc.subplots,
-                savefig=experiment.misc.savefig,
-                logging=experiment.misc.logging,
-            )
-        elif isinstance(gen_test, ERA5DataGenerator):
+        if isinstance(gen_test, ERA5DataGenerator):
             plot_era5(
                 model=model,
                 batches=batches,
@@ -60,19 +45,6 @@ def main():
                 subplots=experiment.misc.subplots,
                 savefig=experiment.misc.savefig,
                 logging=experiment.misc.logging,
-            )
-        elif isinstance(gen_test, KolmogorovGenerator):
-            plot_kolmogorov(
-                model=model,
-                batches=batches,
-                num_fig=min(experiment.misc.num_plots, len(batches)),
-                figsize=(5.0, 5.0),
-                name=eval_name,
-                # plot_dims=(0, 1),
-                # other_dim_slice=0,
-                savefig=experiment.misc.savefig,
-                logging=experiment.misc.logging,
-                subplots=experiment.misc.subplots,
             )
         else:
             plot(
@@ -131,14 +103,7 @@ def main():
             wandb.log({f"val/rmse": test_result["rmse"]}, step=step, commit=False)
         wandb.log({}, commit=True)            
 
-    if isinstance(gen_test, ImageGenerator):
-        plot_image(
-            model=model,
-            batches=batches,
-            num_fig=min(experiment.misc.num_plots, len(batches)),
-            name=f"test/{eval_name}",
-        )
-    elif isinstance(gen_test, ERA5DataGenerator):
+    if isinstance(gen_test, ERA5DataGenerator):
         plot_era5(
             model=model,
             batches=batches,
@@ -150,16 +115,6 @@ def main():
             subplots=experiment.misc.subplots,
             savefig=experiment.misc.savefig,
             logging=experiment.misc.logging,
-        )
-    elif isinstance(gen_test, KolmogorovGenerator):
-        plot_kolmogorov(
-            model=model,
-            batches=batches,
-            num_fig=min(experiment.misc.num_plots, len(batches)),
-            figsize=(18.0, 5.0),
-            savefig=experiment.misc.savefig,
-            logging=experiment.misc.logging,
-            subplots=experiment.misc.subplots,
         )
     else:
         plot(

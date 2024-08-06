@@ -1,6 +1,6 @@
 import torch
 
-from icicl.networks.attention import MultiHeadCrossAttention, MultiHeadSelfAttention
+from tnp.networks.attention import MultiHeadCrossAttention, MultiHeadSelfAttention
 
 
 def test_mhsa():
