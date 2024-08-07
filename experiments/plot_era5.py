@@ -2,6 +2,7 @@ import copy
 import os
 from typing import Callable, List, Tuple
 
+import numpy as np
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib
@@ -149,11 +150,18 @@ def plot_era5(
             diff_args["s"] = figsize[1] + 1.5
             std_args = grid_args | {"vmin": pred_std_grid.min(), "vmax": pred_std_grid.max()}
 
+            divnorm=colors.TwoSlopeNorm(vmin=diff_grid_norm.min(), vcenter=0, vmax=diff_grid_norm.max())
+            cmap = truncate_colormap(plt.get_cmap("seismic"), 
+                                     0.5 - diff_grid_norm.min() / diff_grid.min(), 
+                                     0.5 + diff_grid_norm.max() / diff_grid.max())
+            norm_diff_args = diff_args | {"norm":divnorm, "cmap": cmap}
+
+
             for fig_name, x_plot, y_plot, sargs, in zip(
                 ("Target predictions", "Target true values", "Off grid context", "Global predicted average", "Global true values", "Global error", "Global predicted uncertainty", "Normalised global error"),
                 (xt, xt, xc_off_grid, x_grid, x_grid, x_grid, x_grid, x_grid),
                 (pred_mean_t, yt, yc_off_grid, pred_mean_grid, y_grid, diff_grid, pred_std_grid, diff_grid_norm),
-                (scatter_kwargs, scatter_kwargs, scatter_kwargs | {"s": 5}, grid_args, grid_args, diff_args, std_args, diff_args),
+                (scatter_kwargs, scatter_kwargs, scatter_kwargs | {"s": 5}, grid_args, grid_args, diff_args, std_args, norm_diff_args),
             ):
                 fig = plt.figure(figsize=figsize, dpi=100)
 
@@ -175,7 +183,7 @@ def plot_era5(
                 # Add colourbar.
                 if colorbar:
                     cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.07)
-                    cbar.ax.set_title("K")
+                    cbar.ax.set_title("Z" if sargs is norm_diff_args else "K")
                     cbar.solids.set(alpha=1)
 
                 plt.tight_layout()
@@ -191,3 +199,10 @@ def plot_era5(
                     plt.show()
 
                 plt.close()
+
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=1000):
+    new_cmap = colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap

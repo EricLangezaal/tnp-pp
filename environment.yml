@@ -80,7 +80,6 @@ dependencies:
       - h5py==3.11.0
       - hiyapyco==0.5.5
       - hydra-core==1.3.2
-      - icicl==0.0.1
       - idna==3.4
       - importlib-metadata==8.0.0
       - importlib-resources==6.1.0

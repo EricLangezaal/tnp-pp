@@ -307,11 +307,11 @@ def create_default_config() -> DictConfig:
             "savefig": False,
             "subplots": False,
             "loss_fn": {
-                "_target_": "icicl.utils.experiment_utils.np_loss_fn",
+                "_target_": "tnp.utils.experiment_utils.np_loss_fn",
                 "_partial_": True,
             },
             "pred_fn": {
-                "_target_": "icicl.utils.experiment_utils.np_pred_fn",
+                "_target_": "tnp.utils.experiment_utils.np_pred_fn",
                 "_partial_": True,
             },
         }
