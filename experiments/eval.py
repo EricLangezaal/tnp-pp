@@ -29,7 +29,7 @@ def main():
     if experiment.misc.only_plots:
         gen_test.batch_size = 1
         gen_test.num_batches = experiment.misc.num_plots
-        _, batches = val_epoch(model=model, generator=gen_test)
+        _, batches = val_epoch(model=model, generator=val_loader)
 
         eval_name = wandb.run.name + "/" + eval_name
 

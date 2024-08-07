@@ -466,7 +466,8 @@ def initialize_evaluation() -> DictConfig:
 
     # Set model to run.config.model.
     if args.run_path is not None:
-        config.model = run.config["model"]
+        #config.model = run.config["model"]
+        pass
 
     # Set random seed.
     pl.seed_everything(config.misc.seed)
