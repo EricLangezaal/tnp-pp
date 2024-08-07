@@ -152,8 +152,8 @@ def plot_era5(
 
             divnorm=colors.TwoSlopeNorm(vmin=diff_grid_norm.min(), vcenter=0, vmax=diff_grid_norm.max())
             cmap = truncate_colormap(plt.get_cmap("seismic"), 
-                                     0.5 - diff_grid_norm.min() / diff_grid.min(), 
-                                     0.5 + diff_grid_norm.max() / diff_grid.max())
+                                     0.5 - 0.5 * diff_grid_norm.min() / diff_grid.min(), 
+                                     0.5 + 0.5 * diff_grid_norm.max() / diff_grid.max())
             norm_diff_args = diff_args | {"norm":divnorm, "cmap": cmap}
 
 

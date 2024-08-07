@@ -31,7 +31,7 @@ def main():
         gen_test.num_batches = experiment.misc.num_plots
         _, batches = val_epoch(model=model, generator=val_loader)
 
-        eval_name = wandb.run.name + "/" + eval_name
+        eval_name = "test2/" + eval_name
 
         if isinstance(gen_test, ERA5DataGenerator):
             plot_era5(
