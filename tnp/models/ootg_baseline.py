@@ -1,4 +1,4 @@
-from scipy.interpolate import LinearNDInterpolator, interpn
+from scipy.interpolate import griddata, interpn
 import numpy as np
 import torch
 from torch import nn
@@ -37,8 +37,8 @@ class InterpBaselineEncoder(nn.Module):
         yt_off = []
         yt_on = []
         for bxc_off, byc_off, bxc_on, byc_on, bxt in zip(xc_off_grid, yc_off_grid, xc_on_grid, yc_on_grid, xt):
-            off_interp = LinearNDInterpolator(bxc_off, byc_off, fill_value=byc_off.mean())
-            yt_off.append(off_interp(bxt))
+            off_interp = griddata(bxc_off, byc_off, bxt, fill_value=byc_off.mean())
+            yt_off.append(off_interp)
 
             on_interp = interpn((bxc_on[:, 0, 0], bxc_on[0, :, 1]), byc_on, bxt, 
                                 bounds_error=False, fill_value=byc_on.mean())
