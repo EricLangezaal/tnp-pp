@@ -18,7 +18,7 @@ class CustomDelta(td.Distribution):
         return torch.zeros_like(self.output)
     
     def log_prob(self, value):
-       return nn.functional.mse_loss(self.output, value, reduction='none').sqrt()
+       return nn.functional.mse_loss(self.output, value, reduction='none')
 
 
 class DeltaLikelihood(Likelihood):
