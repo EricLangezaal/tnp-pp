@@ -76,7 +76,7 @@ params:
 misc:
   project: era5-dual-modality
   context_info: ${eval:'int(${params.min_context_pc} * 1000)'}-${eval:'int(${params.max_context_pc} * 1000)'}k
-  name: baseline-BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-data=${params.used_modality}-OFFC=${misc.context_info}
+  name: baseline-mix-prop-BGS=${params.batch_grid_size}_CF=${params.coarsen_factors}-data=${params.used_modality}-OFFC=${misc.context_info}
   only_plots: False
   # fake_train_steps: 500
   gradient_clip_val: 0.5
