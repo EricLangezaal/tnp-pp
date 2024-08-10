@@ -58,7 +58,7 @@ likelihood:
 optimiser:
   _target_: torch.optim.AdamW
   _partial_: True
-  lr: 5.0e-7
+  lr: 5.0e-4
 
 params:
   epochs: 200
