@@ -12,7 +12,7 @@ class InterpBaselineEncoder(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.mix_layer = MLP(2, 1, bias=False, layers=tuple())
+        self.mix_prop_logit = torch.nn.Parameter(torch.tensor(0.0))
 
     def forward(
         self, 
@@ -44,9 +44,11 @@ class InterpBaselineEncoder(nn.Module):
                                 bounds_error=False, fill_value=byc_on.mean())
             yt_on.append(on_interp)
 
-        yt = np.concatenate((np.stack(yt_off, axis=0), np.stack(yt_on, axis=0)), axis=-1)
-        yt = torch.tensor(yt, dtype=torch.float32, device=device)
-        yt = self.mix_layer(yt)
+        yt_off = torch.tensor(np.stack(yt_off, axis=0), dtype=torch.float32, device=device)
+        yt_on = torch.tensor(np.stack(yt_on, axis=0), dtype=torch.float32, device=device)
+        mix_prop = nn.functional.sigmoid(self.mix_prop_logit)
+
+        yt = mix_prop * yt_off + (1 - mix_prop) * yt_on
         return yt
         
 

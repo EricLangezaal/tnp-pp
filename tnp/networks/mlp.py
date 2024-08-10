@@ -26,6 +26,7 @@ class MLP(nn.Module):
         self,
         in_dim: int,
         out_dim: int,
+        bias: bool = True,
         layers: Optional[Tuple[int, ...]] = None,
         num_layers: Optional[int] = None,
         width: Optional[int] = None,
@@ -47,14 +48,14 @@ class MLP(nn.Module):
 
         # Build layers.
         if len(layers) == 0:
-            self.net = nn.Linear(in_dim, out_dim, dtype=dtype)
+            self.net = nn.Linear(in_dim, out_dim, bias=bias, dtype=dtype)
         else:
-            net = [nn.Linear(in_dim, layers[0], dtype=dtype)]
+            net = [nn.Linear(in_dim, layers[0], bias=bias, dtype=dtype)]
             for i in range(1, len(layers)):
                 net.append(nonlinearity)
-                net.append(nn.Linear(layers[i - 1], layers[i], dtype=dtype))
+                net.append(nn.Linear(layers[i - 1], layers[i], bias=bias, dtype=dtype))
             net.append(nonlinearity)
-            net.append(nn.Linear(layers[-1], out_dim, dtype=dtype))
+            net.append(nn.Linear(layers[-1], out_dim, bias=bias, dtype=dtype))
             self.net = nn.Sequential(*net)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
