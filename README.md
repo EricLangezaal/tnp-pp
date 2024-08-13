@@ -3,7 +3,7 @@
 This framework contains all relevant Python code for the experiments conducted in the thesis '{On, Off}-The-Grid Data Modelling Using Transformer Neural Processes' by Eric Langezaal. This framework is largely based on a codebase for TNPs developed by my supervisor Matthew Ashman, a public version of which is available [here](https://github.com/cambridge-mlg/tnp). 
 
 > [!NOTE]
-> See [{On, Off}-The-Grid Data Modelling Using Transformer Neural Processes]() for a more detailed explanation of this research.
+> See [{On, Off}-The-Grid Data Modelling Using Transformer Neural Processes]()(T.B.A.) for a more detailed explanation of this research.
 
 ## Requirements and installation
 The environment can either be installed using the Conda environment file, or through the Pip requirements file. To install the environment using Conda:
